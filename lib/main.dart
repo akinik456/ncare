@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'core/device_state_manager.dart';
 import 'core/setup_manager.dart';
+import 'features/setup/setup_screen.dart';
+import 'features/home/home_screen.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
