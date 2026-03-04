@@ -1,0 +1,61 @@
+import 'dart:async';
+
+import 'package:geolocator/geolocator.dart' as geo;
+import 'package:permission_handler/permission_handler.dart';
+
+class DeviceStateManager {
+  DeviceStateManager._();
+  static final DeviceStateManager instance = DeviceStateManager._();
+
+  final _readyController = StreamController<bool>.broadcast();
+
+  bool _isReady = false;
+  Timer? _ticker;
+  StreamSubscription<geo.ServiceStatus>? _gpsSub;
+
+  bool get isReady => _isReady;
+
+  // Stream last value first, then updates
+  Stream<bool> get readyStream async* {
+    yield _isReady;
+    yield* _readyController.stream;
+  }
+
+  void start() {
+    _ticker?.cancel();
+    _gpsSub?.cancel();
+
+    // Initial check
+    _checkState();
+
+    // GPS on/off changes
+    _gpsSub = geo.Geolocator.getServiceStatusStream().listen((_) {
+      _checkState();
+    });
+
+    // Safety polling (OEM devices etc.)
+    _ticker = Timer.periodic(const Duration(seconds: 2), (_) => _checkState());
+  }
+
+  Future<void> recheckNow() async => _checkState();
+
+  Future<void> requestPermissions() async {
+    // While-in-use first
+    await Permission.location.request();
+    // Then always (may open settings flow depending on device)
+    await Permission.locationAlways.request();
+  }
+
+  Future<void> _checkState() async {
+    final perm = await Permission.locationAlways.status;
+    final gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
+
+    _updateReady(perm.isGranted && gpsEnabled);
+  }
+
+  void _updateReady(bool value) {
+    if (_isReady == value) return;
+    _isReady = value;
+    _readyController.add(_isReady);
+  }
+}

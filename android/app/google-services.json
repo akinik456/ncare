@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "809224944285",
+    "project_id": "ncare-5ad1f",
+    "storage_bucket": "ncare-5ad1f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:809224944285:android:450e44587a9096bc8f7274",
+        "android_client_info": {
+          "package_name": "com.example.ncare"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB0fT04mUFhkz2H5Si5C9W8NO6ByhEolP4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
