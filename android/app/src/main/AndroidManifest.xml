@@ -2,6 +2,8 @@
 <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <application
         android:label="ncare"
         android:name="${applicationName}"
@@ -33,6 +35,20 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+		<meta-data
+		android:name="com.google.firebase.messaging.default_notification_channel_id"
+		android:value="ncare_default_channel" />
+		<service
+			android:name=".NcareMessagingService"
+			android:exported="false">
+			<intent-filter>
+				<action android:name="com.google.firebase.MESSAGING_EVENT" />
+			</intent-filter>
+		</service>	
+		<service
+			android:name=".NcareForegroundService"
+			android:exported="false"
+			android:foregroundServiceType="location"/>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

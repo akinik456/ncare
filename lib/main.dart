@@ -1,20 +1,88 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart';
+
 import 'core/device_state_manager.dart';
 import 'core/setup_manager.dart';
 import 'features/setup/setup_screen.dart';
 import 'features/home/home_screen.dart';
 
+import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'firebase_options.dart';
+
+
+
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
   // Start device state (permission + gps watcher)
   DeviceStateManager.instance.start();
-
   final setupDone = await SetupManager.isSetupDone();
-
+  
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  await FirebaseMessaging.instance.subscribeToTopic('test');
+  print("SUBSCRIBED => test");  
   runApp(NCareApp(setupDone: setupDone));
 }
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // 0) init
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  final data = message.data;
+  final type = data['type'];
+  final requestId = data['requestId'];
+
+  if (type != 'rl' || requestId == null) return;
+
+  try {
+    final gpsOn = await Geolocator.isLocationServiceEnabled();
+    if (!gpsOn) {
+      await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
+        'status': 'gps_off',
+        'ts': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      return;
+    }
+
+    final perm = await Permission.locationAlways.status;
+    if (!perm.isGranted) {
+      await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
+        'status': 'permission_missing',
+        'ts': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      return;
+    }
+
+    final pos = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+      timeLimit: const Duration(seconds: 20),
+    );
+
+    await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
+      'status': 'ok',
+      'lat': pos.latitude,
+      'lng': pos.longitude,
+      'acc': pos.accuracy,
+      'ts': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    print("BG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
+  } catch (e) {
+    await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
+      'status': 'error',
+      'error': e.toString(),
+      'ts': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+}
+  
 
 class NCareApp extends StatelessWidget {
   final bool setupDone;
@@ -31,107 +99,5 @@ class NCareApp extends StatelessWidget {
   }
 }
 
-class SetupScreen extends StatelessWidget {
-  const SetupScreen({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('NCare Setup')),
-      body: Center(
-        child: StreamBuilder<bool>(
-          initialData: DeviceStateManager.instance.isReady,
-          stream: DeviceStateManager.instance.readyStream,
-          builder: (context, snapshot) {
-            final ready = snapshot.data ?? false;
 
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  ready ? "DEVICE READY ✅" : "DEVICE NOT READY ❌",
-                  style: const TextStyle(fontSize: 22),
-                ),
-                const SizedBox(height: 14),
-
-                if (!ready) const Text("Konum izni ve GPS gerekli."),
-
-                const SizedBox(height: 18),
-
-                ElevatedButton(
-                  onPressed: () async {
-                    await DeviceStateManager.instance.requestPermissions();
-                    // state zaten auto refresh, ama hızlı update için:
-                    await DeviceStateManager.instance.recheckNow();
-                  },
-                  child: const Text("İzinleri kontrol et"),
-                ),
-
-                const SizedBox(height: 14),
-
-                if (ready)
-                  ElevatedButton(
-                    onPressed: () async {
-                      await SetupManager.setSetupDone();
-                      if (!context.mounted) return;
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (_) => const HomeScreen()),
-                      );
-                    },
-                    child: const Text("Kurulumu tamamla"),
-                  ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('NCare')),
-      body: Center(
-        child: StreamBuilder<bool>(
-          initialData: DeviceStateManager.instance.isReady,
-          stream: DeviceStateManager.instance.readyStream,
-          builder: (context, snapshot) {
-            final ready = snapshot.data ?? false;
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  ready ? "READY ✅" : "NOT READY ❌",
-                  style: const TextStyle(fontSize: 26),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  ready
-                      ? "NCare running"
-                      : "GPS kapalı veya izin eksik.\nSetup ekranına dön.",
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 18),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (_) => const SetupScreen()),
-                    );
-                  },
-                  child: const Text("Setup"),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}

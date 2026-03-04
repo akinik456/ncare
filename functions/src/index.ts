@@ -11,7 +11,6 @@ export const onRequestCreated = onDocumentCreated(
 
     await admin.messaging().send({
       topic: "test",
-      notification: { title: "NCARE", body: `RL ${requestId}` },
       data: { type: "rl", requestId },
       android: { priority: "high" },
     });

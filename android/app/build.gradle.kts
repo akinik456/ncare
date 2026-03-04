@@ -17,6 +17,9 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+	dependencies {
+		implementation("com.google.firebase:firebase-messaging:23.4.1")
+	}
 
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_17.toString()
