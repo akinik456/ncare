@@ -2,6 +2,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'add_locator_screen.dart';
 
 class RequesterScreen extends StatefulWidget {
   const RequesterScreen({super.key});
@@ -14,6 +15,7 @@ class _RequesterScreenState extends State<RequesterScreen> {
   String? _lastRequestId;
   String? _lastAddress;
   String? _lastAddressKey;
+  String _locatorName ='Locator';
 
   Future<void> _sendRequest() async {
     final doc = await FirebaseFirestore.instance.collection('requests').add({
@@ -84,6 +86,16 @@ class _RequesterScreenState extends State<RequesterScreen> {
 		    
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+			  ElevatedButton(
+				  onPressed: () {
+					Navigator.push(
+					  context,
+					  MaterialPageRoute(builder: (_) => const AddLocatorScreen()),
+					);
+				  },
+				  child: const Text('Add locator'),
+				),
+			
               ElevatedButton(
                 onPressed: _sendRequest,
                 child: const Text('Request Location'),
@@ -125,11 +137,42 @@ class _RequesterScreenState extends State<RequesterScreen> {
 					  return Column(
 					  
 						children: [
-						  const Text("Locator",
-						  style:TextStyle(fontSize:18,fontWeight:FontWeight.w600),
-						  ),
-						  const SizedBox(height:8),
+						  
 							if (_lastAddress != null) ...[
+							StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+  stream: FirebaseFirestore.instance
+      .collection('requesters')
+      .doc('default')
+      .collection('locators')
+      .where('active', isEqualTo: true)
+      .orderBy('createdAt', descending: true)
+      .limit(1)
+      .snapshots(),
+  builder: (context, snap) {
+    if (snap.hasData && snap.data!.docs.isNotEmpty) {
+      final newName =
+          (snap.data!.docs.first.data()['name'] ?? 'Locator').toString();
+
+      if (newName.isNotEmpty && newName != _locatorName) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            setState(() {
+              _locatorName = newName;
+            });
+          }
+        });
+      }
+    }
+
+    return Text(
+      _locatorName,
+      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+      textAlign: TextAlign.center,
+    );
+  },
+),
+const SizedBox(height: 8),
+							
 							  Text(
 								'📍 $_lastAddress',
 								textAlign: TextAlign.center,
