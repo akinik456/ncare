@@ -5,6 +5,9 @@ import 'core/device_state_manager.dart';
 import 'core/setup_manager.dart';
 import 'features/setup/setup_screen.dart';
 import 'features/home/home_screen.dart';
+import 'core/role_manager.dart';
+import 'features/role/role_screen.dart';
+import 'core/locator_ui_state.dart';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -33,14 +36,20 @@ Future<void> main() async {
       .then((_) => print("SUBSCRIBED => test"))
       .catchError((e) => print("SUBSCRIBE ERR => $e"));
 
+  print("APP_START");
   DeviceStateManager.instance.start();
   final setupDone = await SetupManager.isSetupDone();
-  
+  print("SETUP CHECK DONE");
   FirebaseMessaging.onMessage.listen((message) async {
   final data = message.data;
+
   if (data['type'] != 'rl') return;
-  final requestId = data['requestId'];
-  if (requestId == null) return;
+
+  final requestId = data['requestId']?.toString();
+  if (requestId == null || requestId.isEmpty) return;
+
+  // UI: request geldi (app açıkken)
+  LocatorUiState.instance.onRequestReceived(requestId);
 
   try {
     final pos = await Geolocator.getCurrentPosition(
@@ -57,6 +66,9 @@ Future<void> main() async {
       'via': 'fg',
     }, SetOptions(merge: true));
 
+    // UI: gönderildi
+    LocatorUiState.instance.onSentOk();
+
     print("FG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
   } catch (e) {
     await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
@@ -65,6 +77,9 @@ Future<void> main() async {
       'ts': FieldValue.serverTimestamp(),
       'via': 'fg',
     }, SetOptions(merge: true));
+
+    // UI: hata olursa tekrar READY'ye dön (şimdilik)
+    LocatorUiState.instance.reset();
   }
 });
   
@@ -139,7 +154,25 @@ class NCareApp extends StatelessWidget {
       debugShowCheckedModeBanner: true,
       title: 'NCare',
       theme: ThemeData(useMaterial3: true),
-      home: setupDone ? const HomeScreen() : const SetupScreen(),
+      home: setupDone
+    ? FutureBuilder(
+        future: RoleManager.getRole(),
+        builder: (context, snapshot) {
+  if (snapshot.connectionState != ConnectionState.done) {
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  final role = snapshot.data; // null olabilir
+
+  if (role == "locator") return const HomeScreen();
+  if (role == "requester") return const RequesterScreen();
+
+  return const RoleScreen();
+},
+      )
+    : const SetupScreen(),
     );
   }
 }

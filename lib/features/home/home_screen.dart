@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 import '../../core/device_state_manager.dart';
 import '../../core/setup_manager.dart';
 import '../setup/setup_screen.dart';
+import '../../core/locator_ui_state.dart';
+import '../../core/device_state_manager.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+  
+  
     return Scaffold(
       appBar: AppBar(title: const Text('NCare')),
       body: Center(

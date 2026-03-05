@@ -16,3 +16,4 @@ adb logcat | findstr flutter
 veya bizim tag’ler için:
 
 adb logcat | findstr NCARE
+
