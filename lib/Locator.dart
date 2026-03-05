@@ -18,60 +18,16 @@ import 'features/requester/requester_screen.dart';
 
 
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  FirebaseMessaging.instance
-      .subscribeToTopic('test')
-      .timeout(const Duration(seconds: 5))
-      .then((_) => print("SUBSCRIBED => test"))
-      .catchError((e) => print("SUBSCRIBE ERR => $e"));
-
+void main() async {
+  // Start device state (permission + gps watcher)
   DeviceStateManager.instance.start();
   final setupDone = await SetupManager.isSetupDone();
   
-  FirebaseMessaging.onMessage.listen((message) async {
-  final data = message.data;
-  if (data['type'] != 'rl') return;
-  final requestId = data['requestId'];
-  if (requestId == null) return;
-
-  try {
-    final pos = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-      timeLimit: const Duration(seconds: 20),
-    );
-
-    await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
-      'status': 'ok',
-      'lat': pos.latitude,
-      'lng': pos.longitude,
-      'acc': pos.accuracy,
-      'ts': FieldValue.serverTimestamp(),
-      'via': 'fg',
-    }, SetOptions(merge: true));
-
-    print("FG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
-  } catch (e) {
-    await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
-      'status': 'error',
-      'error': e.toString(),
-      'ts': FieldValue.serverTimestamp(),
-      'via': 'fg',
-    }, SetOptions(merge: true));
-  }
-});
-  
-
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  await FirebaseMessaging.instance.subscribeToTopic('test');
+  print("SUBSCRIBED => test");  
   runApp(NCareApp(setupDone: setupDone));
 }
-
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // 0) init
@@ -139,7 +95,7 @@ class NCareApp extends StatelessWidget {
       debugShowCheckedModeBanner: true,
       title: 'NCare',
       theme: ThemeData(useMaterial3: true),
-      home: setupDone ? const HomeScreen() : const SetupScreen(),
+      home: const RequesterScreen(),//setupDone ? const HomeScreen() : const SetupScreen(),
     );
   }
 }
