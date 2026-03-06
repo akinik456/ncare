@@ -18,13 +18,17 @@ class _RequesterScreenState extends State<RequesterScreen> {
   String _locatorName = 'Locator';
 
   Future<void> _sendRequest() async {
-    final doc = await FirebaseFirestore.instance.collection('requests').add({
-      'type': 'rl',
-      'ts': FieldValue.serverTimestamp(),
-    });
+  final doc = await FirebaseFirestore.instance
+      .collection('requesters')
+      .doc('default')
+      .collection('requests')
+      .add({
+    'type': 'rl',
+    'ts': FieldValue.serverTimestamp(),
+  });
 
-    setState(() => _lastRequestId = doc.id);
-  }
+  setState(() => _lastRequestId = doc.id);
+}
 
   Future<void> _openInMaps(double lat, double lng) async {
     final uri =
