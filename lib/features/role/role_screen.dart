@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import '../../core/role_manager.dart';
 import '../home/home_screen.dart';
@@ -36,12 +37,14 @@ class RoleScreen extends StatelessWidget {
             end: Alignment.bottomCenter,
             colors: [
               Color(0xFFE8EEF7),
-			  Color(0xFFF1F5F9),
+              Color(0xFFF1F5F9),
               Color(0xFFE2E8F0),
             ],
           ),
         ),
         child: SafeArea(
+          top: true,
+          bottom: true,
           child: Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
@@ -50,37 +53,56 @@ class RoleScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 4),
 
                     Center(
                       child: Container(
-                        width: 82,
-                        height: 82,
+                        width: 92,
+                        height: 92,
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1F6FEB).withValues(alpha: 0.10),
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFFE0ECFF),
+                              Color(0xFFEEF4FF),
+                            ],
+                          ),
                           shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color(0xFFC7DBFF),
+                          ),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x141F6FEB),
+                              blurRadius: 20,
+                              offset: Offset(0, 8),
+                            ),
+                          ],
                         ),
                         child: const Icon(
                           Icons.place_rounded,
-                          size: 40,
+                          size: 44,
                           color: Color(0xFF1F6FEB),
                         ),
                       ),
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 18),
 
                     Text(
                       'NCare',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.6,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -1.0,
                         color: const Color(0xFF0F172A),
+                        height: 1.0,
                       ),
                     ),
 
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 6),
 
                     Text(
                       'Choose how this device will be used',
@@ -107,7 +129,8 @@ class RoleScreen extends StatelessWidget {
                     _RoleCard(
                       icon: Icons.phone_android_rounded,
                       title: 'Locator',
-                      subtitle: 'This phone sends its location automatically when a request arrives.',
+                      subtitle:
+                          'This phone sends its location automatically when a request arrives.',
                       accent: const Color(0xFF1F6FEB),
                       onTap: () => _select(context, "locator"),
                     ),
@@ -117,7 +140,8 @@ class RoleScreen extends StatelessWidget {
                     _RoleCard(
                       icon: Icons.travel_explore_rounded,
                       title: 'Requester',
-                      subtitle: 'This phone requests location from a paired locator device.',
+                      subtitle:
+                          'This phone requests location from a paired locator device.',
                       accent: const Color(0xFF0F766E),
                       onTap: () => _select(context, "requester"),
                     ),
@@ -125,7 +149,10 @@ class RoleScreen extends StatelessWidget {
                     const SizedBox(height: 24),
 
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.82),
                         borderRadius: BorderRadius.circular(18),
@@ -247,7 +274,7 @@ class _RoleCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 4),
                 Icon(
                   Icons.arrow_forward_ios_rounded,
                   size: 18,

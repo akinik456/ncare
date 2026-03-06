@@ -144,34 +144,32 @@ class _RequesterScreenState extends State<RequesterScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-  children: [
-    Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: const Icon(
-        Icons.travel_explore_rounded,
-        color: Colors.white,
-        size: 24,
-      ),
-    ),
-
-    const SizedBox(width: 12),
-
-    const Text(
-      'Requester Device',
-      style: TextStyle(
-        color: Colors.white,
-        fontSize: 20,
-        fontWeight: FontWeight.w800,
-        letterSpacing: -0.3,
-      ),
-    ),
-  ],
-),
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(
+                          Icons.travel_explore_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Requester Device',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 8),
                   Text(
                     'Send a location request and view the latest response from the locator device.',
@@ -201,6 +199,54 @@ class _RequesterScreenState extends State<RequesterScreen> {
                       ),
                     ),
                   ),
+				  const SizedBox(height: 12),
+
+StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+  stream: FirebaseFirestore.instance
+      .collection('requesters')
+      .doc('default')
+      .collection('locators')
+      .where('active', isEqualTo: true)
+      .limit(1)
+      .snapshots(),
+  builder: (context, snap) {
+    final docs = snap.data?.docs ?? [];
+
+    if (docs.isNotEmpty) {
+      final name = (docs.first.data()['name'] ?? 'Locator').toString();
+      _locatorName = name;
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.person_rounded,
+            color: Colors.white,
+            size: 18,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _locatorName,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  },
+),
+				  
                 ],
               ),
             ),
@@ -373,101 +419,72 @@ class _RequesterScreenState extends State<RequesterScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                       Row(
-  children: [
-    Container(
-      width: 38,
-      height: 38,
-      decoration: BoxDecoration(
-        color: const Color(0xFFDCFCE7),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Icon(
-        Icons.location_on_rounded,
-        color: Color(0xFF16A34A),
-        size: 20,
-      ),
-    ),
-    const SizedBox(width: 10),
-    Text(
-      'Location result',
-      style: theme.textTheme.titleSmall?.copyWith(
-        fontWeight: FontWeight.w800,
-        color: const Color(0xFF0F172A),
-      ),
-    ),
-  ],
-),
-const SizedBox(height: 12),
-const SizedBox(height: 14),
-StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                          stream: FirebaseFirestore.instance
-                              .collection('requesters')
-                              .doc('default')
-                              .collection('locators')
-                              .where('active', isEqualTo: true)
-                              .orderBy('createdAt', descending: true)
-                              .limit(1)
-                              .snapshots(),
-                          builder: (context, snap) {
-                            if (snap.hasData && snap.data!.docs.isNotEmpty) {
-                              final newName = (snap.data!.docs.first
-                                          .data()['name'] ??
-                                      'Locator')
-                                  .toString();
-
-                              if (newName.isNotEmpty &&
-                                  newName != _locatorName) {
-                                WidgetsBinding.instance
-                                    .addPostFrameCallback((_) {
-                                  if (mounted) {
-                                    setState(() {
-                                      _locatorName = newName;
-                                    });
-                                  }
-                                });
-                              }
-                            }
-
-                            return Container(
-  width: double.infinity,
-  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-  decoration: BoxDecoration(
-    color: const Color(0xFFF8FAFC),
-    borderRadius: BorderRadius.circular(16),
-    border: Border.all(
-      color: const Color(0xFFE2E8F0),
-    ),
-  ),
-  child: Row(
-    children: [
-      Container(
-        width: 38,
-        height: 38,
-        decoration: BoxDecoration(
-          color: const Color(0xFFE0E7FF),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: const Icon(
-          Icons.person_rounded,
-          color: Color(0xFF4338CA),
-          size: 20,
-        ),
-      ),
-      const SizedBox(width: 10),
-      Expanded(
-        child: Text(
-          _locatorName,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w800,
-            color: const Color(0xFF0F172A),
-          ),
-        ),
-      ),
-    ],
-  ),
-);
-                          },
+                        Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFDCFCE7),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.location_on_rounded,
+                                color: Color(0xFF16A34A),
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Location result',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: const Color(0xFF0F172A),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE0E7FF),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.person_rounded,
+                                  color: Color(0xFF4338CA),
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _locatorName,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFF0F172A),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 14),
                         if (_lastAddress != null)
@@ -508,53 +525,47 @@ StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                           ),
                         const SizedBox(height: 14),
                         Row(
-  children: [
-    const Icon(
-      Icons.gps_fixed_rounded,
-      size: 18,
-      color: Color(0xFF475569),
-    ),
-    const SizedBox(width: 6),
-
-    Text(
-      acc != null
-          ? 'Accuracy ${acc.toStringAsFixed(0)} m'
-          : 'Accuracy -',
-      style: theme.textTheme.bodyMedium?.copyWith(
-        color: const Color(0xFF475569),
-        fontWeight: FontWeight.w600,
-      ),
-    ),
-
-    const SizedBox(width: 10),
-
-    const Text(
-      '•',
-      style: TextStyle(
-        color: Color(0xFF94A3B8),
-        fontWeight: FontWeight.w700,
-      ),
-    ),
-
-    const SizedBox(width: 10),
-
-    const Icon(
-      Icons.schedule_rounded,
-      size: 18,
-      color: Color(0xFF475569),
-    ),
-
-    const SizedBox(width: 6),
-
-    Text(
-      ts != null ? timeAgo(ts) : '-',
-      style: theme.textTheme.bodyMedium?.copyWith(
-        color: const Color(0xFF475569),
-        fontWeight: FontWeight.w600,
-      ),
-    ),
-  ],
-),
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.gps_fixed_rounded,
+                              size: 18,
+                              color: Color(0xFF475569),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              acc != null
+                                  ? 'Accuracy ${acc.toStringAsFixed(0)} m'
+                                  : 'Accuracy -',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: const Color(0xFF475569),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            const Text(
+                              '•',
+                              style: TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            const Icon(
+                              Icons.schedule_rounded,
+                              size: 18,
+                              color: Color(0xFF475569),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              ts != null ? timeAgo(ts) : '-',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: const Color(0xFF475569),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 16),
                         SizedBox(
                           width: double.infinity,
