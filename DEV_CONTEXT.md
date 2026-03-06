@@ -1,134 +1,40 @@
-# NCARE - DEV CONTEXT
+# NCare – DEV CONTEXT
 
-## Project Goal
-NCare is a lightweight emergency location request system.
+## Project Overview
+NCare is a mobile app designed for **on-demand location requests** between two devices.
 
-Flow:
+Primary scenario:
+- Parent requests location
+- Child / elderly phone sends location automatically
 
-A → request location
-↓
-Firebase (Firestore trigger)
-↓
-Cloud Function
-↓
-FCM push
-↓
-B device receives push
-↓
-Native wake
-↓
-Foreground service
-↓
-Location fetch
-↓
-Send response
+The **locator device does nothing manually**.  
+Location is sent automatically when a request arrives.
 
 ---
 
-## Current Status
+# Architecture
 
-Working components:
+## Request Flow
 
-✔ Firebase project created  
-✔ Firestore database active  
-✔ Cloud Function deployed (onRequestCreated)  
-✔ Firestore trigger working  
-✔ FCM push pipeline working  
-✔ DeviceStateManager implemented  
-✔ Location permission check implemented  
-✔ GPS state check implemented  
-✔ READY / NOT READY system working  
-✔ Setup flow implemented  
-✔ Setup flag persistence (shared_preferences)
+Requester device:
+1. User taps **Request location**
+2. App writes request to Firestore
+3. Cloud Function triggers
+4. FCM push sent to locator device
 
----
+Locator device:
+1. Receives FCM data message
+2. Native FirebaseMessagingService catches message
+3. Starts Foreground Service
+4. Foreground Service requests GPS
+5. Location sent to Firestore
 
-## App Flow
-
-App start:
-
-setup_done ?
-↓
-false → SetupScreen
-true → HomeScreen
-
-SetupScreen:
-
-Device ready state:
-- Location permission
-- Background location
-- GPS enabled
-
-When READY:
-User can complete setup.
+Requester device:
+1. Watches Firestore response
+2. Displays location + address
 
 ---
 
-## Current UI
+# Firebase Structure
 
-Setup Screen:
-- DEVICE READY / NOT READY
-- Permission check button
-- Complete setup button
-
-Home Screen:
-- READY / NOT READY state
-- Setup navigation button
-
----
-
-## Core Classes
-
-DeviceStateManager  
-- permission check
-- gps check
-- ready stream
-
-SetupManager  
-- setup_done flag
-- shared_preferences persistence
-
----
-
-## Dependencies
-
-permission_handler  
-geolocator  
-shared_preferences  
-firebase_core  
-firebase_messaging
-
----
-
-## Next Step
-
-Implement:
-
-Firebase push → native handler
-
-Native MessagingService:
-
-Receive push
-↓
-Start foreground service
-↓
-Fetch location
-↓
-Send response to Firestore
-
----
-
-## Long Term Plan
-
-Add group mode:
-
-A ↔ B ↔ C ↔ D
-
-Multiple users share location requests.
-
----
-
-## Repo
-
-Local path:
-C:\ncare
+## requests

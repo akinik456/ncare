@@ -17,3 +17,152 @@ veya bizim tag’ler için:
 
 adb logcat | findstr NCARE
 
+*************************
+We are continuing development of a Flutter app called NCare.
+
+I will upload a zip containing the full project source.
+
+Before suggesting any changes:
+
+1) Read DEV_CONTEXT.md
+2) Understand the architecture
+3) Do not modify logic unless necessary
+4) Focus on UI improvement first
+
+Current goal:
+Improve UI design of existing screens without breaking functionality.
+
+I will now upload the project zip.
+
+*************************
+requests/{requestId}
+
+Fields:
+- type = "rl"
+- createdAt
+
+## responses
+responses/{requestId}
+
+Fields:
+- status
+- lat
+- lng
+- acc
+- ts
+
+Example:
+status: ok lat: 40.0163 lng: 32.8664 acc: 8 ts: serverTimestamp
+
+---
+
+# Locator Registration (Requester side)
+
+Multiple locator devices supported.
+
+Firestore structure:
+requesters/default/locators/{locatorId}
+
+
+Fields:
+name phone createdAt active
+
+Example:
+name: "Ali" phone: "+905..." active: true
+
+Requester UI shows locator name above the location result.
+
+---
+
+# UI Current State
+
+Requester screen shows:
+
+Locator name  
+Address (reverse geocoding)  
+Accuracy  
+Timestamp  
+Open in Maps button  
+
+Example:
+Ali 📍 Kavaklıdere, Ankara
+Accuracy: 8 m 12 sec ago
+[ Request location ]
+[ Open in Maps ]
+
+---
+
+# Reverse Geocoding
+
+Uses Flutter package:
+geocoding
+
+Coordinates converted to address on requester device.
+
+---
+
+# Android Background System
+
+Locator uses:
+
+- FirebaseMessagingService
+- ForegroundService
+- Geolocator
+
+Flow:
+FCM push → Native MessagingService → Start ForegroundService → Get GPS → Write Firestore response
+
+System already tested and working.
+
+---
+
+# Current Status
+
+Working:
+
+✔ FCM push  
+✔ Native message handler  
+✔ Foreground service start  
+✔ GPS retrieval  
+✔ Firestore response write  
+✔ Requester response UI  
+✔ Reverse geocoding  
+✔ Locator registration (name)
+
+---
+
+# Development Style
+
+Development uses **step-by-step small changes**.
+
+Important rule:
+
+Never modify multiple parts at once.
+
+Always:
+One change → test → continue
+
+---
+
+# Next Development Targets
+
+Upcoming tasks:
+
+1. UI polish
+2. Locator selector list
+3. Pairing system (QR)
+4. Boot receiver
+5. Watchdog system
+6. Play Store preparation
+
+---
+
+# Code Style
+
+Flutter  
+Material 3  
+Simple UI components  
+Minimal dependencies
+
+
+

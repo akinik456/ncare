@@ -151,31 +151,12 @@ class NCareApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: true,
+      debugShowCheckedModeBanner: false,
       title: 'NCare',
       theme: ThemeData(useMaterial3: true),
-      home: setupDone
-    ? FutureBuilder(
-        future: RoleManager.getRole(),
-        builder: (context, snapshot) {
-  if (snapshot.connectionState != ConnectionState.done) {
-    return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
-    );
-  }
-
-  final role = snapshot.data; // null olabilir
-
-  if (role == "locator") return const HomeScreen();
-  if (role == "requester") return const RequesterScreen();
-
-  return const RoleScreen();
-},
-      )
-    : const SetupScreen(),
+      home: const RoleScreen(),
     );
   }
 }
-
 
 
