@@ -1,40 +1,41 @@
-# NCare – DEV CONTEXT
+# NCare - Development Context
 
 ## Project Overview
-NCare is a mobile app designed for **on-demand location requests** between two devices.
 
-Primary scenario:
-- Parent requests location
-- Child / elderly phone sends location automatically
+NCare is an Android-based family location request system.
 
-The **locator device does nothing manually**.  
-Location is sent automatically when a request arrives.
+The app allows a **requester device** to send a location request to a **locator device**.  
+The locator automatically retrieves GPS location and writes the response.
 
----
+Main goal:
 
-# Architecture
+A simple and reliable system for families to request the location of a child, elder, or relative.
 
-## Request Flow
+Example use case:
 
-Requester device:
-1. User taps **Request location**
-2. App writes request to Firestore
-3. Cloud Function triggers
-4. FCM push sent to locator device
-
-Locator device:
-1. Receives FCM data message
-2. Native FirebaseMessagingService catches message
-3. Starts Foreground Service
-4. Foreground Service requests GPS
-5. Location sent to Firestore
-
-Requester device:
-1. Watches Firestore response
-2. Displays location + address
+Parent → requests location  
+Child phone → automatically sends GPS location
 
 ---
 
-# Firebase Structure
+# System Architecture
 
-## requests
+Current architecture uses:
+
+Requester → Firestore → Cloud Function → FCM → Locator → GPS → Firestore response
+
+Flow:
+
+1. Requester creates request
+2. Cloud Function sends push notification
+3. Locator receives push
+4. Foreground service starts
+5. GPS retrieved
+6. Response written to Firestore
+7. Requester reads response
+
+---
+
+# Firestore Structure (Current)
+
+## Requests

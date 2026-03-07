@@ -34,58 +34,66 @@ await SystemChrome.setEnabledSystemUIMode(
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
+  print("APP_START");
+DeviceStateManager.instance.start();
+final setupDone = await SetupManager.isSetupDone();
+print("SETUP CHECK DONE");
+
+final role = await RoleManager.getRole();
+print("ROLE => $role");
+
+if (role == 'locator') {
   FirebaseMessaging.instance
       .subscribeToTopic('test')
       .timeout(const Duration(seconds: 5))
       .then((_) => print("SUBSCRIBED => test"))
       .catchError((e) => print("SUBSCRIBE ERR => $e"));
 
-  print("APP_START");
-  DeviceStateManager.instance.start();
-  final setupDone = await SetupManager.isSetupDone();
-  print("SETUP CHECK DONE");
   FirebaseMessaging.onMessage.listen((message) async {
-  final data = message.data;
+    final data = message.data;
 
-  if (data['type'] != 'rl') return;
+    if (data['type'] != 'rl') return;
 
-  final requestId = data['requestId']?.toString();
-  if (requestId == null || requestId.isEmpty) return;
+    final requestId = data['requestId']?.toString();
+    if (requestId == null || requestId.isEmpty) return;
 
-  // UI: request geldi (app açıkken)
-  LocatorUiState.instance.onRequestReceived(requestId);
+    // UI: request geldi (app açıkken)
+    LocatorUiState.instance.onRequestReceived(requestId);
 
-  try {
-    final pos = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-      timeLimit: const Duration(seconds: 20),
-    );
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 20),
+      );
 
-    await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
-      'status': 'ok',
-      'lat': pos.latitude,
-      'lng': pos.longitude,
-      'acc': pos.accuracy,
-      'ts': FieldValue.serverTimestamp(),
-      'via': 'fg',
-    }, SetOptions(merge: true));
+      await FirebaseFirestore.instance.collection('requesters').doc('default').collection('responses').doc(requestId).set({
+        'status': 'ok',
+        'lat': pos.latitude,
+        'lng': pos.longitude,
+        'acc': pos.accuracy,
+        'ts': FieldValue.serverTimestamp(),
+        'via': 'fg',
+      }, SetOptions(merge: true));
 
-    // UI: gönderildi
-    LocatorUiState.instance.onSentOk();
+      // UI: gönderildi
+      LocatorUiState.instance.onSentOk();
 
-    print("FG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
-  } catch (e) {
-    await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
-      'status': 'error',
-      'error': e.toString(),
-      'ts': FieldValue.serverTimestamp(),
-      'via': 'fg',
-    }, SetOptions(merge: true));
+      print("FG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
+    } catch (e) {
+      await FirebaseFirestore.instance.collection('requesters').doc('default').collection('responses').doc(requestId).set({
+        'status': 'error',
+        'error': e.toString(),
+        'ts': FieldValue.serverTimestamp(),
+        'via': 'fg',
+      }, SetOptions(merge: true));
 
-    // UI: hata olursa tekrar READY'ye dön (şimdilik)
-    LocatorUiState.instance.reset();
-  }
-});
+      // UI: hata olursa tekrar READY'ye dön (şimdilik)
+      LocatorUiState.instance.reset();
+    }
+  });
+} else {
+  print("LOCATOR FLOW SKIPPED => role=$role");
+}
   
 
   runApp(NCareApp(setupDone: setupDone));
@@ -98,7 +106,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+   final role = await RoleManager.getRole();
 
+  if (role != 'locator') {
+    print("BG LOCATOR FLOW SKIPPED => role=$role");
+    return;
+  }
+  
   final data = message.data;
   final type = data['type'];
   final requestId = data['requestId'];
@@ -108,7 +122,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
     final gpsOn = await Geolocator.isLocationServiceEnabled();
     if (!gpsOn) {
-      await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
+      await FirebaseFirestore.instance.collection('requesters').doc('default').collection('responses').doc(requestId).set({
         'status': 'gps_off',
         'ts': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -117,7 +131,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
     final perm = await Permission.locationAlways.status;
     if (!perm.isGranted) {
-      await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
+      await FirebaseFirestore.instance.collection('requesters').doc('default').collection('responses').doc(requestId).set({
         'status': 'permission_missing',
         'ts': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -129,7 +143,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       timeLimit: const Duration(seconds: 20),
     );
 
-    await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
+    await FirebaseFirestore.instance.collection('requesters').doc('default').collection('responses').doc(requestId).set({
       'status': 'ok',
       'lat': pos.latitude,
       'lng': pos.longitude,
@@ -139,7 +153,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
     print("BG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
   } catch (e) {
-    await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
+    await FirebaseFirestore.instance.collection('requesters').doc('default').collection('responses').doc(requestId).set({
       'status': 'error',
       'error': e.toString(),
       'ts': FieldValue.serverTimestamp(),
@@ -158,9 +172,29 @@ class NCareApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'NCare',
       theme: ThemeData(useMaterial3: true),
-      home: const RoleScreen(),
+      home: FutureBuilder<String?>(
+        future: RoleManager.getRole(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final role = snapshot.data;
+
+          if (role == 'locator') {
+            return const HomeScreen();
+          }
+
+          if (role == 'requester') {
+            return const RequesterScreen();
+          }
+
+          return const RoleScreen();
+        },
+      ),
     );
   }
 }
-
 

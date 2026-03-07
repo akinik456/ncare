@@ -209,7 +209,7 @@ StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
   stream: FirebaseFirestore.instance
       .collection('requesters')
       .doc('default')
-      .collection('locators')
+      .collection('responses')
       .where('active', isEqualTo: true)
       .limit(1)
       .snapshots(),
@@ -357,9 +357,11 @@ StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             if (requestId != null)
               StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
-                    .collection('responses')
-                    .doc(requestId)
-                    .snapshots(),
+				.collection('requesters')
+				.doc('default')
+				.collection('responses')
+				.doc(_lastRequestId)
+				.snapshots(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
                     return _StatusCard(

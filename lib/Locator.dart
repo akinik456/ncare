@@ -42,10 +42,16 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   if (type != 'rl' || requestId == null) return;
 
+  final responseRef = FirebaseFirestore.instance
+      .collection('requesters')
+      .doc('default')
+      .collection('responses')
+      .doc(requestId);
+
   try {
     final gpsOn = await Geolocator.isLocationServiceEnabled();
     if (!gpsOn) {
-      await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
+      await responseRef.set({
         'status': 'gps_off',
         'ts': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -54,7 +60,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
     final perm = await Permission.locationAlways.status;
     if (!perm.isGranted) {
-      await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
+      await responseRef.set({
         'status': 'permission_missing',
         'ts': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -66,7 +72,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       timeLimit: const Duration(seconds: 20),
     );
 
-    await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
+    await responseRef.set({
       'status': 'ok',
       'lat': pos.latitude,
       'lng': pos.longitude,
@@ -76,7 +82,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
     print("BG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
   } catch (e) {
-    await FirebaseFirestore.instance.collection('responses').doc(requestId).set({
+    await responseRef.set({
       'status': 'error',
       'error': e.toString(),
       'ts': FieldValue.serverTimestamp(),

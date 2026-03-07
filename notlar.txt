@@ -27,98 +27,102 @@ Before suggesting any changes:
 1) Read DEV_CONTEXT.md
 2) Understand the architecture
 3) Do not modify logic unless necessary
-4) Focus on UI improvement first
+4) Focus on small safe changes
 
 Current goal:
-Improve UI design of existing screens without breaking functionality.
+
+Migrate Firestore structure to requester-based collections.
 
 I will now upload the project zip.
 
 *************************
+## Requests
 requests/{requestId}
 
 Fields:
-- type = "rl"
-- createdAt
+type: "rl" createdAt
 
-## responses
+---
+
+## Responses
 responses/{requestId}
 
+
 Fields:
-- status
-- lat
-- lng
-- acc
-- ts
+status lat lng acc ts
+
 
 Example:
 status: ok lat: 40.0163 lng: 32.8664 acc: 8 ts: serverTimestamp
 
+
 ---
 
-# Locator Registration (Requester side)
+## Locator Registration
 
-Multiple locator devices supported.
+Multiple locator devices are supported.
 
-Firestore structure:
+Structure:
 requesters/default/locators/{locatorId}
 
 
 Fields:
 name phone createdAt active
 
+
 Example:
 name: "Ali" phone: "+905..." active: true
 
-Requester UI shows locator name above the location result.
 
 ---
 
-# UI Current State
+# UI Structure
 
-Requester screen shows:
+## Requester Screen
 
-Locator name  
-Address (reverse geocoding)  
-Accuracy  
-Timestamp  
-Open in Maps button  
+Header card shows:
+Requester Device
+Active locator name
+[ Request location ]
+
+
+Result card shows:
+Locator name Address Accuracy Time ago Open in Maps button
+
 
 Example:
-Ali 📍 Kavaklıdere, Ankara
-Accuracy: 8 m 12 sec ago
-[ Request location ]
-[ Open in Maps ]
+Ali 📍 Kavaklıdere, Ankara Accuracy 8 m • Just now [ Open in Maps ]
+
 
 ---
 
 # Reverse Geocoding
 
-Uses Flutter package:
+Using Flutter package:
 geocoding
 
-Coordinates converted to address on requester device.
+
+Coordinates are converted to address on the requester device.
 
 ---
 
-# Android Background System
+# Locator System (Android)
 
 Locator uses:
+FirebaseMessagingService ForegroundService Geolocator
 
-- FirebaseMessagingService
-- ForegroundService
-- Geolocator
 
 Flow:
-FCM push → Native MessagingService → Start ForegroundService → Get GPS → Write Firestore response
+FCM push → Native MessagingService → ForegroundService start → GPS retrieve → Write Firestore response
 
-System already tested and working.
+
+System is already tested and working.
 
 ---
 
-# Current Status
+# Current Development Status
 
-Working:
+Working features:
 
 ✔ FCM push  
 ✔ Native message handler  
@@ -127,33 +131,56 @@ Working:
 ✔ Firestore response write  
 ✔ Requester response UI  
 ✔ Reverse geocoding  
-✔ Locator registration (name)
+✔ Locator registration UI  
+✔ Active locator name shown above request button
+
+---
+
+# Current Limitations
+
+Requests are currently written to a **global requests collection**.
+
+Future improvement will move to a **requester-based structure**.
+
+Example planned structure:
+requesters/{requesterId}/requests/{requestId} requesters/{requesterId}/responses/{requestId} requesters/{requesterId}/locators/{locatorId}
+
+
+This will allow:
+
+• cleaner architecture  
+• multiple requester devices  
+• no cross-device interference
 
 ---
 
 # Development Style
 
-Development uses **step-by-step small changes**.
-
 Important rule:
 
-Never modify multiple parts at once.
+Small steps only.
 
-Always:
-One change → test → continue
+Never change multiple parts simultaneously.
+
+Workflow:
+1 change → test → commit → continue
+
 
 ---
 
 # Next Development Targets
 
-Upcoming tasks:
+Next tasks:
 
-1. UI polish
-2. Locator selector list
-3. Pairing system (QR)
-4. Boot receiver
-5. Watchdog system
-6. Play Store preparation
+1. Migrate Firestore structure to requester-based collections
+2. Update requester request path
+3. Update locator response path
+4. Update Cloud Function logic
+5. Re-introduce locator selector
+6. Add QR pairing system
+7. Boot receiver
+8. Watchdog service
+9. Play Store preparation
 
 ---
 
@@ -163,6 +190,4 @@ Flutter
 Material 3  
 Simple UI components  
 Minimal dependencies
-
-
 

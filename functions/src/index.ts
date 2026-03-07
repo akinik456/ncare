@@ -4,7 +4,7 @@ import * as admin from "firebase-admin";
 admin.initializeApp();
 
 export const onRequestCreated = onDocumentCreated(
-  { document: "requests/{requestId}", region: "us-central1" },
+  { document: "requesters/{requesterId}/requests/{requestId}", region: "us-central1" },
   async (event) => {
     const requestId = event.params.requestId;
     console.log("REQUEST TRIGGERED", requestId);
