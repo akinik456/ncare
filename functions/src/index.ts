@@ -11,7 +11,7 @@ export const onRequestCreated = onDocumentCreated(
 
     await admin.messaging().send({
       topic: "test",
-      data: { type: "rl", requestId },
+      data: { type: "rl", requestId, requesterId: event.params.requesterId },
       android: { priority: "high" },
     });
   }

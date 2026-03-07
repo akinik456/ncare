@@ -2,6 +2,9 @@ import 'package:geocoding/geocoding.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
+
 import 'add_locator_screen.dart';
 
 class RequesterScreen extends StatefulWidget {
@@ -16,25 +19,42 @@ class _RequesterScreenState extends State<RequesterScreen> {
   String? _lastAddress;
   String? _lastAddressKey;
   String _locatorName = 'Locator';
+  String? requesterId;
+
+  @override
+  void initState() {
+    super.initState();
+    _initRequesterId();
+  }
+
+  Future<void> _initRequesterId() async {
+    final id = await getRequesterId();
+    if (!mounted) return;
+    setState(() {
+      requesterId = id;
+    });
+  }
 
   Future<void> _sendRequest() async {
-  final doc = await FirebaseFirestore.instance
-      .collection('requesters')
-      .doc('default')
-      .collection('requests')
-      .add({
-    'type': 'rl',
-    'ts': FieldValue.serverTimestamp(),
-  });
+    if (requesterId == null || requesterId!.isEmpty) return;
 
-  setState(() => _lastRequestId = doc.id);
-}
+    final doc = await FirebaseFirestore.instance
+        .collection('requesters')
+        .doc(requesterId)
+        .collection('requests')
+        .add({
+      'type': 'rl',
+      'ts': FieldValue.serverTimestamp(),
+    });
+
+    setState(() => _lastRequestId = doc.id);
+  }
 
   Future<void> _openInMaps(double lat, double lng) async {
     final uri =
         Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      // v1 sessiz geç
+      // sessiz geç
     }
   }
 
@@ -60,12 +80,13 @@ class _RequesterScreenState extends State<RequesterScreen> {
       final addr = parts.where((e) => e.isNotEmpty).join(', ');
       if (addr.isEmpty) return;
 
+      if (!mounted) return;
       setState(() {
         _lastAddressKey = key;
         _lastAddress = addr;
       });
     } catch (_) {
-      // v1 sessiz geç
+      // sessiz geç
     }
   }
 
@@ -82,6 +103,12 @@ class _RequesterScreenState extends State<RequesterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (requesterId == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final requestId = _lastRequestId;
     final theme = Theme.of(context);
 
@@ -203,54 +230,37 @@ class _RequesterScreenState extends State<RequesterScreen> {
                       ),
                     ),
                   ),
-				  const SizedBox(height: 12),
-
-StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-  stream: FirebaseFirestore.instance
-      .collection('requesters')
-      .doc('default')
-      .collection('responses')
-      .where('active', isEqualTo: true)
-      .limit(1)
-      .snapshots(),
-  builder: (context, snap) {
-    final docs = snap.data?.docs ?? [];
-
-    if (docs.isNotEmpty) {
-      final name = (docs.first.data()['name'] ?? 'Locator').toString();
-      _locatorName = name;
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.person_rounded,
-            color: Colors.white,
-            size: 18,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              _locatorName,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  },
-),
-				  
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 14,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.person_rounded,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _locatorName,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -357,11 +367,11 @@ StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             if (requestId != null)
               StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
-				.collection('requesters')
-				.doc('default')
-				.collection('responses')
-				.doc(_lastRequestId)
-				.snapshots(),
+                    .collection('requesters')
+                    .doc(requesterId)
+                    .collection('responses')
+                    .doc(requestId)
+                    .snapshots(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
                     return _StatusCard(
@@ -518,8 +528,7 @@ StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                                 Expanded(
                                   child: Text(
                                     _lastAddress!,
-                                    style:
-                                        theme.textTheme.bodyMedium?.copyWith(
+                                    style: theme.textTheme.bodyMedium?.copyWith(
                                       color: const Color(0xFF0F172A),
                                       height: 1.45,
                                       fontWeight: FontWeight.w600,
@@ -604,6 +613,17 @@ StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       ),
     );
   }
+}
+
+Future<String> getRequesterId() async {
+  final prefs = await SharedPreferences.getInstance();
+
+  var id = prefs.getString('requesterId');
+  if (id != null && id.isNotEmpty) return id;
+
+  id = const Uuid().v4();
+  await prefs.setString('requesterId', id);
+  return id;
 }
 
 class _InfoChip extends StatelessWidget {

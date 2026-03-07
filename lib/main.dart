@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 
 import 'core/device_state_manager.dart';
 import 'core/setup_manager.dart';
-import 'features/setup/setup_screen.dart';
 import 'features/home/home_screen.dart';
 import 'core/role_manager.dart';
 import 'features/role/role_screen.dart';
@@ -18,16 +17,19 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
+
 import 'features/requester/requester_screen.dart';
-
-
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-await SystemChrome.setEnabledSystemUIMode(
+
+  await SystemChrome.setEnabledSystemUIMode(
     SystemUiMode.manual,
     overlays: SystemUiOverlay.values,
   );
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -35,94 +37,131 @@ await SystemChrome.setEnabledSystemUIMode(
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   print("APP_START");
-DeviceStateManager.instance.start();
-final setupDone = await SetupManager.isSetupDone();
-print("SETUP CHECK DONE");
+  DeviceStateManager.instance.start();
+  final setupDone = await SetupManager.isSetupDone();
+  print("SETUP CHECK DONE");
 
-final role = await RoleManager.getRole();
-print("ROLE => $role");
+  final role = await RoleManager.getRole();
+  print("ROLE => $role");
 
-if (role == 'locator') {
-  FirebaseMessaging.instance
-      .subscribeToTopic('test')
-      .timeout(const Duration(seconds: 5))
-      .then((_) => print("SUBSCRIBED => test"))
-      .catchError((e) => print("SUBSCRIBE ERR => $e"));
+  if (role == 'locator') {
+    FirebaseMessaging.instance
+        .subscribeToTopic('test')
+        .timeout(const Duration(seconds: 5))
+        .then((_) => print("SUBSCRIBED => test"))
+        .catchError((e) => print("SUBSCRIBE ERR => $e"));
 
-  FirebaseMessaging.onMessage.listen((message) async {
-    final data = message.data;
+    FirebaseMessaging.onMessage.listen((message) async {
+      final data = message.data;
 
-    if (data['type'] != 'rl') return;
+      if (data['type'] != 'rl') return;
 
-    final requestId = data['requestId']?.toString();
-    if (requestId == null || requestId.isEmpty) return;
+      final requestId = data['requestId']?.toString();
+      final requesterId = data['requesterId']?.toString();
 
-    // UI: request geldi (app açıkken)
-    LocatorUiState.instance.onRequestReceived(requestId);
+      if (requestId == null ||
+          requestId.isEmpty ||
+          requesterId == null ||
+          requesterId.isEmpty) {
+        return;
+      }
 
-    try {
-      final pos = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 20),
-      );
+      LocatorUiState.instance.onRequestReceived(requestId);
 
-      await FirebaseFirestore.instance.collection('requesters').doc('default').collection('responses').doc(requestId).set({
-        'status': 'ok',
-        'lat': pos.latitude,
-        'lng': pos.longitude,
-        'acc': pos.accuracy,
-        'ts': FieldValue.serverTimestamp(),
-        'via': 'fg',
-      }, SetOptions(merge: true));
+      try {
+        final pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: const Duration(seconds: 20),
+        );
 
-      // UI: gönderildi
-      LocatorUiState.instance.onSentOk();
+        await FirebaseFirestore.instance
+            .collection('requesters')
+            .doc(requesterId)
+            .collection('responses')
+            .doc(requestId)
+            .set({
+          'status': 'ok',
+          'lat': pos.latitude,
+          'lng': pos.longitude,
+          'acc': pos.accuracy,
+          'ts': FieldValue.serverTimestamp(),
+          'via': 'fg',
+        }, SetOptions(merge: true));
 
-      print("FG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
-    } catch (e) {
-      await FirebaseFirestore.instance.collection('requesters').doc('default').collection('responses').doc(requestId).set({
-        'status': 'error',
-        'error': e.toString(),
-        'ts': FieldValue.serverTimestamp(),
-        'via': 'fg',
-      }, SetOptions(merge: true));
+        LocatorUiState.instance.onSentOk();
 
-      // UI: hata olursa tekrar READY'ye dön (şimdilik)
-      LocatorUiState.instance.reset();
-    }
-  });
-} else {
-  print("LOCATOR FLOW SKIPPED => role=$role");
-}
-  
+        print("FG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
+      } catch (e) {
+        await FirebaseFirestore.instance
+            .collection('requesters')
+            .doc(requesterId)
+            .collection('responses')
+            .doc(requestId)
+            .set({
+          'status': 'error',
+          'error': e.toString(),
+          'ts': FieldValue.serverTimestamp(),
+          'via': 'fg',
+        }, SetOptions(merge: true));
+
+        LocatorUiState.instance.reset();
+      }
+    });
+  } else {
+    print("LOCATOR FLOW SKIPPED => role=$role");
+  }
 
   runApp(NCareApp(setupDone: setupDone));
 }
 
+Future<String> getRequesterId() async {
+  final prefs = await SharedPreferences.getInstance();
+
+  var id = prefs.getString('requesterId');
+  if (id != null && id.isNotEmpty) return id;
+
+  id = const Uuid().v4();
+  await prefs.setString('requesterId', id);
+  return id;
+}
+
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // 0) init
   WidgetsFlutterBinding.ensureInitialized();
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-   final role = await RoleManager.getRole();
 
+  final role = await RoleManager.getRole();
   if (role != 'locator') {
     print("BG LOCATOR FLOW SKIPPED => role=$role");
     return;
   }
-  
+
   final data = message.data;
   final type = data['type'];
-  final requestId = data['requestId'];
+  final requestId = data['requestId']?.toString();
+  final requesterId = data['requesterId']?.toString();
 
-  if (type != 'rl' || requestId == null) return;
+  if (type != 'rl' ||
+      requestId == null ||
+      requestId.isEmpty ||
+      requesterId == null ||
+      requesterId.isEmpty) {
+    return;
+  }
+
+  final responseRef = FirebaseFirestore.instance
+      .collection('requesters')
+      .doc(requesterId)
+      .collection('responses')
+      .doc(requestId);
 
   try {
     final gpsOn = await Geolocator.isLocationServiceEnabled();
     if (!gpsOn) {
-      await FirebaseFirestore.instance.collection('requesters').doc('default').collection('responses').doc(requestId).set({
+      await responseRef.set({
         'status': 'gps_off',
         'ts': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -131,7 +170,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
     final perm = await Permission.locationAlways.status;
     if (!perm.isGranted) {
-      await FirebaseFirestore.instance.collection('requesters').doc('default').collection('responses').doc(requestId).set({
+      await responseRef.set({
         'status': 'permission_missing',
         'ts': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -143,7 +182,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       timeLimit: const Duration(seconds: 20),
     );
 
-    await FirebaseFirestore.instance.collection('requesters').doc('default').collection('responses').doc(requestId).set({
+    await responseRef.set({
       'status': 'ok',
       'lat': pos.latitude,
       'lng': pos.longitude,
@@ -153,14 +192,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
     print("BG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
   } catch (e) {
-    await FirebaseFirestore.instance.collection('requesters').doc('default').collection('responses').doc(requestId).set({
+    await responseRef.set({
       'status': 'error',
       'error': e.toString(),
       'ts': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
 }
-  
 
 class NCareApp extends StatelessWidget {
   final bool setupDone;
@@ -197,4 +235,3 @@ class NCareApp extends StatelessWidget {
     );
   }
 }
-
