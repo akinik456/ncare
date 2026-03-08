@@ -1,9 +1,11 @@
+import 'dart:convert';
+
 import 'package:geocoding/geocoding.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+
 import '../../core/identity_manager.dart';
 import 'add_locator_screen.dart';
 
@@ -47,7 +49,11 @@ class _RequesterScreenState extends State<RequesterScreen> {
       'ts': FieldValue.serverTimestamp(),
     });
 
-    setState(() => _lastRequestId = doc.id);
+    setState(() {
+      _lastRequestId = doc.id;
+      _lastAddress = null;
+      _lastAddressKey = null;
+    });
   }
 
   Future<void> _openInMaps(double lat, double lng) async {
@@ -73,8 +79,6 @@ class _RequesterScreenState extends State<RequesterScreen> {
         if ((p.locality ?? '').trim().isNotEmpty) p.locality!.trim(),
         if ((p.administrativeArea ?? '').trim().isNotEmpty)
           p.administrativeArea!.trim(),
-        if ((p.postalCode ?? '').trim().isNotEmpty) p.postalCode!.trim(),
-        if ((p.country ?? '').trim().isNotEmpty) p.country!.trim(),
       ];
 
       final addr = parts.where((e) => e.isNotEmpty).join(', ');
@@ -111,6 +115,10 @@ class _RequesterScreenState extends State<RequesterScreen> {
 
     final requestId = _lastRequestId;
     final theme = Theme.of(context);
+    final qrData = jsonEncode({
+      'type': 'ncare_pair',
+      'requesterId': requesterId,
+    });
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
@@ -137,7 +145,7 @@ class _RequesterScreenState extends State<RequesterScreen> {
                 );
               },
               icon: const Icon(Icons.person_add_alt_1_rounded),
-              label: const Text('Add locator'),
+              label: const Text('Add'),
               style: FilledButton.styleFrom(
                 foregroundColor: const Color(0xFF0F172A),
                 backgroundColor: Colors.white,
@@ -148,10 +156,10 @@ class _RequesterScreenState extends State<RequesterScreen> {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(28),
                 gradient: const LinearGradient(
@@ -171,105 +179,148 @@ class _RequesterScreenState extends State<RequesterScreen> {
                   ),
                 ],
               ),
-              child: Column(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(
-                          Icons.travel_explore_rounded,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text(
-                        'Requester Device',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Send a location request and view the latest response from the locator device.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.92),
-                      height: 1.45,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _sendRequest,
-                      icon: const Icon(Icons.my_location_rounded),
-                      label: const Text('Request location'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: const Color(0xFF1D4ED8),
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        textStyle: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 10,
-                      horizontal: 14,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
-                          Icons.person_rounded,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _locatorName,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
+                        Row(
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.16),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: const Icon(
+                                Icons.travel_explore_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
                             ),
+                            const SizedBox(width: 10),
+                            const Expanded(
+                              child: Text(
+                                'Requester Device',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Request location and pair locator with QR.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            height: 1.35,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: _sendRequest,
+                            icon: const Icon(Icons.my_location_rounded),
+                            label: const Text('Request location'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: const Color(0xFF1D4ED8),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 11),
+                              textStyle: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.person_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _locatorName,
+                                  style:
+                                      theme.textTheme.titleMedium?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(width: 14),
+                  Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: QrImageView(
+                          data: qrData,
+                          version: QrVersions.auto,
+                          size: 96,
+                          backgroundColor: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: 96,
+                        child: Text(
+                          'Scan on locator',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.95),
+                            fontWeight: FontWeight.w600,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
             Container(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(22),
                 border: Border.all(color: const Color(0xFFE2E8F0)),
                 boxShadow: const [
                   BoxShadow(
@@ -282,8 +333,8 @@ class _RequesterScreenState extends State<RequesterScreen> {
               child: Row(
                 children: [
                   Container(
-                    width: 46,
-                    height: 46,
+                    width: 42,
+                    height: 42,
                     decoration: BoxDecoration(
                       color: const Color(0xFFDBEAFE),
                       borderRadius: BorderRadius.circular(14),
@@ -293,7 +344,7 @@ class _RequesterScreenState extends State<RequesterScreen> {
                       color: Color(0xFF1D4ED8),
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -305,13 +356,14 @@ class _RequesterScreenState extends State<RequesterScreen> {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 2),
                         Text(
                           requestId ?? '-',
                           style: theme.textTheme.titleSmall?.copyWith(
                             color: const Color(0xFF0F172A),
                             fontWeight: FontWeight.w700,
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
@@ -319,10 +371,10 @@ class _RequesterScreenState extends State<RequesterScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
             if (requestId == null)
               Container(
-                padding: const EdgeInsets.all(22),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(24),
@@ -331,8 +383,8 @@ class _RequesterScreenState extends State<RequesterScreen> {
                 child: Column(
                   children: [
                     Container(
-                      width: 58,
-                      height: 58,
+                      width: 54,
+                      height: 54,
                       decoration: BoxDecoration(
                         color: const Color(0xFFE0E7FF),
                         borderRadius: BorderRadius.circular(18),
@@ -340,10 +392,10 @@ class _RequesterScreenState extends State<RequesterScreen> {
                       child: const Icon(
                         Icons.location_searching_rounded,
                         color: Color(0xFF4338CA),
-                        size: 28,
+                        size: 26,
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     Text(
                       'No active request yet',
                       style: theme.textTheme.titleMedium?.copyWith(
@@ -352,12 +404,12 @@ class _RequesterScreenState extends State<RequesterScreen> {
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
                     Text(
-                      'Tap "Request location" to create a new request and wait for the locator response.',
+                      'Tap request location and wait for locator response.',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: const Color(0xFF64748B),
-                        height: 1.45,
+                        height: 1.4,
                       ),
                       textAlign: TextAlign.center,
                     ),
@@ -401,6 +453,11 @@ class _RequesterScreenState extends State<RequesterScreen> {
                   final lng = (data['lng'] as num?)?.toDouble();
                   final acc = (data['acc'] as num?)?.toDouble();
                   final ts = data['ts'] as Timestamp?;
+                  final locatorId = (data['locatorId'] ?? '').toString();
+
+                  if (locatorId.isNotEmpty && _locatorName == 'Locator') {
+                    _locatorName = locatorId;
+                  }
 
                   final hasFix = (status == 'ok' && lat != null && lng != null);
 
@@ -422,7 +479,7 @@ class _RequesterScreenState extends State<RequesterScreen> {
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(26),
+                      borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                       boxShadow: const [
                         BoxShadow(
@@ -438,8 +495,8 @@ class _RequesterScreenState extends State<RequesterScreen> {
                         Row(
                           children: [
                             Container(
-                              width: 38,
-                              height: 38,
+                              width: 36,
+                              height: 36,
                               decoration: BoxDecoration(
                                 color: const Color(0xFFDCFCE7),
                                 borderRadius: BorderRadius.circular(12),
@@ -460,12 +517,12 @@ class _RequesterScreenState extends State<RequesterScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 12),
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
-                            vertical: 12,
+                            vertical: 11,
                           ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF8FAFC),
@@ -477,8 +534,8 @@ class _RequesterScreenState extends State<RequesterScreen> {
                           child: Row(
                             children: [
                               Container(
-                                width: 38,
-                                height: 38,
+                                width: 36,
+                                height: 36,
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFE0E7FF),
                                   borderRadius: BorderRadius.circular(12),
@@ -497,16 +554,17 @@ class _RequesterScreenState extends State<RequesterScreen> {
                                     fontWeight: FontWeight.w800,
                                     color: const Color(0xFF0F172A),
                                   ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 14),
-                        if (_lastAddress != null)
+                        if (_lastAddress != null) ...[
+                          const SizedBox(height: 12),
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.all(16),
+                            padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF8FAFC),
                               borderRadius: BorderRadius.circular(18),
@@ -530,7 +588,7 @@ class _RequesterScreenState extends State<RequesterScreen> {
                                     _lastAddress!,
                                     style: theme.textTheme.bodyMedium?.copyWith(
                                       color: const Color(0xFF0F172A),
-                                      height: 1.45,
+                                      height: 1.4,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -538,50 +596,26 @@ class _RequesterScreenState extends State<RequesterScreen> {
                               ],
                             ),
                           ),
-                        const SizedBox(height: 14),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        ],
+                        const SizedBox(height: 12),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 10,
+                          runSpacing: 8,
                           children: [
-                            const Icon(
-                              Icons.gps_fixed_rounded,
-                              size: 18,
-                              color: Color(0xFF475569),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              acc != null
+                            _MiniInfo(
+                              icon: Icons.gps_fixed_rounded,
+                              text: acc != null
                                   ? 'Accuracy ${acc.toStringAsFixed(0)} m'
                                   : 'Accuracy -',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: const Color(0xFF475569),
-                                fontWeight: FontWeight.w600,
-                              ),
                             ),
-                            const SizedBox(width: 10),
-                            const Text(
-                              '•',
-                              style: TextStyle(
-                                color: Color(0xFF94A3B8),
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            const Icon(
-                              Icons.schedule_rounded,
-                              size: 18,
-                              color: Color(0xFF475569),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              ts != null ? timeAgo(ts) : '-',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: const Color(0xFF475569),
-                                fontWeight: FontWeight.w600,
-                              ),
+                            _MiniInfo(
+                              icon: Icons.schedule_rounded,
+                              text: ts != null ? timeAgo(ts) : '-',
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 14),
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton.icon(
@@ -592,7 +626,7 @@ class _RequesterScreenState extends State<RequesterScreen> {
                               foregroundColor: const Color(0xFF1D4ED8),
                               side:
                                   const BorderSide(color: Color(0xFFBFDBFE)),
-                              padding: const EdgeInsets.symmetric(vertical: 15),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(18),
                               ),
@@ -615,47 +649,35 @@ class _RequesterScreenState extends State<RequesterScreen> {
   }
 }
 
-Future<String> getRequesterId() async {
-  final prefs = await SharedPreferences.getInstance();
-
-  var id = prefs.getString('requesterId');
-  if (id != null && id.isNotEmpty) return id;
-
-  id = const Uuid().v4();
-  await prefs.setString('requesterId', id);
-  return id;
-}
-
-class _InfoChip extends StatelessWidget {
+class _MiniInfo extends StatelessWidget {
   final IconData icon;
-  final String label;
+  final String text;
 
-  const _InfoChip({
+  const _MiniInfo({
     required this.icon,
-    required this.label,
+    required this.text,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 18, color: const Color(0xFF475569)),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF0F172A),
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
+          Icon(icon, size: 17, color: const Color(0xFF475569)),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: const Color(0xFF475569),
+                  fontWeight: FontWeight.w600,
+                ),
           ),
         ],
       ),
@@ -683,7 +705,7 @@ class _StatusCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -692,8 +714,8 @@ class _StatusCard extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            width: 58,
-            height: 58,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
               color: iconBg,
               borderRadius: BorderRadius.circular(18),

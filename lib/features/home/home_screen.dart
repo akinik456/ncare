@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../core/device_state_manager.dart';
 import '../setup/setup_screen.dart';
+import '../../core/identity_manager.dart';
+
+
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -12,6 +15,7 @@ class HomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
+
         backgroundColor: const Color(0xFFF1F5F9),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -285,3 +289,4 @@ class _MiniInfo extends StatelessWidget {
     );
   }
 }
+
