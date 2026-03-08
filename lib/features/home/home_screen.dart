@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/device_state_manager.dart';
 import '../setup/setup_screen.dart';
 import '../../core/identity_manager.dart';
-
+import 'pair_screen.dart';
 
 
 class HomeScreen extends StatelessWidget {
@@ -14,20 +14,22 @@ class HomeScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
-      appBar: AppBar(
-
-        backgroundColor: const Color(0xFFF1F5F9),
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        titleSpacing: 20,
-        title: const Text(
-          'NCare',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF0F172A),
+appBar: AppBar(
+  title: const Text("Locator"),
+  actions: [
+    IconButton(
+      icon: const Icon(Icons.qr_code_scanner),
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const PairScreen(),
           ),
-        ),
-      ),
+        );
+      },
+    ),
+  ],
+),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
