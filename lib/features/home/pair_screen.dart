@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../core/identity_manager.dart';
 
 class PairScreen extends StatefulWidget {
   const PairScreen({super.key});
@@ -48,6 +50,19 @@ class _PairScreenState extends State<PairScreen> {
 		  final prefs = await SharedPreferences.getInstance();
  		  await prefs.setString('pairedRequesterId', requesterId);
 		  await FirebaseMessaging.instance.subscribeToTopic(requesterId);
+		  
+		  final locatorId = await 		  
+		  IdentityManager.getRequesterId();
+		  		  
+		  await FirebaseFirestore.instance
+			.collection('requesters')
+			.doc(requesterId)
+			.collection('locators')
+			.doc(locatorId)
+			.set({
+		 'active': true,
+         'createdAt': FieldValue.serverTimestamp(),
+		  });
           if (!mounted) return;
 		  Navigator.pop(context, requesterId);
         },

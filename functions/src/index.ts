@@ -6,12 +6,18 @@ admin.initializeApp();
 export const onRequestCreated = onDocumentCreated(
   { document: "requesters/{requesterId}/requests/{requestId}", region: "us-central1" },
   async (event) => {
+    const requesterId = event.params.requesterId;
     const requestId = event.params.requestId;
-    console.log("REQUEST TRIGGERED", requestId);
+
+    console.log("REQUEST TRIGGERED", requesterId, requestId);
 
     await admin.messaging().send({
-      topic: "test",
-      data: { type: "rl", requestId, requesterId: event.params.requesterId },
+      topic: requesterId,              // <-- test yerine requesterId
+      data: {
+        type: "rl",
+        requestId,
+        requesterId,                   // locator tarafında lazım
+      },
       android: { priority: "high" },
     });
   }
