@@ -20,6 +20,8 @@ import 'firebase_options.dart';
 import 'features/requester/requester_screen.dart';
 import 'core/identity_manager.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -43,11 +45,17 @@ Future<void> main() async {
   print("ROLE => $role");
 
   if (role == 'locator') {
-    FirebaseMessaging.instance
-        .subscribeToTopic('test')
-        .timeout(const Duration(seconds: 5))
-        .then((_) => print("SUBSCRIBED => test"))
-        .catchError((e) => print("SUBSCRIBE ERR => $e"));
+  
+    final prefs = await SharedPreferences.getInstance();
+final requesterId = prefs.getString('pairedRequesterId');
+
+if (requesterId != null && requesterId.isNotEmpty) {
+  FirebaseMessaging.instance
+      .subscribeToTopic(requesterId)
+      .timeout(const Duration(seconds: 5))
+      .then((_) => print("SUBSCRIBED => $requesterId"))
+      .catchError((e) => print("SUBSCRIBE ERR => $e"));
+}
 
     FirebaseMessaging.onMessage.listen((message) async {
       final data = message.data;
