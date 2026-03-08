@@ -4,7 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
-
+import '../../core/identity_manager.dart';
 import 'add_locator_screen.dart';
 
 class RequesterScreen extends StatefulWidget {
@@ -28,7 +28,7 @@ class _RequesterScreenState extends State<RequesterScreen> {
   }
 
   Future<void> _initRequesterId() async {
-    final id = await getRequesterId();
+    final id = await IdentityManager.getRequesterId();
     if (!mounted) return;
     setState(() {
       requesterId = id;

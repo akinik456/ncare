@@ -17,10 +17,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
-
 import 'features/requester/requester_screen.dart';
+import 'core/identity_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -69,6 +67,8 @@ Future<void> main() async {
       LocatorUiState.instance.onRequestReceived(requestId);
 
       try {
+        final locatorId = await IdentityManager.getRequesterId();
+
         final pos = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high,
           timeLimit: const Duration(seconds: 20),
@@ -80,6 +80,7 @@ Future<void> main() async {
             .collection('responses')
             .doc(requestId)
             .set({
+          'locatorId': locatorId,
           'status': 'ok',
           'lat': pos.latitude,
           'lng': pos.longitude,
@@ -92,12 +93,15 @@ Future<void> main() async {
 
         print("FG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
       } catch (e) {
+        final locatorId = await IdentityManager.getRequesterId();
+
         await FirebaseFirestore.instance
             .collection('requesters')
             .doc(requesterId)
             .collection('responses')
             .doc(requestId)
             .set({
+          'locatorId': locatorId,
           'status': 'error',
           'error': e.toString(),
           'ts': FieldValue.serverTimestamp(),
@@ -112,17 +116,6 @@ Future<void> main() async {
   }
 
   runApp(NCareApp(setupDone: setupDone));
-}
-
-Future<String> getRequesterId() async {
-  final prefs = await SharedPreferences.getInstance();
-
-  var id = prefs.getString('requesterId');
-  if (id != null && id.isNotEmpty) return id;
-
-  id = const Uuid().v4();
-  await prefs.setString('requesterId', id);
-  return id;
 }
 
 @pragma('vm:entry-point')
@@ -152,6 +145,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     return;
   }
 
+  final locatorId = await IdentityManager.getRequesterId();
+
   final responseRef = FirebaseFirestore.instance
       .collection('requesters')
       .doc(requesterId)
@@ -162,6 +157,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     final gpsOn = await Geolocator.isLocationServiceEnabled();
     if (!gpsOn) {
       await responseRef.set({
+        'locatorId': locatorId,
         'status': 'gps_off',
         'ts': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -171,6 +167,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     final perm = await Permission.locationAlways.status;
     if (!perm.isGranted) {
       await responseRef.set({
+        'locatorId': locatorId,
         'status': 'permission_missing',
         'ts': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -183,6 +180,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     );
 
     await responseRef.set({
+      'locatorId': locatorId,
       'status': 'ok',
       'lat': pos.latitude,
       'lng': pos.longitude,
@@ -193,6 +191,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     print("BG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
   } catch (e) {
     await responseRef.set({
+      'locatorId': locatorId,
       'status': 'error',
       'error': e.toString(),
       'ts': FieldValue.serverTimestamp(),
