@@ -19,7 +19,6 @@ import 'firebase_options.dart';
 
 import 'features/requester/requester_screen.dart';
 import 'core/identity_manager.dart';
-
 import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
@@ -45,17 +44,16 @@ Future<void> main() async {
   print("ROLE => $role");
 
   if (role == 'locator') {
-  
     final prefs = await SharedPreferences.getInstance();
-final requesterId = prefs.getString('pairedRequesterId');
+    final requesterId = prefs.getString('pairedRequesterId');
 
-if (requesterId != null && requesterId.isNotEmpty) {
-  FirebaseMessaging.instance
-      .subscribeToTopic(requesterId)
-      .timeout(const Duration(seconds: 5))
-      .then((_) => print("SUBSCRIBED => $requesterId"))
-      .catchError((e) => print("SUBSCRIBE ERR => $e"));
-}
+    if (requesterId != null && requesterId.isNotEmpty) {
+      FirebaseMessaging.instance
+          .subscribeToTopic(requesterId)
+          .timeout(const Duration(seconds: 5))
+          .then((_) => print("SUBSCRIBED => $requesterId"))
+          .catchError((e) => print("SUBSCRIBE ERR => $e"));
+    }
 
     FirebaseMessaging.onMessage.listen((message) async {
       final data = message.data;
@@ -64,6 +62,8 @@ if (requesterId != null && requesterId.isNotEmpty) {
 
       final requestId = data['requestId']?.toString();
       final requesterId = data['requesterId']?.toString();
+      final targetLocatorId = data['locatorId']?.toString();
+      final myLocatorId = await IdentityManager.getRequesterId();
 
       if (requestId == null ||
           requestId.isEmpty ||
@@ -72,11 +72,16 @@ if (requesterId != null && requesterId.isNotEmpty) {
         return;
       }
 
+      if (targetLocatorId == null ||
+          targetLocatorId.isEmpty ||
+          targetLocatorId != myLocatorId) {
+        print("FG SKIP => target=$targetLocatorId mine=$myLocatorId");
+        return;
+      }
+
       LocatorUiState.instance.onRequestReceived(requestId);
 
       try {
-        final locatorId = await IdentityManager.getRequesterId();
-
         final pos = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high,
           timeLimit: const Duration(seconds: 20),
@@ -88,7 +93,7 @@ if (requesterId != null && requesterId.isNotEmpty) {
             .collection('responses')
             .doc(requestId)
             .set({
-          'locatorId': locatorId,
+          'locatorId': myLocatorId,
           'status': 'ok',
           'lat': pos.latitude,
           'lng': pos.longitude,
@@ -101,15 +106,13 @@ if (requesterId != null && requesterId.isNotEmpty) {
 
         print("FG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
       } catch (e) {
-        final locatorId = await IdentityManager.getRequesterId();
-
         await FirebaseFirestore.instance
             .collection('requesters')
             .doc(requesterId)
             .collection('responses')
             .doc(requestId)
             .set({
-          'locatorId': locatorId,
+          'locatorId': myLocatorId,
           'status': 'error',
           'error': e.toString(),
           'ts': FieldValue.serverTimestamp(),
@@ -144,6 +147,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final type = data['type'];
   final requestId = data['requestId']?.toString();
   final requesterId = data['requesterId']?.toString();
+  final targetLocatorId = data['locatorId']?.toString();
+  final myLocatorId = await IdentityManager.getRequesterId();
 
   if (type != 'rl' ||
       requestId == null ||
@@ -153,7 +158,12 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     return;
   }
 
-  final locatorId = await IdentityManager.getRequesterId();
+  if (targetLocatorId == null ||
+      targetLocatorId.isEmpty ||
+      targetLocatorId != myLocatorId) {
+    print("BG SKIP => target=$targetLocatorId mine=$myLocatorId");
+    return;
+  }
 
   final responseRef = FirebaseFirestore.instance
       .collection('requesters')
@@ -165,7 +175,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     final gpsOn = await Geolocator.isLocationServiceEnabled();
     if (!gpsOn) {
       await responseRef.set({
-        'locatorId': locatorId,
+        'locatorId': myLocatorId,
         'status': 'gps_off',
         'ts': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -175,7 +185,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     final perm = await Permission.locationAlways.status;
     if (!perm.isGranted) {
       await responseRef.set({
-        'locatorId': locatorId,
+        'locatorId': myLocatorId,
         'status': 'permission_missing',
         'ts': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -188,7 +198,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     );
 
     await responseRef.set({
-      'locatorId': locatorId,
+      'locatorId': myLocatorId,
       'status': 'ok',
       'lat': pos.latitude,
       'lng': pos.longitude,
@@ -199,7 +209,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     print("BG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
   } catch (e) {
     await responseRef.set({
-      'locatorId': locatorId,
+      'locatorId': myLocatorId,
       'status': 'error',
       'error': e.toString(),
       'ts': FieldValue.serverTimestamp(),

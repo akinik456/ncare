@@ -16,6 +16,11 @@ adb logcat | findstr flutter
 veya bizim tag’ler için:
 
 adb logcat | findstr NCARE
+*************************
+deploy
+cd functions
+npm run build
+firebase deploy --only functions
 
 *************************
 We are continuing development of a Flutter app called NCare.
