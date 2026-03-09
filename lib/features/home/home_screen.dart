@@ -1,13 +1,12 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 import '../../core/device_state_manager.dart';
 import '../../core/identity_manager.dart';
 import '../setup/setup_screen.dart';
-
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,39 +21,44 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-	_initLocatorId();
-    _checkPairing();
+    _initLocatorId();
   }
 
   Future<void> _initLocatorId() async {
     final id = await IdentityManager.getRequesterId();
     if (!mounted) return;
+
     setState(() {
       locatorId = id;
     });
+
+    _checkPairing();
   }
-  
+
   Future<void> _checkPairing() async {
-  try {
-    final locatorId = await IdentityManager.getRequesterId();
+    if (locatorId == null || locatorId!.isEmpty) return;
 
-    final doc = await FirebaseFirestore.instance
-        .collection('locators')
-        .doc(locatorId)
-        .get();
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('locators')
+          .doc(locatorId)
+          .get();
 
-    final requesterId = doc.data()?['pairedRequesterId']?.toString();
+      final requesterId = doc.data()?['pairedRequesterId']?.toString();
 
-    if (requesterId != null && requesterId.isNotEmpty) {
-      await FirebaseMessaging.instance.subscribeToTopic(requesterId);
-      print("PAIRED WITH REQUESTER => $requesterId");
-    } else {
-      print("NO PAIR FOUND");
+      if (requesterId != null && requesterId.isNotEmpty) {
+        final locatorTopic = 'locator_$locatorId';
+
+        await FirebaseMessaging.instance.subscribeToTopic(locatorTopic);
+        print("PAIRED WITH REQUESTER => $requesterId");
+        print("LOCATOR TOPIC OK => $locatorTopic");
+      } else {
+        print("NO PAIR FOUND");
+      }
+    } catch (e) {
+      print("PAIRING ERROR => $e");
     }
-  } catch (e) {
-    print("CHECK PAIRING ERR => $e");
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -197,64 +201,63 @@ class _HomeScreenState extends State<HomeScreen> {
                             const SizedBox(width: 14),
                             Column(
                               children: [
-							    GestureDetector(
-  onTap: () {
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(28),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Locator QR',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 16),
-              QrImageView(
-                data: qrData,
-                version: QrVersions.auto,
-                size: 260,
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Scan this code on requester device',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Color(0xFF475569),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  },
-  child: Container(
-    padding: const EdgeInsets.all(10),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: QrImageView(
-      data: qrData,
-      version: QrVersions.auto,
-      size: 120,
-    ),
-  ),
-),
-                                
-								
+                                GestureDetector(
+                                  onTap: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (_) => Dialog(
+                                        backgroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(28),
+                                        ),
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(20),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Text(
+                                                'Locator QR',
+                                                style: TextStyle(
+                                                  fontSize: 20,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Color(0xFF0F172A),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 16),
+                                              QrImageView(
+                                                data: qrData,
+                                                version: QrVersions.auto,
+                                                size: 260,
+                                              ),
+                                              const SizedBox(height: 12),
+                                              const Text(
+                                                'Scan this code on requester device',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  color: Color(0xFF475569),
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: QrImageView(
+                                      data: qrData,
+                                      version: QrVersions.auto,
+                                      size: 120,
+                                    ),
+                                  ),
+                                ),
                                 const SizedBox(height: 8),
                                 SizedBox(
                                   width: 120,

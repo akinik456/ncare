@@ -19,7 +19,6 @@ import 'firebase_options.dart';
 
 import 'features/requester/requester_screen.dart';
 import 'core/identity_manager.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,16 +43,14 @@ Future<void> main() async {
   print("ROLE => $role");
 
   if (role == 'locator') {
-    final prefs = await SharedPreferences.getInstance();
-    final requesterId = prefs.getString('pairedRequesterId');
+    final myLocatorId = await IdentityManager.getRequesterId();
+    final locatorTopic = 'locator_$myLocatorId';
 
-    if (requesterId != null && requesterId.isNotEmpty) {
-      FirebaseMessaging.instance
-          .subscribeToTopic(requesterId)
-          .timeout(const Duration(seconds: 5))
-          .then((_) => print("SUBSCRIBED => $requesterId"))
-          .catchError((e) => print("SUBSCRIBE ERR => $e"));
-    }
+    FirebaseMessaging.instance
+        .subscribeToTopic(locatorTopic)
+        .timeout(const Duration(seconds: 5))
+        .then((_) => print("SUBSCRIBED => $locatorTopic"))
+        .catchError((e) => print("SUBSCRIBE ERR => $e"));
 
     FirebaseMessaging.onMessage.listen((message) async {
       final data = message.data;
@@ -63,7 +60,6 @@ Future<void> main() async {
       final requestId = data['requestId']?.toString();
       final requesterId = data['requesterId']?.toString();
       final targetLocatorId = data['locatorId']?.toString();
-      final myLocatorId = await IdentityManager.getRequesterId();
 
       if (requestId == null ||
           requestId.isEmpty ||

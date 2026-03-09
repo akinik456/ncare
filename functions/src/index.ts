@@ -20,10 +20,18 @@ export const onRequestCreated = onDocumentCreated(
       return;
     }
 
-    console.log("REQUEST TRIGGERED", requesterId, requestId, locatorId);
+    const locatorTopic = `locator_${locatorId}`;
+
+    console.log(
+      "REQUEST TRIGGERED",
+      requesterId,
+      requestId,
+      locatorId,
+      locatorTopic,
+    );
 
     await admin.messaging().send({
-      topic: requesterId,
+      topic: locatorTopic,
       data: {
         type: "rl",
         requestId,
