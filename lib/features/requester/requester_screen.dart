@@ -32,7 +32,31 @@ class _RequesterScreenState extends State<RequesterScreen> {
     setState(() {
       requesterId = id;
     });
+   _loadLocatorName();
   }
+  
+  Future<void> _loadLocatorName() async {
+  if (requesterId == null) return;
+
+  final snap = await FirebaseFirestore.instance
+      .collection('requesters')
+      .doc(requesterId)
+      .collection('locators')
+      .where('active', isEqualTo: true)
+      .limit(1)
+      .get();
+
+  if (snap.docs.isEmpty) return;
+
+  final name = (snap.docs.first.data()['name'] ?? '').toString().trim();
+
+  if (name.isEmpty || !mounted) return;
+
+  setState(() {
+    _locatorName = name;
+  });
+}
+
 
   Future<void> _sendRequest() async {
     if (requesterId == null || requesterId!.isEmpty) return;
@@ -253,14 +277,54 @@ class _RequesterScreenState extends State<RequesterScreen> {
                         ),
                         const SizedBox(width: 8),
                         Expanded(
-                          child: Text(
-                            _locatorName,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+						child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+  stream: FirebaseFirestore.instance
+      .collection('requesters')
+      .doc(requesterId)
+      .collection('locators')
+      .where('active', isEqualTo: true)
+      .snapshots(),
+  builder: (context, snapshot) {
+    final docs = snapshot.data?.docs ?? [];
+
+    if (docs.isEmpty) {
+      return Text(
+        'No locator',
+        style: theme.textTheme.titleMedium?.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: docs.map((doc) {
+        final name = (doc.data()['name'] ?? doc.id).toString();
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.18),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            name,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  },
+)
+
+
+						  
+						  
+						  
                         ),
                       ],
                     ),
@@ -269,62 +333,9 @@ class _RequesterScreenState extends State<RequesterScreen> {
               ),
             ),
             const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x120F172A),
-                    blurRadius: 18,
-                    offset: Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDBEAFE),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.tag_rounded,
-                      color: Color(0xFF1D4ED8),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Last request id',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: const Color(0xFF64748B),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          requestId ?? '-',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            color: const Color(0xFF0F172A),
-                            fontWeight: FontWeight.w700,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
+			
+			
+            
             if (requestId == null)
               Container(
                 padding: const EdgeInsets.all(20),
