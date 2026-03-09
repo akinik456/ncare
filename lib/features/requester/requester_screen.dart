@@ -17,8 +17,8 @@ class _RequesterScreenState extends State<RequesterScreen> {
   String? _lastRequestId;
   String? _lastAddress;
   String? _lastAddressKey;
-  String _locatorName = 'Locator';
   String? requesterId;
+  String? _selectedLocatorId;
 
   @override
   void initState() {
@@ -29,37 +29,15 @@ class _RequesterScreenState extends State<RequesterScreen> {
   Future<void> _initRequesterId() async {
     final id = await IdentityManager.getRequesterId();
     if (!mounted) return;
+
     setState(() {
       requesterId = id;
     });
-   _loadLocatorName();
   }
-  
-  Future<void> _loadLocatorName() async {
-  if (requesterId == null) return;
-
-  final snap = await FirebaseFirestore.instance
-      .collection('requesters')
-      .doc(requesterId)
-      .collection('locators')
-      .where('active', isEqualTo: true)
-      .limit(1)
-      .get();
-
-  if (snap.docs.isEmpty) return;
-
-  final name = (snap.docs.first.data()['name'] ?? '').toString().trim();
-
-  if (name.isEmpty || !mounted) return;
-
-  setState(() {
-    _locatorName = name;
-  });
-}
-
 
   Future<void> _sendRequest() async {
     if (requesterId == null || requesterId!.isEmpty) return;
+    if (_selectedLocatorId == null || _selectedLocatorId!.isEmpty) return;
 
     final doc = await FirebaseFirestore.instance
         .collection('requesters')
@@ -67,6 +45,7 @@ class _RequesterScreenState extends State<RequesterScreen> {
         .collection('requests')
         .add({
       'type': 'rl',
+      'locatorId': _selectedLocatorId,
       'ts': FieldValue.serverTimestamp(),
     });
 
@@ -230,7 +209,7 @@ class _RequesterScreenState extends State<RequesterScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Request location from the paired locator device.',
+                    'Request location from the selected locator device.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: Colors.white.withValues(alpha: 0.92),
                       height: 1.35,
@@ -240,12 +219,16 @@ class _RequesterScreenState extends State<RequesterScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
-                      onPressed: _sendRequest,
+                      onPressed:
+                          _selectedLocatorId == null ? null : _sendRequest,
                       icon: const Icon(Icons.my_location_rounded),
                       label: const Text('Request location'),
                       style: FilledButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: const Color(0xFF1D4ED8),
+                        disabledBackgroundColor:
+                            Colors.white.withValues(alpha: 0.65),
+                        disabledForegroundColor: const Color(0xFF94A3B8),
                         padding: const EdgeInsets.symmetric(vertical: 11),
                         textStyle: const TextStyle(
                           fontSize: 15,
@@ -268,74 +251,85 @@ class _RequesterScreenState extends State<RequesterScreen> {
                       color: Colors.white.withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.person_rounded,
-                          color: Colors.white,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-						child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-  stream: FirebaseFirestore.instance
-      .collection('requesters')
-      .doc(requesterId)
-      .collection('locators')
-      .where('active', isEqualTo: true)
-      .snapshots(),
-  builder: (context, snapshot) {
-    final docs = snapshot.data?.docs ?? [];
+                    child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseFirestore.instance
+                          .collection('requesters')
+                          .doc(requesterId)
+                          .collection('locators')
+                          .where('active', isEqualTo: true)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        final docs = snapshot.data?.docs ?? [];
 
-    if (docs.isEmpty) {
-      return Text(
-        'No locator',
-        style: theme.textTheme.titleMedium?.copyWith(
-          color: Colors.white,
-          fontWeight: FontWeight.w700,
-        ),
-      );
-    }
+                        if (docs.isEmpty) {
+                          return Text(
+                            'No locator',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          );
+                        }
 
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: docs.map((doc) {
-        final name = (doc.data()['name'] ?? doc.id).toString();
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.18),
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Text(
-            name,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  },
-)
+                        final hasSelected = docs.any(
+                          (doc) => doc.id == _selectedLocatorId,
+                        );
 
+                        if (!hasSelected) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (!mounted) return;
+                            setState(() {
+                              _selectedLocatorId = docs.first.id;
+                            });
+                          });
+                        }
 
-						  
-						  
-						  
-                        ),
-                      ],
+                        return Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: docs.map((doc) {
+                            final locatorId = doc.id;
+                            final name =
+                                (doc.data()['name'] ?? locatorId).toString();
+                            final selected = locatorId == _selectedLocatorId;
+
+                            return GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _selectedLocatorId = locatorId;
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 7,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? Colors.white
+                                      : Colors.white.withValues(alpha: 0.18),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  name,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: selected
+                                        ? const Color(0xFF1D4ED8)
+                                        : Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        );
+                      },
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 14),
-			
-			
-            
             if (requestId == null)
               Container(
                 padding: const EdgeInsets.all(20),
@@ -370,7 +364,9 @@ class _RequesterScreenState extends State<RequesterScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'Tap request location and wait for locator response.',
+                      _selectedLocatorId == null
+                          ? 'Add and select a locator first.'
+                          : 'Tap request location and wait for locator response.',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: const Color(0xFF64748B),
                         height: 1.4,
@@ -390,10 +386,10 @@ class _RequesterScreenState extends State<RequesterScreen> {
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) {
-                    return _StatusCard(
+                    return const _StatusCard(
                       icon: Icons.hourglass_top_rounded,
-                      iconBg: const Color(0xFFFFF7ED),
-                      iconColor: const Color(0xFFEA580C),
+                      iconBg: Color(0xFFFFF7ED),
+                      iconColor: Color(0xFFEA580C),
                       title: 'Waiting for response',
                       subtitle:
                           'Request sent successfully. Waiting for locator device...',
@@ -402,10 +398,10 @@ class _RequesterScreenState extends State<RequesterScreen> {
 
                   final data = snapshot.data!.data();
                   if (data == null) {
-                    return _StatusCard(
+                    return const _StatusCard(
                       icon: Icons.hourglass_top_rounded,
-                      iconBg: const Color(0xFFFFF7ED),
-                      iconColor: const Color(0xFFEA580C),
+                      iconBg: Color(0xFFFFF7ED),
+                      iconColor: Color(0xFFEA580C),
                       title: 'Waiting for response',
                       subtitle:
                           'Request sent successfully. Waiting for locator device...',
@@ -417,25 +413,6 @@ class _RequesterScreenState extends State<RequesterScreen> {
                   final lng = (data['lng'] as num?)?.toDouble();
                   final acc = (data['acc'] as num?)?.toDouble();
                   final ts = data['ts'] as Timestamp?;
-				  
-				  final locatorId = (data['locatorId'] ?? '').toString();
-                  
-				  if (locatorId.isNotEmpty) {
-  FirebaseFirestore.instance
-      .collection('requesters')
-      .doc(requesterId)
-      .collection('locators')
-      .doc(locatorId)
-      .get()
-      .then((doc) {
-    final name = (doc.data()?['name'] ?? '').toString().trim();
-    if (name.isNotEmpty && mounted) {
-      setState(() {
-        _locatorName = name;
-      });
-    }
-  });
-}
 
                   final hasFix = (status == 'ok' && lat != null && lng != null);
 
@@ -534,7 +511,6 @@ class _RequesterScreenState extends State<RequesterScreen> {
                         ],
                         const SizedBox(height: 12),
                         Wrap(
-                          alignment: WrapAlignment.center,
                           spacing: 10,
                           runSpacing: 8,
                           children: [
