@@ -14,12 +14,13 @@ class RequesterScreen extends StatefulWidget {
 }
 
 class _RequesterScreenState extends State<RequesterScreen> {
-  String? _lastRequestId;
+  String? _lastRequestId; // ekranda gösterilen son başarılı cevap
+  String? _pendingRequestId; // şu an beklenen yeni request
   String? _lastAddress;
   String? _lastAddressKey;
   String? requesterId;
   String? _selectedLocatorId;
-  bool _timeout=false;
+  bool _timeout = false;
 
   @override
   void initState() {
@@ -51,21 +52,19 @@ class _RequesterScreenState extends State<RequesterScreen> {
     });
 
     setState(() {
-      _lastRequestId = doc.id;
-      _lastAddress = null;
-      _lastAddressKey = null;
+      _pendingRequestId = doc.id;
+      _timeout = false;
     });
-	_timeout=false;
-	Future.delayed(const Duration(seconds: 60), () {
-    if (!mounted) return;
 
-    if (_lastRequestId == doc.id) {
-      setState(() {
-        _timeout = true;
-      });
-    }
-  });
-	
+    Future.delayed(const Duration(seconds: 60), () {
+      if (!mounted) return;
+
+      if (_pendingRequestId == doc.id) {
+        setState(() {
+          _timeout = true;
+        });
+      }
+    });
   }
 
   Future<void> _openInMaps(double lat, double lng) async {
@@ -125,8 +124,9 @@ class _RequesterScreenState extends State<RequesterScreen> {
       );
     }
 
-    final requestId = _lastRequestId;
     final theme = Theme.of(context);
+    final visibleRequestId = _lastRequestId;
+    final pendingRequestId = _pendingRequestId;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
@@ -283,9 +283,8 @@ class _RequesterScreenState extends State<RequesterScreen> {
                           );
                         }
 
-                        final hasSelected = docs.any(
-                          (doc) => doc.id == _selectedLocatorId,
-                        );
+                        final hasSelected =
+                            docs.any((doc) => doc.id == _selectedLocatorId);
 
                         if (!hasSelected) {
                           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -342,7 +341,8 @@ class _RequesterScreenState extends State<RequesterScreen> {
               ),
             ),
             const SizedBox(height: 14),
-            if (requestId == null)
+
+            if (visibleRequestId == null && pendingRequestId == null)
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -388,203 +388,245 @@ class _RequesterScreenState extends State<RequesterScreen> {
                   ],
                 ),
               ),
-			if (requestId != null)
+
+            if (pendingRequestId != null) ...[
+              _StatusCard(
+                icon: _timeout
+                    ? Icons.error_outline
+                    : Icons.hourglass_top_rounded,
+                iconBg: _timeout
+                    ? const Color(0xFFFEF2F2)
+                    : const Color(0xFFFFF7ED),
+                iconColor: _timeout
+                    ? const Color(0xFFDC2626)
+                    : const Color(0xFFEA580C),
+                title: _timeout
+                    ? 'Locator did not respond'
+                    : 'Waiting for response',
+                subtitle: _timeout
+                    ? 'Please try again'
+                    : 'Request sent successfully. Waiting for locator device...',
+              ),
+              const SizedBox(height: 14),
+            ],
+
+            if (pendingRequestId != null || visibleRequestId != null)
               StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
                     .collection('requesters')
                     .doc(requesterId)
                     .collection('responses')
-                    .doc(requestId)
+                    .doc(pendingRequestId ?? visibleRequestId)
                     .snapshots(),
                 builder: (context, snapshot) {
-				if (_timeout) {
-				  return _StatusCard(
-					icon: Icons.error_outline,
-					iconBg: Color(0xFFFEF2F2),
-					iconColor: Color(0xFFDC2626),
-					title: "Locator did not respond",
-					subtitle: "Please try again",
-				  );
-				}
-                  if (!snapshot.hasData) {
-                    return const _StatusCard(
-                      icon: Icons.hourglass_top_rounded,
-                      iconBg: Color(0xFFFFF7ED),
-                      iconColor: Color(0xFFEA580C),
-                      title: 'Waiting for response',
-                      subtitle:
-                          'Request sent successfully. Waiting for locator device...',
-                    );
+                  final data = snapshot.data?.data();
+
+                  if (data != null) {
+                    final status = (data['status'] ?? '').toString();
+                    final lat = (data['lat'] as num?)?.toDouble();
+                    final lng = (data['lng'] as num?)?.toDouble();
+                    final hasFix =
+                        (status == 'ok' && lat != null && lng != null);
+
+                    if (hasFix && pendingRequestId != null) {
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
+                        setState(() {
+                          _lastRequestId = pendingRequestId;
+                          _pendingRequestId = null;
+                          _timeout = false;
+                          _lastAddress = null;
+                          _lastAddressKey = null;
+                        });
+                      });
+                    }
                   }
 
-                  final data = snapshot.data!.data();
-                  if (data == null) {
-                    return const _StatusCard(
-                      icon: Icons.hourglass_top_rounded,
-                      iconBg: Color(0xFFFFF7ED),
-                      iconColor: Color(0xFFEA580C),
-                      title: 'Waiting for response',
-                      subtitle:
-                          'Request sent successfully. Waiting for locator device...',
-                    );
+                  if (visibleRequestId == null && pendingRequestId != null) {
+                    // Henüz daha önce hiç sonuç yoksa ve yeni cevap da gelmediyse
+                    if (data == null) {
+                      return const SizedBox();
+                    }
                   }
 
-                  final status = (data['status'] ?? '').toString();
-                  final lat = (data['lat'] as num?)?.toDouble();
-                  final lng = (data['lng'] as num?)?.toDouble();
-                  final acc = (data['acc'] as num?)?.toDouble();
-                  final ts = data['ts'] as Timestamp?;
-				  final battery = (data['battery'] as num?)?.toInt();
-
-                  final hasFix = (status == 'ok' && lat != null && lng != null);
-				  if (hasFix && _timeout) {
-					  WidgetsBinding.instance.addPostFrameCallback((_) {
-						if (!mounted) return;
-						setState(() {
-						  _timeout = false;
-						});
-					  });
-					}
-
-                  if (!hasFix) {
-                    return _StatusCard(
-                      icon: Icons.sync_problem_rounded,
-                      iconBg: const Color(0xFFFEF2F2),
-                      iconColor: const Color(0xFFDC2626),
-                      title: 'Response received',
-                      subtitle: 'Status: $status\nWaiting for valid location...',
-                    );
+                  if (visibleRequestId == null && pendingRequestId == null) {
+                    return const SizedBox();
                   }
 
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    _resolveAddress(lat!, lng!);
-                  });
+                  final displayDocId = _lastRequestId ?? visibleRequestId;
+                  if (displayDocId == null) {
+                    return const SizedBox();
+                  }
 
-                  return Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x120F172A),
-                          blurRadius: 18,
-                          offset: Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFDCFCE7),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(
-                                Icons.location_on_rounded,
-                                color: Color(0xFF16A34A),
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              'Location result',
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: const Color(0xFF0F172A),
-                              ),
+                  return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                    stream: FirebaseFirestore.instance
+                        .collection('requesters')
+                        .doc(requesterId)
+                        .collection('responses')
+                        .doc(displayDocId)
+                        .snapshots(),
+                    builder: (context, visibleSnapshot) {
+                      final visibleData = visibleSnapshot.data?.data();
+
+                      if (visibleData == null) {
+                        return const SizedBox();
+                      }
+
+                      final status = (visibleData['status'] ?? '').toString();
+                      final lat = (visibleData['lat'] as num?)?.toDouble();
+                      final lng = (visibleData['lng'] as num?)?.toDouble();
+                      final acc = (visibleData['acc'] as num?)?.toDouble();
+                      final ts = visibleData['ts'] as Timestamp?;
+                      final battery =
+                          (visibleData['battery'] as num?)?.toInt();
+
+                      final hasFix =
+                          (status == 'ok' && lat != null && lng != null);
+
+                      if (!hasFix) {
+                        return _StatusCard(
+                          icon: Icons.sync_problem_rounded,
+                          iconBg: const Color(0xFFFEF2F2),
+                          iconColor: const Color(0xFFDC2626),
+                          title: 'Response received',
+                          subtitle:
+                              'Status: $status\nWaiting for valid location...',
+                        );
+                      }
+
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _resolveAddress(lat!, lng!);
+                      });
+
+                      return Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x120F172A),
+                              blurRadius: 18,
+                              offset: Offset(0, 8),
                             ),
                           ],
                         ),
-                        if (_lastAddress != null) ...[
-                          const SizedBox(height: 12),
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(
-                                color: const Color(0xFFE2E8F0),
-                              ),
-                            ),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
                               children: [
-                                const Padding(
-                                  padding: EdgeInsets.only(top: 2),
-                                  child: Icon(
-                                    Icons.place_rounded,
-                                    color: Color(0xFF1D4ED8),
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFDCFCE7),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.location_on_rounded,
+                                    color: Color(0xFF16A34A),
+                                    size: 20,
                                   ),
                                 ),
                                 const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    _lastAddress!,
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: const Color(0xFF0F172A),
-                                      height: 1.4,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                Text(
+                                  'Location result',
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: const Color(0xFF0F172A),
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                        ],
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 8,
-                          children: [
-                            _MiniInfo(
-                              icon: Icons.gps_fixed_rounded,
-                              text: acc != null
-                                  ? 'Accuracy ${acc.toStringAsFixed(0)} m'
-                                  : 'Accuracy -',
+                            if (_lastAddress != null) ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: const Color(0xFFE2E8F0),
+                                  ),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 2),
+                                      child: Icon(
+                                        Icons.place_rounded,
+                                        color: Color(0xFF1D4ED8),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        _lastAddress!,
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                          color: const Color(0xFF0F172A),
+                                          height: 1.4,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 8,
+                              children: [
+                                _MiniInfo(
+                                  icon: Icons.gps_fixed_rounded,
+                                  text: acc != null
+                                      ? 'Accuracy ${acc.toStringAsFixed(0)} m'
+                                      : 'Accuracy -',
+                                ),
+                                if (battery != null)
+                                  _MiniInfo(
+                                    icon: Icons.battery_full,
+                                    text: 'Battery $battery%',
+                                  ),
+                                _MiniInfo(
+                                  icon: Icons.schedule_rounded,
+                                  text: ts != null ? timeAgo(ts) : '-',
+                                ),
+                              ],
                             ),
-							if (battery != null)
-							  _MiniInfo(
-								icon: Icons.battery_full,
-								text: 'Battery $battery%',
-							  ),
-                            _MiniInfo(
-                              icon: Icons.schedule_rounded,
-                              text: ts != null ? timeAgo(ts) : '-',
+                            const SizedBox(height: 14),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: () => _openInMaps(lat, lng),
+                                icon: const Icon(Icons.map_rounded),
+                                label: const Text('Open in Maps'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: const Color(0xFF1D4ED8),
+                                  side: const BorderSide(
+                                      color: Color(0xFFBFDBFE)),
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                  textStyle: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 14),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: () => _openInMaps(lat, lng),
-                            icon: const Icon(Icons.map_rounded),
-                            label: const Text('Open in Maps'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: const Color(0xFF1D4ED8),
-                              side:
-                                  const BorderSide(color: Color(0xFFBFDBFE)),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                              textStyle: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   );
                 },
               ),
