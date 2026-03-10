@@ -1,14 +1,11 @@
 
 3 Multi requester
 Örnek:
-
-
 child locator
    ↑
 mother requester
 father requester
 Gerekecek:
-
 
 pairs/
    requesterId
@@ -35,14 +32,6 @@ internet gidip gelmesi
 uçak modu
 
 
-9 App kurulurken LOC izin isteme
-Role seçildiğinde:
-
-
-locator → permissions
-İstenmeli:
-location always
-notification
 
 10 Marka & isim
 NCare geçici.

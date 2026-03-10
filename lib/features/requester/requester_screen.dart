@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/identity_manager.dart';
 import 'add_locator_screen.dart';
+import 'package:intl/intl.dart';
 
 class RequesterScreen extends StatefulWidget {
   const RequesterScreen({super.key});
@@ -104,18 +105,12 @@ class _RequesterScreenState extends State<RequesterScreen> {
       // sessiz geç
     }
   }
-
-  String timeAgo(Timestamp ts) {
-    final now = DateTime.now();
-    final time = ts.toDate();
-    final diff = now.difference(time);
-
-    if (diff.inSeconds < 5) return "Just now";
-    if (diff.inSeconds < 60) return "${diff.inSeconds} sec ago";
-    if (diff.inMinutes < 60) return "${diff.inMinutes} min ago";
-    return "${diff.inHours} h ago";
-  }
-
+  String lastSeen(Timestamp ts) {
+	  final time = ts.toDate();
+	  final formatted = DateFormat('d MMM yyyy • HH:mm').format(time);
+	  return 'Last seen $formatted';
+	}
+	
   @override
   Widget build(BuildContext context) {
     if (requesterId == null) {
@@ -596,7 +591,7 @@ class _RequesterScreenState extends State<RequesterScreen> {
                                   ),
                                 _MiniInfo(
                                   icon: Icons.schedule_rounded,
-                                  text: ts != null ? timeAgo(ts) : '-',
+                                  text: ts != null ? lastSeen(ts) : '-',
                                 ),
                               ],
                             ),
