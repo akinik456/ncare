@@ -1,17 +1,4 @@
 
-2 Eski response silinmemesi
-Şu an:
-
-request → response overwrite
-oluyor.
-İstediğimiz:
-
-responses/
-   request1
-   request2
-   request3
-UI sadece sonuncuyu gösterir.
-
 3 Multi requester
 Örnek:
 
@@ -47,16 +34,6 @@ restart
 internet gidip gelmesi
 uçak modu
 
-8 Locator online / offline
-Firestore alanı:
-
-
-locators/{locatorId}
-   lastSeen
-UI:
-
-
-Ali • Online
 
 9 App kurulurken LOC izin isteme
 Role seçildiğinde:

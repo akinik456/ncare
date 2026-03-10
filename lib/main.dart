@@ -183,7 +183,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       return;
     }
 
-    final perm = await Permission.locationAlways.status;
+    final perm = await Permission.locationWhenInUse.status;
     if (!perm.isGranted) {
       await responseRef.set({
         'locatorId': myLocatorId,

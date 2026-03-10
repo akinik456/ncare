@@ -43,11 +43,11 @@ class DeviceStateManager {
     // While-in-use first
     await Permission.location.request();
     // Then always (may open settings flow depending on device)
-    await Permission.locationAlways.request();
+    await Permission.locationWhenInUse.request();
   }
 
   Future<void> _checkState() async {
-    final perm = await Permission.locationAlways.status;
+    final perm = await Permission.locationWhenInUse.status;
     final gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
 
     _updateReady(perm.isGranted && gpsEnabled);

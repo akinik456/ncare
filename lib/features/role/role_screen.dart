@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/role_manager.dart';
 import '../home/home_screen.dart';
 import '../requester/requester_screen.dart';
+import '../locator/locator_permission_screen.dart';
 
 class RoleScreen extends StatelessWidget {
   const RoleScreen({super.key});
@@ -13,9 +14,9 @@ class RoleScreen extends StatelessWidget {
     if (!context.mounted) return;
 
     if (role == "locator") {
-      Navigator.pushReplacement(
+      Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        MaterialPageRoute(builder: (_) => const LocatorPermissionScreen()),
       );
     } else {
       Navigator.pushReplacement(
