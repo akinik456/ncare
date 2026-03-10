@@ -4,6 +4,7 @@ import '../../core/role_manager.dart';
 import '../home/home_screen.dart';
 import '../requester/requester_screen.dart';
 import '../locator/locator_permission_screen.dart';
+import '../setup/name_screen.dart';
 
 class RoleScreen extends StatelessWidget {
   const RoleScreen({super.key});
@@ -16,12 +17,12 @@ class RoleScreen extends StatelessWidget {
     if (role == "locator") {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const LocatorPermissionScreen()),
+        MaterialPageRoute(builder: (_) => const NameScreen()),
       );
     } else {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const RequesterScreen()),
+        MaterialPageRoute(builder: (_) => const NameScreen()),
       );
     }
   }

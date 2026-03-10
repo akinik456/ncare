@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/device_state_manager.dart';
 import '../../core/identity_manager.dart';
@@ -17,11 +18,13 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String? locatorId;
+  String? locatorName;
 
   @override
   void initState() {
     super.initState();
     _initLocatorId();
+	_loadLocatorName();
   }
 
   Future<void> _initLocatorId() async {
@@ -33,6 +36,19 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     _checkPairing();
+  }
+  
+  Future<void> _loadLocatorName() async {
+  final locatorId = await IdentityManager.getRequesterId(); 
+  final doc = await FirebaseFirestore.instance
+  .collection('locators')
+  .doc(locatorId)
+  .get(); 
+  if (!mounted) return; 
+  setState(() {
+  locatorName = doc.data()?['name'] ??
+  "Locator";
+  }); 
   }
 
   Future<void> _checkPairing() async {
@@ -59,6 +75,40 @@ class _HomeScreenState extends State<HomeScreen> {
       print("PAIRING ERROR => $e");
     }
   }
+  Future<void> _sendCallMeAlert() async {
+
+  final locatorId = await IdentityManager.getRequesterId();
+
+  final locatorDoc = await FirebaseFirestore.instance
+      .collection('locators')
+      .doc(locatorId)
+      .get();
+
+  final requesterId = locatorDoc.data()?['pairedRequesterId'];
+
+  if (requesterId == null || requesterId.isEmpty) return;
+
+  await FirebaseFirestore.instance
+      .collection('requesters')
+      .doc(requesterId)
+      .collection('alerts')
+      .add({
+    'type': 'call_me',
+    'locatorId': locatorId,
+    'ts': FieldValue.serverTimestamp(),
+  });
+
+  if (!mounted) return;
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text("Call request sent"),
+      duration: Duration(seconds: 2),
+    ),
+  );
+}
+
+  
 
   @override
   Widget build(BuildContext context) {
@@ -69,10 +119,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final theme = Theme.of(context);
-
+	
     final qrData = jsonEncode({
       'type': 'ncare_locator',
       'locatorId': locatorId,
+	  'locatorName':locatorName ?? "Locator",
     });
 
     return Scaffold(
@@ -278,6 +329,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                       ),
+					  const SizedBox(height:12),
+					  FilledButton.icon(
+						onPressed: _sendCallMeAlert,
+						icon: const Icon(Icons.call),
+						label: const Text("Call requester"),
+					  ),	  
                       const SizedBox(height: 14),
                       Container(
                         padding: const EdgeInsets.all(16),

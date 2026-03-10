@@ -36,12 +36,21 @@ Future<void> _save() async {
 
     print("REQUESTER SIDE LOCATOR SAVED");
 
-    await FirebaseFirestore.instance
-        .collection('locators')
-        .doc(locatorId)
-        .set({
-      'pairedRequesterId': requesterId,
-    }, SetOptions(merge: true));
+    final requesterDoc = await FirebaseFirestore.instance
+		.collection('requesters')
+		.doc(requesterId)
+		.get();
+
+	final requesterName =
+		(requesterDoc.data()?['name'] ?? '').toString();
+		
+	await FirebaseFirestore.instance
+		.collection('locators')
+		.doc(widget.locatorId)
+		.set({
+	  'pairedRequesterId': requesterId,
+	  'requesterName': requesterName,
+	}, SetOptions(merge: true));
 
     print("TOP LEVEL PAIR SAVED");
 
