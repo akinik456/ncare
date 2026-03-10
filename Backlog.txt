@@ -1,0 +1,116 @@
+1 Timeout UX (yeni yaptık)
+locator cevap vermezse timeout kartı belki Try again butonu eklenebilir
+
+2 Eski response silinmemesi
+Şu an:
+
+request → response overwrite
+oluyor.
+İstediğimiz:
+
+responses/
+   request1
+   request2
+   request3
+UI sadece sonuncuyu gösterir.
+
+3 Multi requester
+Örnek:
+
+
+child locator
+   ↑
+mother requester
+father requester
+Gerekecek:
+
+
+pairs/
+   requesterId
+   locatorId
+   
+4 Locator battery %
+Locator response içine:
+
+
+battery: 82
+UI:
+
+
+Ali
+Battery 82%
+Accuracy 8m
+
+5 Konum geçmişi (tartışılacak)
+Şu an:
+
+
+responses/requestId
+Kalıcı.
+Ama konuşmamız gereken:
+geçmiş tutulacak mı
+kaç gün tutulacak
+privacy konusu
+
+6 Yeni request eski response'u silmesin
+Şu an:
+
+
+lastRequestId
+UI değişiyor.
+Ama eski data Firestore'da kalmalı.
+
+7 Locator bg / fg / restart testleri
+Test senaryoları:
+app kapalı
+ekran kilitli
+restart
+internet gidip gelmesi
+uçak modu
+
+8 Locator online / offline
+Firestore alanı:
+
+
+locators/{locatorId}
+   lastSeen
+UI:
+
+
+Ali • Online
+
+9 App kurulurken LOC izin isteme
+Role seçildiğinde:
+
+
+locator → permissions
+İstenmeli:
+location always
+notification
+
+10 Marka & isim
+NCare geçici.
+Alternatifler konuşulacak.
+
+11 App icon
+Play Store için gerekli.
+
+12 Locator silme / pasif yapma
+Requester tarafında:
+
+
+locators/
+   active:false
+   
+13 Call me (locator ring)
+Requester → locator
+
+
+type: call
+Locator:
+
+14 UI Polish
+
+15 locator eklerken call me , battery low bildirim izinleri
+
+

@@ -1,0 +1,1176 @@
+import 'package:geocoding/geocoding.dart';
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../core/identity_manager.dart';
+import 'add_locator_screen.dart';
+
+class RequesterScreen extends StatefulWidget {
+  const RequesterScreen({super.key});
+
+  @override
+  State<RequesterScreen> createState() => _RequesterScreenState();
+}
+
+class _RequesterScreenState extends State<RequesterScreen> {
+  String? _lastRequestId;
+  String? _lastAddress;
+  String? _lastAddressKey;
+  String? requesterId;
+  String? _selectedLocatorId;
+
+  @override
+  void initState() {
+    super.initState();
+    _initRequesterId();
+  }
+
+  Future<void> _initRequesterId() async {
+    final id = await IdentityManager.getRequesterId();
+    if (!mounted) return;
+
+    setState(() {
+      requesterId = id;
+    });
+  }
+
+  Future<void> _sendRequest() async {
+    if (requesterId == null || requesterId!.isEmpty) return;
+    if (_selectedLocatorId == null || _selectedLocatorId!.isEmpty) return;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('requesters')
+        .doc(requesterId)
+        .collection('requests')
+        .add({
+      'type': 'rl',
+      'locatorId': _selectedLocatorId,
+      'ts': FieldValue.serverTimestamp(),
+    });
+
+    if (!mounted) return;
+    setState(() {
+      _lastRequestId = doc.id;
+      _lastAddress = null;
+      _lastAddressKey = null;
+    });
+  }
+
+  Future<void> _openInMaps(double lat, double lng) async {
+    final uri =
+        Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      // silent
+    }
+  }
+
+  Future<void> _resolveAddress(double lat, double lng) async {
+    final key = '${lat.toStringAsFixed(5)},${lng.toStringAsFixed(5)}';
+    if (_lastAddressKey == key && _lastAddress != null) return;
+
+    try {
+      final placemarks = await placemarkFromCoordinates(lat, lng);
+      if (placemarks.isEmpty) return;
+
+      final p = placemarks.first;
+
+      final parts = <String>[
+        if ((p.street ?? '').trim().isNotEmpty) p.street!.trim(),
+        if ((p.locality ?? '').trim().isNotEmpty) p.locality!.trim(),
+        if ((p.administrativeArea ?? '').trim().isNotEmpty)
+          p.administrativeArea!.trim(),
+      ];
+
+      final addr = parts.where((e) => e.isNotEmpty).join(', ');
+      if (addr.isEmpty) return;
+
+      if (!mounted) return;
+      setState(() {
+        _lastAddressKey = key;
+        _lastAddress = addr;
+      });
+    } catch (_) {
+      // silent
+    }
+  }
+
+  String timeAgo(Timestamp ts) {
+    final now = DateTime.now();
+    final time = ts.toDate();
+    final diff = now.difference(time);
+
+    if (diff.inSeconds < 5) return 'Just now';
+    if (diff.inSeconds < 60) return '${diff.inSeconds} sec ago';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    return '${diff.inHours} h ago';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (requesterId == null) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF07111F),
+        body: Center(
+          child: CircularProgressIndicator(
+            color: Color(0xFF4FD1FF),
+          ),
+        ),
+      );
+    }
+
+    final requestId = _lastRequestId;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFF07111F),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF07111F),
+        elevation: 0,
+        centerTitle: false,
+        titleSpacing: 20,
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'NCare',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 22,
+                letterSpacing: -0.5,
+              ),
+            ),
+            SizedBox(height: 2),
+            Text(
+              'Requester Console',
+              style: TextStyle(
+                color: Color(0xFF7DD3FC),
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 14),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AddLocatorScreen()),
+                );
+              },
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0E1A2B),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: const Color(0xFF17314D),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.add_rounded,
+                      color: Color(0xFF7DD3FC),
+                      size: 18,
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      'Add',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
+          children: [
+            _HeroRadarPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const _SectionEyebrow(
+                    icon: Icons.radar_rounded,
+                    text: 'LIVE REQUEST',
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Locate your\nselected device.',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 30,
+                      height: 1.05,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    _selectedLocatorId == null
+                        ? 'Add a locator and begin a live location request.'
+                        : 'A request will be sent instantly to the selected locator.',
+                    style: const TextStyle(
+                      color: Color(0xFF9FB3C8),
+                      fontSize: 14.5,
+                      height: 1.45,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF55E6FF),
+                            Color(0xFF0EA5E9),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x5522D3EE),
+                            blurRadius: 28,
+                            offset: Offset(0, 12),
+                          ),
+                        ],
+                      ),
+                      child: ElevatedButton.icon(
+                        onPressed:
+                            _selectedLocatorId == null ? null : _sendRequest,
+                        icon: const Icon(Icons.navigation_rounded),
+                        label: const Text('REQUEST LOCATION'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          foregroundColor: const Color(0xFF03111C),
+                          disabledBackgroundColor: Colors.transparent,
+                          disabledForegroundColor:
+                              Colors.white.withOpacity(0.45),
+                          minimumSize: const Size.fromHeight(60),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xCC091424),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: const Color(0xFF17314D),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _selectedLocatorId == null
+                              ? Icons.portable_wifi_off_rounded
+                              : Icons.memory_rounded,
+                          color: _selectedLocatorId == null
+                              ? const Color(0xFF64748B)
+                              : const Color(0xFF67E8F9),
+                          size: 18,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _selectedLocatorId == null
+                                ? 'No locator selected'
+                                : 'Selected locator is ready for live request',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            const _BlockTitle(
+              title: 'Available Locators',
+              subtitle: 'Select one device to receive the request',
+            ),
+            const SizedBox(height: 12),
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('requesters')
+                  .doc(requesterId)
+                  .collection('locators')
+                  .where('active', isEqualTo: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                final docs = snapshot.data?.docs ?? [];
+
+                if (docs.isEmpty) {
+                  return const _DarkEmptyCard(
+                    icon: Icons.devices_other_rounded,
+                    title: 'No active locator found',
+                    subtitle:
+                        'Tap Add and connect a locator before sending a live request.',
+                  );
+                }
+
+                final hasSelected =
+                    docs.any((doc) => doc.id == _selectedLocatorId);
+
+                if (!hasSelected) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!mounted) return;
+                    setState(() {
+                      _selectedLocatorId = docs.first.id;
+                    });
+                  });
+                }
+
+                return Column(
+                  children: docs.map((doc) {
+                    final locatorId = doc.id;
+                    final name = (doc.data()['name'] ?? locatorId).toString();
+                    final selected = locatorId == _selectedLocatorId;
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _LocatorCard(
+                        name: name,
+                        locatorId: locatorId,
+                        selected: selected,
+                        onTap: () {
+                          setState(() {
+                            _selectedLocatorId = locatorId;
+                          });
+                        },
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+            const SizedBox(height: 8),
+            const _BlockTitle(
+              title: 'Response Feed',
+              subtitle: 'Live status and latest valid location result',
+            ),
+            const SizedBox(height: 12),
+            if (requestId == null)
+              const _DarkEmptyCard(
+                icon: Icons.stream_rounded,
+                title: 'No request yet',
+                subtitle:
+                    'Choose a locator and press REQUEST LOCATION to start tracking.',
+              ),
+            if (requestId != null)
+              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                stream: FirebaseFirestore.instance
+                    .collection('requesters')
+                    .doc(requesterId)
+                    .collection('responses')
+                    .doc(requestId)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) {
+                    return const _TechStatusCard(
+                      accent: Color(0xFFF59E0B),
+                      icon: Icons.radar_rounded,
+                      title: 'Contacting locator...',
+                      subtitle:
+                          'Request sent successfully. Waiting for locator response.',
+                    );
+                  }
+
+                  final data = snapshot.data!.data();
+                  if (data == null) {
+                    return const _TechStatusCard(
+                      accent: Color(0xFFF59E0B),
+                      icon: Icons.radar_rounded,
+                      title: 'Contacting locator...',
+                      subtitle:
+                          'Request sent successfully. Waiting for locator response.',
+                    );
+                  }
+
+                  final status = (data['status'] ?? '').toString();
+                  final lat = (data['lat'] as num?)?.toDouble();
+                  final lng = (data['lng'] as num?)?.toDouble();
+                  final acc = (data['acc'] as num?)?.toDouble();
+                  final ts = data['ts'] as Timestamp?;
+
+                  final hasFix = (status == 'ok' && lat != null && lng != null);
+
+                  if (!hasFix) {
+                    return _TechStatusCard(
+                      accent: const Color(0xFFFB7185),
+                      icon: Icons.sync_problem_rounded,
+                      title: 'Response received',
+                      subtitle: 'Status: $status\nWaiting for valid location...',
+                    );
+                  }
+
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _resolveAddress(lat!, lng!);
+                  });
+
+                  return Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFF0C1728),
+                          Color(0xFF0A1423),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(color: const Color(0xFF17314D)),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x33000000),
+                          blurRadius: 24,
+                          offset: Offset(0, 14),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            _PulseDot(color: Color(0xFF4ADE80)),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'LOCATION LOCKED',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 20,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Valid coordinates received from locator',
+                          style: TextStyle(
+                            color: Color(0xFF8EA5BC),
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF091321),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: const Color(0xFF15314E),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: const [
+                                  Icon(
+                                    Icons.place_rounded,
+                                    color: Color(0xFF55E6FF),
+                                    size: 18,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'ADDRESS',
+                                    style: TextStyle(
+                                      color: Color(0xFF72D8FF),
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 12,
+                                      letterSpacing: 1.0,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                _lastAddress ?? 'Resolving address...',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  height: 1.4,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            _InfoTile(
+                              icon: Icons.gps_fixed_rounded,
+                              label: 'Accuracy',
+                              value: acc != null
+                                  ? '${acc.toStringAsFixed(0)} m'
+                                  : '-',
+                            ),
+                            _InfoTile(
+                              icon: Icons.schedule_rounded,
+                              label: 'Updated',
+                              value: ts != null ? timeAgo(ts) : '-',
+                            ),
+                            _InfoTile(
+                              icon: Icons.pin_drop_rounded,
+                              label: 'Coordinates',
+                              value:
+                                  '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        SizedBox(
+                          width: double.infinity,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFF234A70)),
+                              gradient: const LinearGradient(
+                                colors: [
+                                  Color(0xFF0E2237),
+                                  Color(0xFF0B1A2D),
+                                ],
+                              ),
+                            ),
+                            child: ElevatedButton.icon(
+                              onPressed: () => _openInMaps(lat, lng),
+                              icon: const Icon(Icons.map_rounded),
+                              label: const Text('OPEN IN MAPS'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                foregroundColor: const Color(0xFF72D8FF),
+                                minimumSize: const Size.fromHeight(56),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                textStyle: const TextStyle(
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 14,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroRadarPanel extends StatelessWidget {
+  final Widget child;
+
+  const _HeroRadarPanel({
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF0E1C31),
+            Color(0xFF0A1322),
+            Color(0xFF08111D),
+          ],
+        ),
+        border: Border.all(color: const Color(0xFF17314D)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x44000000),
+            blurRadius: 28,
+            offset: Offset(0, 16),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -20,
+            right: -10,
+            child: IgnorePointer(
+              child: Container(
+                width: 170,
+                height: 170,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFF22D3EE).withOpacity(0.28),
+                      const Color(0xFF22D3EE).withOpacity(0.08),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 18,
+            right: 18,
+            child: IgnorePointer(
+              child: Column(
+                children: const [
+                  _RadarRing(size: 94),
+                  SizedBox(height: 10),
+                ],
+              ),
+            ),
+          ),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _RadarRing extends StatelessWidget {
+  final double size;
+
+  const _RadarRing({
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: const Color(0xFF4FD1FF).withOpacity(0.45),
+          width: 1.2,
+        ),
+      ),
+      child: Center(
+        child: Container(
+          width: size * 0.58,
+          height: size * 0.58,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFF4FD1FF).withOpacity(0.35),
+              width: 1.1,
+            ),
+          ),
+          child: Center(
+            child: Container(
+              width: size * 0.12,
+              height: size * 0.12,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Color(0xFF67E8F9),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionEyebrow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _SectionEyebrow({
+    required this.icon,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 15, color: const Color(0xFF72D8FF)),
+        const SizedBox(width: 7),
+        Text(
+          text,
+          style: const TextStyle(
+            color: Color(0xFF72D8FF),
+            fontSize: 11.5,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.1,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BlockTitle extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _BlockTitle({
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              color: Color(0xFF7D93AA),
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocatorCard extends StatelessWidget {
+  final String name;
+  final String locatorId;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _LocatorCard({
+    required this.name,
+    required this.locatorId,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final glow = selected
+        ? const Color(0xFF22D3EE).withOpacity(0.20)
+        : Colors.transparent;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(24),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          gradient: selected
+              ? const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF102238),
+                    Color(0xFF0B1828),
+                  ],
+                )
+              : const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF0A1422),
+                    Color(0xFF09111D),
+                  ],
+                ),
+          border: Border.all(
+            color: selected
+                ? const Color(0xFF34D3FF)
+                : const Color(0xFF17314D),
+            width: selected ? 1.4 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: glow,
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                gradient: selected
+                    ? const LinearGradient(
+                        colors: [Color(0xFF22D3EE), Color(0xFF0EA5E9)],
+                      )
+                    : const LinearGradient(
+                        colors: [Color(0xFF122235), Color(0xFF0B1826)],
+                      ),
+              ),
+              child: Icon(
+                selected
+                    ? Icons.radar_rounded
+                    : Icons.devices_other_rounded,
+                color: selected ? const Color(0xFF04111C) : Colors.white,
+                size: 26,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    selected
+                        ? 'Selected locator • ready to receive request'
+                        : 'Tap to select this locator',
+                    style: TextStyle(
+                      color: selected
+                          ? const Color(0xFF84E7FF)
+                          : const Color(0xFF7D93AA),
+                      fontSize: 13.2,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? const Color(0xFF4ADE80)
+                              : const Color(0xFF64748B),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 7),
+                      Text(
+                        selected ? 'LINK ACTIVE' : 'STANDBY',
+                        style: TextStyle(
+                          color: selected
+                              ? const Color(0xFFB6F7C7)
+                              : const Color(0xFF90A2B4),
+                          fontWeight: FontWeight.w800,
+                          fontSize: 11.5,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              selected
+                  ? Icons.check_circle_rounded
+                  : Icons.chevron_right_rounded,
+              color: selected
+                  ? const Color(0xFF67E8F9)
+                  : const Color(0xFF6B8299),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DarkEmptyCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _DarkEmptyCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A1422),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFF17314D)),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 62,
+            height: 62,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF0F2235),
+              border: Border.all(color: const Color(0xFF17314D)),
+            ),
+            child: Icon(
+              icon,
+              color: const Color(0xFF72D8FF),
+              size: 28,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF7D93AA),
+              fontSize: 14,
+              height: 1.45,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TechStatusCard extends StatelessWidget {
+  final Color accent;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _TechStatusCard({
+    required this.accent,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF0C1728),
+            Color(0xFF09111D),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFF17314D)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 24,
+            offset: Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 68,
+            height: 68,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: accent.withOpacity(0.12),
+              border: Border.all(color: accent.withOpacity(0.45)),
+              boxShadow: [
+                BoxShadow(
+                  color: accent.withOpacity(0.14),
+                  blurRadius: 22,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: accent, size: 32),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF8DA3B9),
+              fontSize: 14,
+              height: 1.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _InfoTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 140),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFF091321),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFF15314E)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: const Color(0xFF72D8FF)),
+          const SizedBox(height: 10),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF7C93A9),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PulseDot extends StatelessWidget {
+  final Color color;
+
+  const _PulseDot({
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.55),
+            blurRadius: 12,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+    );
+  }
+}

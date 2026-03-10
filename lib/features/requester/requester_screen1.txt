@@ -19,7 +19,6 @@ class _RequesterScreenState extends State<RequesterScreen> {
   String? _lastAddressKey;
   String? requesterId;
   String? _selectedLocatorId;
-  bool _timeout=false;
 
   @override
   void initState() {
@@ -55,17 +54,6 @@ class _RequesterScreenState extends State<RequesterScreen> {
       _lastAddress = null;
       _lastAddressKey = null;
     });
-	_timeout=false;
-	Future.delayed(const Duration(seconds: 60), () {
-    if (!mounted) return;
-
-    if (_lastRequestId == doc.id) {
-      setState(() {
-        _timeout = true;
-      });
-    }
-  });
-	
   }
 
   Future<void> _openInMaps(double lat, double lng) async {
@@ -388,7 +376,7 @@ class _RequesterScreenState extends State<RequesterScreen> {
                   ],
                 ),
               ),
-			if (requestId != null)
+            if (requestId != null)
               StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
                     .collection('requesters')
@@ -397,15 +385,6 @@ class _RequesterScreenState extends State<RequesterScreen> {
                     .doc(requestId)
                     .snapshots(),
                 builder: (context, snapshot) {
-				if (_timeout) {
-				  return _StatusCard(
-					icon: Icons.error_outline,
-					iconBg: Color(0xFFFEF2F2),
-					iconColor: Color(0xFFDC2626),
-					title: "Locator did not respond",
-					subtitle: "Please try again",
-				  );
-				}
                   if (!snapshot.hasData) {
                     return const _StatusCard(
                       icon: Icons.hourglass_top_rounded,
@@ -434,17 +413,8 @@ class _RequesterScreenState extends State<RequesterScreen> {
                   final lng = (data['lng'] as num?)?.toDouble();
                   final acc = (data['acc'] as num?)?.toDouble();
                   final ts = data['ts'] as Timestamp?;
-				  final battery = (data['battery'] as num?)?.toInt();
 
                   final hasFix = (status == 'ok' && lat != null && lng != null);
-				  if (hasFix && _timeout) {
-					  WidgetsBinding.instance.addPostFrameCallback((_) {
-						if (!mounted) return;
-						setState(() {
-						  _timeout = false;
-						});
-					  });
-					}
 
                   if (!hasFix) {
                     return _StatusCard(
@@ -550,11 +520,6 @@ class _RequesterScreenState extends State<RequesterScreen> {
                                   ? 'Accuracy ${acc.toStringAsFixed(0)} m'
                                   : 'Accuracy -',
                             ),
-							if (battery != null)
-							  _MiniInfo(
-								icon: Icons.battery_full,
-								text: 'Battery $battery%',
-							  ),
                             _MiniInfo(
                               icon: Icons.schedule_rounded,
                               text: ts != null ? timeAgo(ts) : '-',

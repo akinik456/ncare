@@ -19,6 +19,8 @@ import 'firebase_options.dart';
 
 import 'features/requester/requester_screen.dart';
 import 'core/identity_manager.dart';
+import 'package:battery_plus/battery_plus.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,7 +62,9 @@ Future<void> main() async {
       final requestId = data['requestId']?.toString();
       final requesterId = data['requesterId']?.toString();
       final targetLocatorId = data['locatorId']?.toString();
-
+      final battery = Battery();
+      final level = await battery.batteryLevel;
+	  
       if (requestId == null ||
           requestId.isEmpty ||
           requesterId == null ||
@@ -94,6 +98,7 @@ Future<void> main() async {
           'lat': pos.latitude,
           'lng': pos.longitude,
           'acc': pos.accuracy,
+		  'battery': level,
           'ts': FieldValue.serverTimestamp(),
           'via': 'fg',
         }, SetOptions(merge: true));
