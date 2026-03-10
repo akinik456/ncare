@@ -63,7 +63,7 @@ class _NameScreenState extends State<NameScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Your name')),
+      appBar: AppBar(title: const Text('Name shown on requester device')),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
