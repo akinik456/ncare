@@ -40,5 +40,42 @@ export const onRequestCreated = onDocumentCreated(
       },
       android: { priority: "high" },
     });
-  }
+  },
+);
+
+export const onAlertCreated = onDocumentCreated(
+  {
+    document: "requesters/{requesterId}/alerts/{alertId}",
+    region: "us-central1",
+  },
+  async (event) => {
+    const requesterId = event.params.requesterId;
+    const alertId = event.params.alertId;
+
+    const data = event.data?.data();
+    const type = data?.type?.toString();
+    const locatorId = data?.locatorId?.toString() ?? "";
+
+    if (type !== "call_me") {
+      console.log("ALERT IGNORED", requesterId, alertId, type);
+      return;
+    }
+
+    console.log("CALL_ME ALERT", requesterId, alertId, locatorId);
+
+    await admin.messaging().send({
+      topic: requesterId,
+      data: {
+        type: "call_me",
+        alertId,
+        requesterId,
+        locatorId,
+      },
+      notification: {
+        title: "Locator needs you",
+        body: "Please call back",
+      },
+      android: { priority: "high" },
+    });
+  },
 );
