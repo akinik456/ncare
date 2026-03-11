@@ -19,12 +19,15 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String? locatorId;
   String? locatorName;
-
+  String? requesterName;
+  String? displayname;
+  
   @override
   void initState() {
     super.initState();
     _initLocatorId();
 	_loadLocatorName();
+	_loadRequesterName();
   }
 
   Future<void> _initLocatorId() async {
@@ -37,6 +40,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
     _checkPairing();
   }
+	Future<void> _loadRequesterName() async {
+	  final locatorId = await IdentityManager.getRequesterId();
+
+	  final doc = await FirebaseFirestore.instance
+		  .collection('locators')
+		  .doc(locatorId)
+		  .get();
+
+	  if (!mounted) return;
+
+	  setState(() {
+		requesterName = doc.data()?['pairedRequesterName'];
+		displayname=
+		(requesterName!=null &&
+		requesterName!.isNotEmpty)
+		? requesterName
+		: "requester";
+	  });
+	}  
+  
   
   Future<void> _loadLocatorName() async {
   final locatorId = await IdentityManager.getRequesterId(); 
@@ -333,7 +356,7 @@ class _HomeScreenState extends State<HomeScreen> {
 					  FilledButton.icon(
 						onPressed: _sendCallMeAlert,
 						icon: const Icon(Icons.call),
-						label: const Text("Call requester"),
+						label: Text("Ask $displayname to call"),
 					  ),	  
                       const SizedBox(height: 14),
                       Container(
