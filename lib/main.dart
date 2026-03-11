@@ -197,7 +197,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       desiredAccuracy: LocationAccuracy.high,
       timeLimit: const Duration(seconds: 20),
     );
-
+final battery = Battery();
+      final level = await battery.batteryLevel;
     await responseRef.set({
       'locatorId': myLocatorId,
       'status': 'ok',

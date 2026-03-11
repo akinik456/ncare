@@ -1,10 +1,9 @@
 import 'dart:convert';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-import '../../core/identity_manager.dart';
+import 'pairing_options_screen.dart';
 
 class AddLocatorScreen extends StatefulWidget {
   const AddLocatorScreen({super.key});
@@ -39,48 +38,27 @@ class _AddLocatorScreenState extends State<AddLocatorScreen> {
       _handled = true;
       await controller.stop();
 
-      final requesterId = await IdentityManager.getRequesterId();
-
-      final requesterDoc = await FirebaseFirestore.instance
-          .collection('requesters')
-          .doc(requesterId)
-          .get();
-
-      final requesterName =
-          (requesterDoc.data()?['name'] ?? '').toString().trim();
-
-      // Requester altında locator listesi
-      await FirebaseFirestore.instance
-          .collection('requesters')
-          .doc(requesterId)
-          .collection('locators')
-          .doc(locatorId)
-          .set({
-        'name': locatorName,
-        'active': true,
-        'createdAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      // Locator ana doc: pairing bilgisi
-      await FirebaseFirestore.instance
-          .collection('locators')
-          .doc(locatorId)
-          .set({
-        'pairedRequesterId': requesterId,
-        'pairedRequesterName': requesterName,
-      }, SetOptions(merge: true));
-
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('$locatorName paired successfully'),
-          duration: const Duration(seconds: 2),
+      final paired = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PairingOptionsScreen(
+            locatorId: locatorId,
+            locatorName: locatorName,
+          ),
         ),
       );
 
-      Navigator.pop(context, true);
-    } catch (e) {
+      if (!mounted) return;
+
+      if (paired == true) {
+        Navigator.pop(context, true);
+      } else {
+        _handled = false;
+        await controller.start();
+      }
+    } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
