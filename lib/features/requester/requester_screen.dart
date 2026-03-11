@@ -67,6 +67,24 @@ class _RequesterScreenState extends State<RequesterScreen> {
       }
     });
   }
+  
+String lastSeenText(Timestamp ts) {
+  final time = ts.toDate();
+  final now = DateTime.now();
+  final diff = now.difference(time);
+
+  if (diff.inSeconds <= 60) {
+    return "Online";
+  }
+
+  final y = time.year;
+  final m = time.month.toString().padLeft(2, '0');
+  final d = time.day.toString().padLeft(2, '0');
+  final h = time.hour.toString().padLeft(2, '0');
+  final min = time.minute.toString().padLeft(2, '0');
+
+  return "Last seen $y-$m-$d $h:$min";
+}    
 
   Future<void> _openInMaps(double lat, double lng) async {
     final uri =
@@ -477,7 +495,9 @@ class _RequesterScreenState extends State<RequesterScreen> {
 
                       final hasFix =
                           (status == 'ok' && lat != null && lng != null);
-
+					  final online = ts != null &&
+								DateTime.now().difference(ts.toDate()).inSeconds<=60;
+								
                       if (!hasFix) {
                         return _StatusCard(
                           icon: Icons.sync_problem_rounded,
@@ -589,10 +609,13 @@ class _RequesterScreenState extends State<RequesterScreen> {
                                     icon: Icons.battery_full,
                                     text: 'Battery $battery%',
                                   ),
+															
+								  
                                 _MiniInfo(
-                                  icon: Icons.schedule_rounded,
-                                  text: ts != null ? lastSeen(ts) : '-',
+                                  icon: Icons.circle,
+                                  text: online ? "Online" :  lastSeenText(ts!) ,
                                 ),
+								
                               ],
                             ),
                             const SizedBox(height: 14),

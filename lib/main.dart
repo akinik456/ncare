@@ -204,6 +204,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       'lat': pos.latitude,
       'lng': pos.longitude,
       'acc': pos.accuracy,
+	  'battery': level,
       'ts': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 

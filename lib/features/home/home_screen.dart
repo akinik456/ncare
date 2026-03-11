@@ -57,6 +57,9 @@ class _HomeScreenState extends State<HomeScreen> {
 		requesterName!.isNotEmpty)
 		? requesterName
 		: "requester";
+		
+		requesterName = (doc.data()? ['pairedRequesterName'] ?? '').toString().trim();
+				
 	  });
 	}  
   
@@ -131,7 +134,6 @@ class _HomeScreenState extends State<HomeScreen> {
   );
 }
 
-  
 
   @override
   Widget build(BuildContext context) {
@@ -352,12 +354,73 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                       ),
-					  const SizedBox(height:12),
-					  FilledButton.icon(
-						onPressed: _sendCallMeAlert,
-						icon: const Icon(Icons.call),
-						label: Text("Ask $displayname to call"),
-					  ),	  
+					  
+					  StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+  stream: FirebaseFirestore.instance
+      .collection('locators')
+      .doc(locatorId)
+      .snapshots(),
+  builder: (context, snapshot) {
+
+    final data = snapshot.data?.data();
+    final requesterName =
+        (data?['pairedRequesterName'] ?? '').toString().trim();
+
+    final paired = requesterName.isNotEmpty;
+
+    return Column(
+      children: [
+
+        /// PAIR STATUS
+						Container(
+						  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+						  decoration: BoxDecoration(
+							color: Colors.white,
+							borderRadius: BorderRadius.circular(18),
+							border: Border.all(color: const Color(0xFFE2E8F0)),
+						  ),
+						  child: Row(
+							children: [
+							  Icon(
+								paired
+									? Icons.check_circle_rounded
+									: Icons.link_off_rounded,
+								color: paired
+									? const Color(0xFF16A34A)
+									: const Color(0xFFDC2626),
+							  ),
+							  const SizedBox(width: 10),
+							  Expanded(
+								child: Text(
+								  paired
+									  ? "Paired with $requesterName"
+									  : "Not paired yet",
+								  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+										fontWeight: FontWeight.w700,
+										color: const Color(0xFF0F172A),
+									  ),
+								),
+							  ),
+							],
+						  ),
+						),
+				const SizedBox(height: 12),
+
+						/// CALL BUTTON
+						FilledButton.icon(
+						  onPressed: paired ? _sendCallMeAlert : null,
+						  icon: const Icon(Icons.call),
+						  label: Text(
+							paired
+								? "Ask $requesterName to call"
+								: "Ask requester to call",
+						  ),
+						),
+
+					  ],
+					);
+				  },
+				),
                       const SizedBox(height: 14),
                       Container(
                         padding: const EdgeInsets.all(16),
