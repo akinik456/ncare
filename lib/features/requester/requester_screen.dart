@@ -1,6 +1,7 @@
 import 'package:geocoding/geocoding.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/identity_manager.dart';
@@ -22,11 +23,18 @@ class _RequesterScreenState extends State<RequesterScreen> {
   String? requesterId;
   String? _selectedLocatorId;
   bool _timeout = false;
+  String? _callRequestFrom;
+  String? _lastAlertId;
+  String? _activeCallAlertId;
+  String? _callRequestLocatorId;
 
   @override
   void initState() {
     super.initState();
     _initRequesterId();
+
+	
+	
   }
 
   Future<void> _initRequesterId() async {
@@ -36,6 +44,7 @@ class _RequesterScreenState extends State<RequesterScreen> {
     setState(() {
       requesterId = id;
     });
+  _listenCallAlerts();
   }
 
   Future<void> _sendRequest() async {
@@ -85,6 +94,67 @@ String lastSeenText(Timestamp ts) {
 
   return "Last seen $y-$m-$d $h:$min";
 }    
+
+void _listenCallAlerts() {
+  if (requesterId == null || requesterId!.isEmpty) return;
+
+  FirebaseFirestore.instance
+      .collection('requesters')
+      .doc(requesterId)
+      .collection('alerts')
+      //.where('type', isEqualTo: 'call_me')
+      .orderBy('ts', descending: true)
+      .limit(1)
+      .snapshots()
+      .listen((snapshot) async {
+    //if (snapshot.docs.isEmpty) return;
+
+    //final doc = snapshot.docs.first;
+	
+	final docs = snapshot.docs
+      .where((d) => (d.data()['type'] ?? '').toString() == 'call_me')
+      .toList();
+
+  if (docs.isEmpty) return;
+
+  final doc = docs.first;
+	
+    if (_lastAlertId == doc.id) return;
+
+    final data = doc.data();
+    final locatorId = (data['locatorId'] ?? '').toString();
+
+    String displayName = 'Locator';
+
+    if (locatorId.isNotEmpty) {
+      final locatorDoc = await FirebaseFirestore.instance
+          .collection('requesters')
+          .doc(requesterId)
+          .collection('locators')
+          .doc(locatorId)
+          .get();
+
+      displayName =
+          (locatorDoc.data()?['name'] ?? 'Locator').toString().trim();
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _lastAlertId = doc.id;
+	  _activeCallAlertId=doc.id;
+      _callRequestFrom = displayName;
+	  _callRequestLocatorId = locatorId;
+	  
+    });
+  },onError:(e){
+  print("$e");
+  }
+  
+  );
+}
+
+
 
   Future<void> _openInMaps(double lat, double lng) async {
     final uri =
@@ -177,8 +247,69 @@ String lastSeenText(Timestamp ts) {
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+		padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           children: [
+		  if (_callRequestFrom != null)
+  Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFEF2F2),
+      borderRadius: BorderRadius.circular(18),
+      border: Border.all(color: const Color(0xFFDC2626)),
+    ),
+    child: Row(
+      children: [
+        const Icon(Icons.call, color: Color(0xFFDC2626)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            '$_callRequestFrom wants you to call',
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF7F1D1D),
+            ),
+          ),
+        ),
+        TextButton(
+onPressed: () async {
+  final locatorId = _callRequestLocatorId;
+
+  setState(() {
+    _callRequestFrom = null;
+    _callRequestLocatorId = null;
+    _activeCallAlertId = null;
+  });
+
+  if (requesterId == null || requesterId!.isEmpty || locatorId == null) {
+    return;
+  }
+
+  final snap = await FirebaseFirestore.instance
+      .collection('requesters')
+      .doc(requesterId)
+      .collection('alerts')
+      .where('type', isEqualTo: 'call_me')
+      .get();
+
+  final batch = FirebaseFirestore.instance.batch();
+
+  for (final doc in snap.docs) {
+    final data = doc.data();
+    if ((data['locatorId'] ?? '').toString() == locatorId) {
+      batch.delete(doc.reference);
+    }
+  }
+
+  await batch.commit();
+},
+
+          child: const Text('DISMISS'),
+        ),
+      ],
+    ),
+  ),
+
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
