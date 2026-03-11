@@ -16,14 +16,27 @@ class NameScreen extends StatefulWidget {
 class _NameScreenState extends State<NameScreen> {
   final controller = TextEditingController();
   bool saving = false;
+  String? role;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRole();
+  }
+
+  Future<void> _loadRole() async {
+    final r = await RoleManager.getRole();
+    if (!mounted) return;
+    setState(() {
+      role = r;
+    });
+  }
 
   Future<void> _save() async {
     final name = controller.text.trim();
     if (name.isEmpty) return;
 
     setState(() => saving = true);
-
-    final role = await RoleManager.getRole();
 
     if (role == "requester") {
       final id = await IdentityManager.getRequesterId();
@@ -62,16 +75,20 @@ class _NameScreenState extends State<NameScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final title = role == "requester"
+        ? "Name shown on locator device"
+        : "Name shown on requester device";
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Name shown on requester device')),
+      appBar: AppBar(title: Text(title)),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
             TextField(
               controller: controller,
-              decoration: const InputDecoration(
-                labelText: 'Enter your name',
+              decoration: InputDecoration(
+                labelText: title,
               ),
             ),
             const SizedBox(height: 20),
