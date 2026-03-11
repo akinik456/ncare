@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/device_state_manager.dart';
 import '../../core/identity_manager.dart';
 import '../setup/setup_screen.dart';
+import '../../core/locator_settings_reader.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -102,6 +103,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
   Future<void> _sendCallMeAlert() async {
+  final settings = await 
+  LocatorSettingsReader.load();
+  if (settings == null) return;
+  if (!settings.callEnabled) {
+  if (!mounted) return; 
+  ScaffoldMessenger.of(context).showSnackBar(
+  const SnackBar(
+  content: Text('Call request is disabled for this locator'), 
+  duration: Duration(seconds: 2),
+  ),
+  );
+  return;
+  }
+  
 
   final locatorId = await IdentityManager.getRequesterId();
 
@@ -110,7 +125,8 @@ class _HomeScreenState extends State<HomeScreen> {
       .doc(locatorId)
       .get();
 
-  final requesterId = locatorDoc.data()?['pairedRequesterId'];
+  final requesterId = settings.pairedRequesterId;
+  locatorDoc.data()?['pairedRequesterId'];
 
   if (requesterId == null || requesterId.isEmpty) return;
 
@@ -122,10 +138,10 @@ class _HomeScreenState extends State<HomeScreen> {
     'type': 'call_me',
     'locatorId': locatorId,
     'ts': FieldValue.serverTimestamp(),
+	
   });
 
   if (!mounted) return;
-
   ScaffoldMessenger.of(context).showSnackBar(
     const SnackBar(
       content: Text("Call request sent"),
