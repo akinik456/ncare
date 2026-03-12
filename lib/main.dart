@@ -50,7 +50,7 @@ Future<void> main() async {
 
     FirebaseMessaging.instance
         .subscribeToTopic(locatorTopic)
-        .timeout(const Duration(seconds: 5))
+        .timeout(const Duration(seconds: 20))
         .then((_) => print("SUBSCRIBED => $locatorTopic"))
         .catchError((e) => print("SUBSCRIBE ERR => $e"));
 
@@ -125,6 +125,16 @@ Future<void> main() async {
     });
   } else {
     print("LOCATOR FLOW SKIPPED => role=$role");
+	
+  final requesterId = await IdentityManager.getRequesterId();
+
+  FirebaseMessaging.instance
+      .subscribeToTopic(requesterId)
+      .timeout(const Duration(seconds: 20))
+      .then((_) => print("REQ SUBSCRIBED => $requesterId"))
+      .catchError((e) => print("REQ SUBSCRIBE ERR => $e"));
+
+	
   }
 
   runApp(NCareApp(setupDone: setupDone));

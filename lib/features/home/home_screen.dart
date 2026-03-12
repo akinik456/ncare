@@ -137,6 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
       .add({
     'type': 'call_me',
     'locatorId': locatorId,
+	'locatorName': locatorName,
     'ts': FieldValue.serverTimestamp(),
 	
   });

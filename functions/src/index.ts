@@ -55,13 +55,14 @@ export const onAlertCreated = onDocumentCreated(
     const data = event.data?.data();
     const type = data?.type?.toString();
     const locatorId = data?.locatorId?.toString() ?? "";
+    const locatorName = data?.locatorName?.toString() ?? "Locator";
 
     if (type !== "call_me") {
       console.log("ALERT IGNORED", requesterId, alertId, type);
       return;
     }
 
-    console.log("CALL_ME ALERT", requesterId, alertId, locatorId);
+    console.log("CALL_ME ALERT", requesterId, alertId, locatorId, locatorName);
 
     await admin.messaging().send({
       topic: requesterId,
@@ -70,10 +71,11 @@ export const onAlertCreated = onDocumentCreated(
         alertId,
         requesterId,
         locatorId,
+        locatorName,
       },
       notification: {
-        title: "Locator needs you",
-        body: "Please call back",
+        title: "Call request",
+        body: `${locatorName} wants you to call`,
       },
       android: { priority: "high" },
     });
