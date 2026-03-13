@@ -89,7 +89,17 @@ Future<void> saveDeviceWarnings(bool value) async {
   });
 }
   
+String formatLastSeen(DateTime? lastSeen) {
+  if (lastSeen == null) return "-";
 
+  final diff = DateTime.now().difference(lastSeen);
+
+  if (diff.inSeconds < 60) return "ONLINE";
+  if (diff.inMinutes < 60) return "Last seen ${diff.inMinutes}m ago";
+  if (diff.inHours < 24) return "Last seen ${diff.inHours}h ago";
+
+  return "Last seen ${diff.inDays}d ago";
+}
   
   
   @override
@@ -501,79 +511,84 @@ onPressed: () async {
                                 (doc.data()['name'] ?? locatorId).toString();
                             final selected = locatorId == _selectedLocatorId;
 
-                            return GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _selectedLocatorId = locatorId;
-                                });
-                              },
-                              child: 
-							  Column(
-  crossAxisAlignment: CrossAxisAlignment.start,
-  children: [
-
-    Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: 12,
-        vertical: 7,
-      ),
-      decoration: BoxDecoration(
-        color: selected
-            ? Colors.white
-            : Colors.white.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        name,
-        style: theme.textTheme.bodyMedium?.copyWith(
+return GestureDetector(
+  onTap: () {
+    setState(() {
+      _selectedLocatorId = locatorId;
+    });
+  },
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 7,
+        ),
+        decoration: BoxDecoration(
           color: selected
-              ? const Color(0xFF1D4ED8)
-              : Colors.white,
-          fontWeight: FontWeight.w700,
+              ? Colors.white
+              : Colors.white.withValues(alpha: 0.18),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          name,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: selected
+                ? const Color(0xFF1D4ED8)
+                : Colors.white,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
-    ),
+      const SizedBox(height: 6),
+      StreamBuilder<DocumentSnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('locators')
+            .doc(locatorId)
+            .snapshots(),
+        builder: (context, snap) {
+          if (!snap.hasData) {
+            return const SizedBox();
+          }
 
-    const SizedBox(height: 6),
+          final data = snap.data!.data() as Map<String, dynamic>?;
+          final ts = data?['lastSeen'] as Timestamp?;
+          final lastSeen = ts?.toDate();
 
-    StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('locators')
-          .doc(locatorId)
-          .snapshots(),
-      builder: (context, snap) {
+          final online = lastSeen != null &&
+              DateTime.now().difference(lastSeen).inSeconds < 120;
 
-        if (!snap.hasData) {
-          return const SizedBox();
-        }
+          return Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: online ? Colors.green : Colors.white70,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                formatLastSeen(lastSeen),
+                style: TextStyle(
+                  color: online ? Colors.green : Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    ],
+  ),
+);
 
-        final data = snap.data!.data() as Map<String, dynamic>?;
-        final ts = data?['lastSeen'] as Timestamp?;
-        final lastSeen = ts?.toDate();
-
-        bool online = false;
-
-        if (lastSeen != null) {
-          final diff = DateTime.now().difference(lastSeen);
-          online = diff.inSeconds < 120;
-        }
-
-        return Text(
-          online ? "ONLINE" : "Last seen",
-          style: TextStyle(
-            color: online ? Colors.green : Colors.white70,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-        );
-      },
-    ),
-
-  ],
-)
 
 							  
-                            );
+                            
                           }).toList(),
                         );
                       },
