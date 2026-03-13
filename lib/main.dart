@@ -10,6 +10,7 @@ import 'core/role_manager.dart';
 import 'features/role/role_screen.dart';
 import 'core/locator_ui_state.dart';
 import 'core/notification_service.dart';
+import 'core/fcm_manager.dart';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -41,6 +42,13 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  
+  await FcmManager.ensureSubscriptions();
+  
+  FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
+	print("FCM TOKEN REFRESH => $token");
+	await FcmManager.ensureSubscriptions();
+	});
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   await NotificationService.init();
@@ -78,10 +86,6 @@ await flutterLocalNotificationsPlugin.initialize(initSettings);
     final myLocatorId = await IdentityManager.getRequesterId();
     final locatorTopic = 'locator_$myLocatorId';
 
-    FirebaseMessaging.instance.subscribeToTopic(locatorTopic)
-        .then((_) => print("SUBSCRIBED => $locatorTopic"))
-        .catchError((e) => print("SUBSCRIBE ERR => $e"));
-
     FirebaseMessaging.onMessage.listen((message) async {
       final data = message.data;
 
@@ -112,7 +116,7 @@ await flutterLocalNotificationsPlugin.initialize(initSettings);
 	  final prefs = await SharedPreferences.getInstance();
       final enabled = prefs.getBool('locator_request_alerts') ?? true;
 
-       if (!enabled){
+       if (enabled){
       LocatorUiState.instance.onRequestReceived(requestId);
 		}
       try {
@@ -162,11 +166,6 @@ await flutterLocalNotificationsPlugin.initialize(initSettings);
 	
   final requesterId = await IdentityManager.getRequesterId();
 
-  FirebaseMessaging.instance.subscribeToTopic(requesterId)
-      .then((_) => print("REQ SUBSCRIBED => $requesterId"))
-      .catchError((e) => print("REQ SUBSCRIBE ERR => $e"));
-
-	
   }
 
   runApp(NCareApp(setupDone: setupDone));

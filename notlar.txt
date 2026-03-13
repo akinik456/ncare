@@ -23,3 +23,51 @@ npm run build
 firebase deploy --only functions --debug
 
 *************************
+1 Release mode (en temiz yöntem)
+Terminalde:
+
+flutter run --release
+Ne olur:debug yok çok daha hızlı çalışır log az olur gerçek kullanıcı gibi çalışır
+Ama build biraz uzun sürer.
+
+2 Profile mode (benim önerim)
+
+flutter run --profile
+Bu:debug kadar yavaş değil release kadar kapalı değil performans test için ideal
+Genelde ben profil modunu kullanırım.
+
+3 APK üretip kurmak
+Direkt APK:
+
+flutter build apk
+sonra:
+
+flutter install
+
+veya APK'yı telefona at.
+
+4 Gerçek kullanıcı gibi test etmek için
+
+flutter run --release
+Bu:debug tamamen kapalı gerçek kullanıcı performansı bildirim davranışı da daha gerçekçi olur
+Ama build biraz uzun.
+
+******************
+APK oluştur:
+
+flutter build apk --profile
+veya gerçek kullanıcı testi için:
+
+flutter build apk --release
+Çıkan dosya burada olur:
+
+build/app/outputs/flutter-apk/app-profile.apk
+veya
+
+build/app/outputs/flutter-apk/app-release.apk
+
+Benim önerim
+Bildirim ve background davranışı için:
+
+flutter build apk --release
+daha doğru test verir.

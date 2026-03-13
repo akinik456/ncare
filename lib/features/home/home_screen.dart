@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -9,6 +10,7 @@ import '../../core/device_state_manager.dart';
 import '../../core/identity_manager.dart';
 import '../setup/setup_screen.dart';
 import '../../core/locator_settings_reader.dart';
+import '../../core/fcm_manager.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,14 +24,26 @@ class _HomeScreenState extends State<HomeScreen> {
   String? locatorName;
   String? requesterName;
   String? displayname;
+  Timer?  _presenceTimer;
   
   @override
-  void initState() {
-    super.initState();
-    _initLocatorId();
-	_loadLocatorName();
-	_loadRequesterName();
-  }
+void initState() {
+  super.initState();
+
+  _updatePresence(); // ilk anda yaz
+
+  _presenceTimer = Timer.periodic(
+    const Duration(seconds: 30),
+    (_) => _updatePresence(),
+  );
+}
+
+
+@override
+void dispose() {
+  _presenceTimer?.cancel();
+  super.dispose();
+}
 
   Future<void> _initLocatorId() async {
     final id = await IdentityManager.getRequesterId();
@@ -93,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final locatorTopic = 'locator_$locatorId';
 
         try{
-		await FirebaseMessaging.instance.subscribeToTopic(locatorTopic);
+		
         print("PAIRED WITH REQUESTER => $requesterId");
         print("SUBSCRIBED => $locatorTopic");
         }catch(e){
@@ -154,6 +168,18 @@ class _HomeScreenState extends State<HomeScreen> {
     ),
   );
 }
+
+Future<void> _updatePresence() async {
+  final locatorId = await IdentityManager.getRequesterId();
+
+  await FirebaseFirestore.instance
+      .collection('locators')
+      .doc(locatorId)
+      .set({
+    'lastSeen': FieldValue.serverTimestamp(),
+  }, SetOptions(merge: true));
+}
+
 
 
   @override

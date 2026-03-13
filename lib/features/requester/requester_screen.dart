@@ -1,4 +1,5 @@
 import 'package:geocoding/geocoding.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -32,6 +33,7 @@ class _RequesterScreenState extends State<RequesterScreen> {
   String? _callRequestLocatorId;
   bool requestAlertsEnabled=true;
   bool deviceWarningsEnabled=true;
+  Timer? _presenceUiTimer;
 
   @override
   void initState() {
@@ -39,6 +41,13 @@ class _RequesterScreenState extends State<RequesterScreen> {
 	NotificationService.suppressForegroundAlerts = true;
     _initRequesterId();	
 	_loadAlertSettings();
+	_presenceUiTimer = Timer.periodic(
+  const Duration(seconds: 15),
+  (_) {
+    if (mounted) setState(() {});
+  },
+);
+	
   }
 
   Future<void> _initRequesterId() async {
@@ -87,6 +96,7 @@ Future<void> saveDeviceWarnings(bool value) async {
   void dispose(){
    NotificationService.suppressForegroundAlerts = 
   false;
+  _presenceUiTimer?.cancel();
    super.dispose();
   }   
 
@@ -497,27 +507,72 @@ onPressed: () async {
                                   _selectedLocatorId = locatorId;
                                 });
                               },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 7,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: selected
-                                      ? Colors.white
-                                      : Colors.white.withValues(alpha: 0.18),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Text(
-                                  name,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: selected
-                                        ? const Color(0xFF1D4ED8)
-                                        : Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
+                              child: 
+							  Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+
+    Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 7,
+      ),
+      decoration: BoxDecoration(
+        color: selected
+            ? Colors.white
+            : Colors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        name,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: selected
+              ? const Color(0xFF1D4ED8)
+              : Colors.white,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    ),
+
+    const SizedBox(height: 6),
+
+    StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('locators')
+          .doc(locatorId)
+          .snapshots(),
+      builder: (context, snap) {
+
+        if (!snap.hasData) {
+          return const SizedBox();
+        }
+
+        final data = snap.data!.data() as Map<String, dynamic>?;
+        final ts = data?['lastSeen'] as Timestamp?;
+        final lastSeen = ts?.toDate();
+
+        bool online = false;
+
+        if (lastSeen != null) {
+          final diff = DateTime.now().difference(lastSeen);
+          online = diff.inSeconds < 120;
+        }
+
+        return Text(
+          online ? "ONLINE" : "Last seen",
+          style: TextStyle(
+            color: online ? Colors.green : Colors.white70,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        );
+      },
+    ),
+
+  ],
+)
+
+							  
                             );
                           }).toList(),
                         );

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'pairing_options_screen.dart';
+import '../../core/fcm_manager.dart';
 
 class AddLocatorScreen extends StatefulWidget {
   const AddLocatorScreen({super.key});
@@ -53,6 +54,7 @@ class _AddLocatorScreenState extends State<AddLocatorScreen> {
       if (!mounted) return;
 
       if (paired == true) {
+	  await FcmManager.ensureSubscriptions();
         Navigator.pop(context, true);
       } else {
         _handled = false;
