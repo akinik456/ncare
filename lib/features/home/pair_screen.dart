@@ -49,7 +49,12 @@ class _PairScreenState extends State<PairScreen> {
           
 		  final prefs = await SharedPreferences.getInstance();
  		  await prefs.setString('pairedRequesterId', requesterId);
+		  try{
 		  await FirebaseMessaging.instance.subscribeToTopic(requesterId);
+		  print("SUBSCRIBED => $requesterId");
+		  }catch(e){
+		  print("SUBSCRIBED ERR => $e");
+		  }
 		  
 		  final locatorId = await 		  
 		  IdentityManager.getRequesterId();

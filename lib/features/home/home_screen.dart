@@ -92,10 +92,14 @@ class _HomeScreenState extends State<HomeScreen> {
       if (requesterId != null && requesterId.isNotEmpty) {
         final locatorTopic = 'locator_$locatorId';
 
-        await FirebaseMessaging.instance.subscribeToTopic(locatorTopic);
+        try{
+		await FirebaseMessaging.instance.subscribeToTopic(locatorTopic);
         print("PAIRED WITH REQUESTER => $requesterId");
-        print("LOCATOR TOPIC OK => $locatorTopic");
-      } else {
+        print("SUBSCRIBED => $locatorTopic");
+        }catch(e){
+		print("SUBSCRIBED ERR => $e");
+		}	  
+	  } else {
         print("NO PAIR FOUND");
       }
     } catch (e) {

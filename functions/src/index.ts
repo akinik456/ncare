@@ -21,6 +21,14 @@ export const onRequestCreated = onDocumentCreated(
     }
 
     const locatorTopic = `locator_${locatorId}`;
+	
+	const requesterDoc = await admin.firestore()
+   .collection("requesters")
+   .doc(requesterId)
+   .get();
+
+    const requesterName =
+    requesterDoc.data()?.name?.toString() || "Requester";	
 
     console.log(
       "REQUEST TRIGGERED",
@@ -37,8 +45,9 @@ export const onRequestCreated = onDocumentCreated(
         requestId,
         requesterId,
         locatorId,
+		requesterName,
       },
-      android: { priority: "high" },
+	  android: { priority: "high" },
     });
   },
 );
@@ -73,11 +82,7 @@ export const onAlertCreated = onDocumentCreated(
         locatorId,
         locatorName,
       },
-      notification: {
-        title: "Call request",
-        body: `${locatorName} wants you to call`,
-      },
-      android: { priority: "high" },
-    });
+      android: { priority: "high" ,
+	  });
   },
 );

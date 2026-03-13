@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/identity_manager.dart';
+import '../../core/notification_service.dart';
+import '../setup/setup_screen.dart';
 import 'add_locator_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -27,14 +30,15 @@ class _RequesterScreenState extends State<RequesterScreen> {
   String? _lastAlertId;
   String? _activeCallAlertId;
   String? _callRequestLocatorId;
+  bool requestAlertsEnabled=true;
+  bool deviceWarningsEnabled=true;
 
   @override
   void initState() {
     super.initState();
-    _initRequesterId();
-
-	
-	
+	NotificationService.suppressForegroundAlerts = true;
+    _initRequesterId();	
+	_loadAlertSettings();
   }
 
   Future<void> _initRequesterId() async {
@@ -46,6 +50,45 @@ class _RequesterScreenState extends State<RequesterScreen> {
     });
   _listenCallAlerts();
   }
+  
+  Future<void> _loadAlertSettings() async {
+  final prefs = await SharedPreferences.getInstance();
+
+  setState(() {
+    requestAlertsEnabled =
+        prefs.getBool('locator_request_alerts') ?? true;
+
+    deviceWarningsEnabled =
+        prefs.getBool('locator_device_warnings') ?? true;
+  });
+}
+Future<void> saveRequestAlerts(bool value) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool('locator_request_alerts', value);
+
+  setState(() {
+    requestAlertsEnabled = value;
+  });
+}
+
+Future<void> saveDeviceWarnings(bool value) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool('locator_device_warnings', value);
+
+  setState(() {
+    deviceWarningsEnabled = value;
+  });
+}
+  
+
+  
+  
+  @override
+  void dispose(){
+   NotificationService.suppressForegroundAlerts = 
+  false;
+   super.dispose();
+  }   
 
   Future<void> _sendRequest() async {
     if (requesterId == null || requesterId!.isEmpty) return;

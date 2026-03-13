@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'core/device_state_manager.dart';
 import 'core/setup_manager.dart';
@@ -8,9 +9,11 @@ import 'features/home/home_screen.dart';
 import 'core/role_manager.dart';
 import 'features/role/role_screen.dart';
 import 'core/locator_ui_state.dart';
+import 'core/notification_service.dart';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -29,18 +32,45 @@ Future<void> main() async {
     SystemUiMode.manual,
     overlays: SystemUiOverlay.values,
   );
+  
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+	
+	
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  await NotificationService.init();
 
   print("APP_START");
   DeviceStateManager.instance.start();
   final setupDone = await SetupManager.isSetupDone();
   print("SETUP CHECK DONE");
+  
+  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+  'ncare_alerts',
+  'NCare Alerts',
+  description: 'Important alerts from NCare',
+  importance: Importance.high,
+  
+);
 
+await flutterLocalNotificationsPlugin
+    .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>()
+    ?.createNotificationChannel(channel);
+
+const AndroidInitializationSettings androidSettings =
+    AndroidInitializationSettings('@mipmap/ic_launcher');
+
+const InitializationSettings initSettings =
+    InitializationSettings(android: androidSettings);
+
+await flutterLocalNotificationsPlugin.initialize(initSettings);
+	
   final role = await RoleManager.getRole();
   print("ROLE => $role");
 
@@ -48,9 +78,7 @@ Future<void> main() async {
     final myLocatorId = await IdentityManager.getRequesterId();
     final locatorTopic = 'locator_$myLocatorId';
 
-    FirebaseMessaging.instance
-        .subscribeToTopic(locatorTopic)
-        .timeout(const Duration(seconds: 20))
+    FirebaseMessaging.instance.subscribeToTopic(locatorTopic)
         .then((_) => print("SUBSCRIBED => $locatorTopic"))
         .catchError((e) => print("SUBSCRIBE ERR => $e"));
 
@@ -58,12 +86,15 @@ Future<void> main() async {
       final data = message.data;
 
       if (data['type'] != 'rl') return;
+	  
 
       final requestId = data['requestId']?.toString();
       final requesterId = data['requesterId']?.toString();
       final targetLocatorId = data['locatorId']?.toString();
       final battery = Battery();
       final level = await battery.batteryLevel;
+	  
+	  
 	  
       if (requestId == null ||
           requestId.isEmpty ||
@@ -78,9 +109,12 @@ Future<void> main() async {
         print("FG SKIP => target=$targetLocatorId mine=$myLocatorId");
         return;
       }
+	  final prefs = await SharedPreferences.getInstance();
+      final enabled = prefs.getBool('locator_request_alerts') ?? true;
 
+       if (!enabled){
       LocatorUiState.instance.onRequestReceived(requestId);
-
+		}
       try {
         final pos = await Geolocator.getCurrentPosition(
           desiredAccuracy: LocationAccuracy.high,
@@ -128,9 +162,7 @@ Future<void> main() async {
 	
   final requesterId = await IdentityManager.getRequesterId();
 
-  FirebaseMessaging.instance
-      .subscribeToTopic(requesterId)
-      .timeout(const Duration(seconds: 20))
+  FirebaseMessaging.instance.subscribeToTopic(requesterId)
       .then((_) => print("REQ SUBSCRIBED => $requesterId"))
       .catchError((e) => print("REQ SUBSCRIBE ERR => $e"));
 
@@ -147,6 +179,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  
 
   final role = await RoleManager.getRole();
   if (role != 'locator') {
@@ -175,6 +208,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     print("BG SKIP => target=$targetLocatorId mine=$myLocatorId");
     return;
   }
+  
+  await NotificationService.showFromRemoteMessage(message); 
 
   final responseRef = FirebaseFirestore.instance
       .collection('requesters')
@@ -228,6 +263,7 @@ final battery = Battery();
       'ts': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
+  
 }
 
 class NCareApp extends StatelessWidget {

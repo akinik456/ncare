@@ -61,6 +61,8 @@ Locator:
 
 16 geofence
 
+17 battery alert level
+
 
 
 

@@ -2,10 +2,59 @@ import 'package:flutter/material.dart';
 import '../../core/device_state_manager.dart';
 import '../../core/setup_manager.dart';
 import '../home/home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class SetupScreen extends StatelessWidget {
+class SetupScreen extends StatefulWidget {
   const SetupScreen({super.key});
+  
+    @override
+    State<SetupScreen> createState() =>
+  _SetupScreenState();
+  }
+  
+class _SetupScreenState extends State<SetupScreen>
+{
 
+  bool requestAlertsEnabled = true;
+  bool deviceWarningsEnabled = true;
+  
+Future<void> saveRequestAlerts(bool value) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool('locator_request_alerts', value);
+
+  setState(() {
+    requestAlertsEnabled = value;
+  });
+}
+
+Future<void> saveDeviceWarnings(bool value) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool('locator_device_warnings', value);
+
+  setState(() {
+    deviceWarningsEnabled = value;
+  });
+}  
+
+Future<void> loadAlertSettings() async {
+  final prefs = await SharedPreferences.getInstance();
+
+  setState(() {
+    requestAlertsEnabled =
+        prefs.getBool('locator_request_alerts') ?? true;
+
+    deviceWarningsEnabled =
+        prefs.getBool('locator_device_warnings') ?? true;
+  });
+}
+
+@override
+void initState(){
+ super.initState();
+ loadAlertSettings();
+ }
+ 
+  
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -108,7 +157,7 @@ class SetupScreen extends StatelessWidget {
                             const SizedBox(height: 12),
                             Text(
                               ready
-                                
+                               
     ? 'This locator device is ready to receive location requests.'
     : 'Location permission and GPS access are required before this device can be used.',
                               style: theme.textTheme.bodyMedium?.copyWith(
@@ -166,7 +215,7 @@ class SetupScreen extends StatelessWidget {
 
                             const SizedBox(height: 12),
 
-                            
+                           
                             if (ready) ...[
                               const SizedBox(height: 16),
                               SizedBox(
@@ -206,6 +255,18 @@ class SetupScreen extends StatelessWidget {
                           ],
                         ),
                       ),
+					  SwitchListTile(
+  value: requestAlertsEnabled,
+  title: const Text("Request alerts"),
+  subtitle: const Text("Notify when locator receives a location request"),
+  onChanged: saveRequestAlerts,
+),
+SwitchListTile(
+  value: deviceWarningsEnabled,
+  title: const Text("Device warnings"),
+  subtitle: const Text("Notify when GPS or permissions are off"),
+  onChanged: saveDeviceWarnings,
+),
                     ],
                   );
                 },
