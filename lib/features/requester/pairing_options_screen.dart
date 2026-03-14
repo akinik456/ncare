@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:geolocator/geolocator.dart';
 import '../../core/identity_manager.dart';
 
 class PairingOptionsScreen extends StatefulWidget {
@@ -28,7 +28,9 @@ class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
   int _geofenceRadius = 250;
 
   bool _saving = false;
-
+  bool _savingCenter = false;
+  
+  
   @override
   void initState() {
     super.initState();
@@ -43,7 +45,50 @@ class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
       _batteryThreshold = t;
     });
   }
+Future<void> _setCurrentLocationAsGeofenceCenter() async {
+  setState(() => _savingCenter = true);
 
+  try {
+    final requesterId = await IdentityManager.getRequesterId();
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Location permission is required')),
+      );
+      return;
+    }
+
+    final pos = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+
+    await FirebaseFirestore.instance
+        .collection('requesters')
+        .doc(requesterId)
+        .collection('locators')
+        .doc(widget.locatorId)
+        .set({
+      'geofenceCenterLat': pos.latitude,
+      'geofenceCenterLng': pos.longitude,
+    }, SetOptions(merge: true));
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Geofence center saved')),
+    );
+  } finally {
+    if (mounted) {
+      setState(() => _savingCenter = false);
+    }
+  }
+}
   Future<void> _confirmPairing() async {
     setState(() => _saving = true);
 
@@ -290,6 +335,19 @@ class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
             _radiusChip(1000),
           ],
         ),
+		const SizedBox(height: 14),
+SizedBox(
+  width: double.infinity,
+  child: OutlinedButton.icon(
+    onPressed: _savingCenter ? null : _setCurrentLocationAsGeofenceCenter,
+    icon: const Icon(Icons.my_location_rounded),
+    label: Text(
+      _savingCenter
+          ? 'Saving center...'
+          : 'Use my current location as center',
+    ),
+  ),
+),
       ],
     ],
   ),
