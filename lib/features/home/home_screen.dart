@@ -6,6 +6,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:battery_plus/battery_plus.dart';
+import 'package:geolocator/geolocator.dart';
+
 
 import '../../core/device_state_manager.dart';
 import '../../core/identity_manager.dart';
@@ -229,12 +231,19 @@ Future<void> _startBatteryMonitor() async {
 Future<void> _updatePresence() async {
   final locatorId = await IdentityManager.getRequesterId();
 
+  final level = await _battery.batteryLevel;
+  final gpsOn = await Geolocator.isLocationServiceEnabled();
+
   await FirebaseFirestore.instance
       .collection('locators')
       .doc(locatorId)
       .set({
     'lastSeen': FieldValue.serverTimestamp(),
+    'battery': level,
+    'gpsEnabled': gpsOn,
   }, SetOptions(merge: true));
+  
+  print('PRESENCE => battery=$level gps=$gpsOn');
 }
 
 

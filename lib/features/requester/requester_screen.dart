@@ -576,39 +576,68 @@ return GestureDetector(
             .doc(locatorId)
             .snapshots(),
         builder: (context, snap) {
-          if (!snap.hasData) {
-            return const SizedBox();
-          }
+  if (!snap.hasData) {
+    return const SizedBox();
+  }
 
-          final data = snap.data!.data() as Map<String, dynamic>?;
-          final ts = data?['lastSeen'] as Timestamp?;
-          final lastSeen = ts?.toDate();
+  final data = snap.data!.data() as Map<String, dynamic>?;
 
-          final online = lastSeen != null &&
-              DateTime.now().difference(lastSeen).inSeconds < 120;
+  final ts = data?['lastSeen'] as Timestamp?;
+  final lastSeen = ts?.toDate();
 
-          return Row(
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: online ? Colors.green : Colors.white70,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                formatLastSeen(lastSeen),
-                style: TextStyle(
-                  color: online ? Colors.green : Colors.white70,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          );
-        },
+  final battery = data?['battery'] ?? 0;
+  final gpsOn = data?['gpsEnabled'] ?? true;
+
+  final online = lastSeen != null &&
+      DateTime.now().difference(lastSeen).inSeconds < 120;
+
+  return Row(
+    children: [
+      Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          color: online ? Colors.green : Colors.white70,
+          shape: BoxShape.circle,
+        ),
+      ),
+      const SizedBox(width: 6),
+
+      Text(
+        online ? "ONLINE" : formatLastSeen(lastSeen),
+        style: TextStyle(
+          color: online ? Colors.green : Colors.white70,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+
+      const SizedBox(width: 10),
+
+      Text(
+        "🔋 $battery%",
+        style: const TextStyle(
+          color: Colors.white70,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+
+      const SizedBox(width: 10),
+
+      Text(
+        gpsOn ? "GPS ON" : "GPS OFF",
+        style: TextStyle(
+          color: gpsOn ? Colors.white70 : Colors.orange,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ],
+  );
+}
+
+		
       ),
     ],
   ),
