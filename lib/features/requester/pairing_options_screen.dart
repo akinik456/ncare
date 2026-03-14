@@ -30,11 +30,14 @@ class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
   bool _saving = false;
   bool _savingCenter = false;
   
+  double? _geofenceCenterLat;
+  double? _geofenceCenterLng;
   
   @override
   void initState() {
     super.initState();
     _loadBatteryThreshold();
+	_loadGeofenceCenter();
   }
 
   Future<void> _loadBatteryThreshold() async {
@@ -45,6 +48,24 @@ class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
       _batteryThreshold = t;
     });
   }
+Future<void> _loadGeofenceCenter() async {
+  final requesterId = await IdentityManager.getRequesterId();
+  final doc = await FirebaseFirestore.instance
+      .collection('requesters')
+      .doc(requesterId)
+      .collection('locators')
+      .doc(widget.locatorId)
+      .get();
+
+  final data = doc.data();
+  if (!mounted) return;
+
+  setState(() {
+    _geofenceCenterLat = (data?['geofenceCenterLat'] as num?)?.toDouble();
+    _geofenceCenterLng = (data?['geofenceCenterLng'] as num?)?.toDouble();
+  });
+}  
+  
 Future<void> _setCurrentLocationAsGeofenceCenter() async {
   setState(() => _savingCenter = true);
 
@@ -78,8 +99,16 @@ Future<void> _setCurrentLocationAsGeofenceCenter() async {
       'geofenceCenterLat': pos.latitude,
       'geofenceCenterLng': pos.longitude,
     }, SetOptions(merge: true));
+	
+	
 
-    if (!mounted) return;
+    
+if (!mounted) return;
+setState(() {
+  _geofenceCenterLat = pos.latitude;
+  _geofenceCenterLng = pos.longitude;
+});
+	
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Geofence center saved')),
     );
@@ -348,6 +377,14 @@ SizedBox(
     ),
   ),
 ),
+const SizedBox(height: 8),
+Text(
+  (_geofenceCenterLat != null && _geofenceCenterLng != null)
+      ? 'Center saved'
+      : 'Center not set',
+  style: Theme.of(context).textTheme.bodySmall,
+),
+
       ],
     ],
   ),
