@@ -36,6 +36,7 @@ void initState() {
     const Duration(seconds: 30),
     (_) => _updatePresence(),
   );
+  _initLocatorId();
 }
 
 
@@ -66,16 +67,14 @@ void dispose() {
 	  if (!mounted) return;
 
 	  setState(() {
-		requesterName = doc.data()?['pairedRequesterName'];
-		displayname=
-		(requesterName!=null &&
-		requesterName!.isNotEmpty)
-		? requesterName
-		: "requester";
-		
-		requesterName = (doc.data()? ['pairedRequesterName'] ?? '').toString().trim();
-				
-	  });
+  requesterName =
+      (doc.data()?['pairedRequesterName'] ?? '').toString().trim();
+
+  displayname = requesterName!.isNotEmpty
+      ? requesterName
+      : "requester";
+});
+
 	}  
   
   
