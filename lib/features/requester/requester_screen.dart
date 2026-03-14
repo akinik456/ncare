@@ -1,4 +1,5 @@
 import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,7 +21,7 @@ class RequesterScreen extends StatefulWidget {
   State<RequesterScreen> createState() => _RequesterScreenState();
 }
 
-class _RequesterScreenState extends State<RequesterScreen> {
+class _RequesterScreenState extends State<RequesterScreen> with SingleTickerProviderStateMixin{
   String? _lastRequestId; // ekranda gösterilen son başarılı cevap
   String? _pendingRequestId; // şu an beklenen yeni request
   String? _lastAddress;
@@ -35,6 +36,11 @@ class _RequesterScreenState extends State<RequesterScreen> {
   bool requestAlertsEnabled=true;
   bool deviceWarningsEnabled=true;
   Timer? _presenceUiTimer;
+  late AnimationController _pulseController;
+  late Animation<double> _pulse;
+  double? _myLat;
+  double? _myLng;
+  
 
   @override
   void initState() {
@@ -48,11 +54,38 @@ class _RequesterScreenState extends State<RequesterScreen> {
     if (mounted) setState(() {});
   },
 );
+	_pulseController = AnimationController(
+  vsync: this,
+  duration: const Duration(seconds: 2),
+)..repeat(reverse: true);
+_pulse = Tween<double>(begin: 0.6, end: 1.2).animate(_pulseController);
 
+  _getMyLocation();
   _initBatteryDefaults();
 	
   }
+Future<void> _getMyLocation() async {
 
+  LocationPermission permission = await Geolocator.checkPermission();
+
+  if (permission == LocationPermission.denied) {
+    permission = await Geolocator.requestPermission();
+  }
+
+  if (permission == LocationPermission.deniedForever) {
+    return;
+  }
+
+  final pos = await Geolocator.getCurrentPosition(
+    desiredAccuracy: LocationAccuracy.high,
+  );
+
+  setState(() {
+    _myLat = pos.latitude;
+    _myLng = pos.longitude;
+  });
+
+}
   Future<void> _initRequesterId() async {
     final id = await IdentityManager.getRequesterId();
     if (!mounted) return;
@@ -83,6 +116,8 @@ Future<void> _initBatteryDefaults() async {
   }
 }
 
+
+
 Future<void> saveRequestAlerts(bool value) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.setBool('locator_request_alerts', value);
@@ -112,13 +147,25 @@ String formatLastSeen(DateTime? lastSeen) {
 
   return "Last seen ${diff.inDays}d ago";
 }
-  
+
+String formatDistance(double? meters) {
+  if (meters == null) return '-';
+
+  if (meters < 1000) {
+    return '${meters.toStringAsFixed(0)} m';
+  }
+
+  return '${(meters / 1000).toStringAsFixed(1)} km';
+}
+
+
   
   @override
   void dispose(){
    NotificationService.suppressForegroundAlerts = 
   false;
   _presenceUiTimer?.cancel();
+  _pulseController.dispose();
    super.dispose();
   }   
 
@@ -576,6 +623,7 @@ return GestureDetector(
             .doc(locatorId)
             .snapshots(),
         builder: (context, snap) {
+
   if (!snap.hasData) {
     return const SizedBox();
   }
@@ -590,51 +638,97 @@ return GestureDetector(
 
   final online = lastSeen != null &&
       DateTime.now().difference(lastSeen).inSeconds < 120;
+	  
+final lat = (data?['lat'] as num?)?.toDouble();
+final lng = (data?['lng'] as num?)?.toDouble();	  
+double? distance;
 
-  return Row(
-    children: [
-      Container(
-        width: 8,
-        height: 8,
-        decoration: BoxDecoration(
-          color: online ? Colors.green : Colors.white70,
-          shape: BoxShape.circle,
-        ),
+if (_myLat != null && lat != null) {
+  distance = Geolocator.distanceBetween(
+    _myLat!,
+    _myLng!,
+    lat!,
+    lng!,
+  );
+}
+return Row(
+  children: [
+    online
+        ? AnimatedBuilder(
+            animation: _pulse,
+            builder: (context, child) {
+              return Transform.scale(
+                scale: _pulse.value,
+                child: child,
+              );
+            },
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: Colors.green,
+                shape: BoxShape.circle,
+              ),
+            ),
+          )
+        : Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: Colors.white70,
+              shape: BoxShape.circle,
+            ),
+          ),
+
+    const SizedBox(width: 6),
+
+    Text(
+      online ? "ONLINE" : formatLastSeen(lastSeen),
+      style: TextStyle(
+        color: online ? Colors.green : Colors.white70,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
       ),
-      const SizedBox(width: 6),
+    ),
 
-      Text(
-        online ? "ONLINE" : formatLastSeen(lastSeen),
-        style: TextStyle(
-          color: online ? Colors.green : Colors.white70,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
+    const SizedBox(width: 12),
+
+    Text(
+      "🔋$battery%",
+      style: const TextStyle(
+        color: Colors.white70,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
       ),
+    ),
 
-      const SizedBox(width: 10),
+    const SizedBox(width: 12),
 
+    Text(
+      gpsOn ? "📍GPS" : "⚠️GPS",
+      style: TextStyle(
+        color: gpsOn ? Colors.white70 : Colors.orange,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+
+    if (distance != null) ...[
+      const SizedBox(width: 12),
       Text(
-        "🔋 $battery%",
+        formatDistance(distance),
         style: const TextStyle(
           color: Colors.white70,
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
       ),
-
-      const SizedBox(width: 10),
-
-      Text(
-        gpsOn ? "GPS ON" : "GPS OFF",
-        style: TextStyle(
-          color: gpsOn ? Colors.white70 : Colors.orange,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
     ],
-  );
+  ],
+);
+  
+  
+  
 }
 
 		

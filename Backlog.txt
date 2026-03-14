@@ -53,6 +53,9 @@ Play Store için gerekli.
 
 10 remote lo add
 
+11 her locator ün kendi son adresi olmalı , loc değişince ya kendi son adresi
+gösterilmeli ya da silinmeli
+
 
 
 
