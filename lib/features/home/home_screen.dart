@@ -5,6 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:battery_plus/battery_plus.dart';
 
 import '../../core/device_state_manager.dart';
 import '../../core/identity_manager.dart';
@@ -25,6 +26,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String? requesterName;
   String? displayname;
   Timer?  _presenceTimer;
+  Timer?  _batteryTimer;
+  final Battery _battery=Battery();
   
   @override
 void initState() {
@@ -37,8 +40,33 @@ void initState() {
     (_) => _updatePresence(),
   );
   _initLocatorId();
+  _startBatteryMonitor();
 }
 
+Future<void> _createBatteryAlert(int level) async {
+  try {
+    final requesterId = await IdentityManager.getRequesterId();
+    final locatorId = await IdentityManager.getRequesterId();
+
+    if (requesterId == null || locatorId == null) return;
+
+    await FirebaseFirestore.instance
+        .collection('requesters')
+        .doc(requesterId)
+        .collection('alerts')
+        .add({
+      'type': 'battery_low',
+      'locatorId': locatorId,
+      'locatorName': displayname ?? 'Locator',
+      'battery': level,
+      'ts': FieldValue.serverTimestamp(),
+    });
+
+    print("BATTERY ALERT CREATED => $level%");
+  } catch (e) {
+    print("BATTERY ALERT ERROR => $e");
+  }
+}
 
 @override
 void dispose() {
@@ -167,6 +195,36 @@ void dispose() {
     ),
   );
 }
+
+Future<void> _startBatteryMonitor() async {
+  _batteryTimer?.cancel();
+
+  _batteryTimer = Timer.periodic(const Duration(minutes: 15), (timer) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final enabled = prefs.getBool('batteryAlarmEnabled') ?? false;
+    if (!enabled) return;
+
+    final threshold = prefs.getInt('batteryAlertThreshold') ?? 20;
+
+    final level = await _battery.batteryLevel;
+
+    bool sent = prefs.getBool('batteryAlertSent') ?? false;
+
+    if (level <= threshold && !sent) {
+      print("BATTERY ALERT TRIGGER $level");
+
+      await _createBatteryAlert(level);
+
+      await prefs.setBool('batteryAlertSent', true);
+    }
+
+    if (level > threshold) {
+      await prefs.setBool('batteryAlertSent', false);
+    }
+  });
+}
+
 
 Future<void> _updatePresence() async {
   final locatorId = await IdentityManager.getRequesterId();

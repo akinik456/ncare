@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/identity_manager.dart';
 
@@ -18,11 +19,12 @@ class PairingOptionsScreen extends StatefulWidget {
 }
 
 class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
-  late final TextEditingController _nameController;
-
   bool _callEnabled = true;
   bool _batteryAlarmEnabled = true;
+  bool _gpsOffAlarmEnabled = false;
   bool _geofenceAlarmEnabled = false;
+
+  int _batteryThreshold = 20;
   int _geofenceRadius = 250;
 
   bool _saving = false;
@@ -30,19 +32,19 @@ class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.locatorName);
+    _loadBatteryThreshold();
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
+  Future<void> _loadBatteryThreshold() async {
+    final prefs = await SharedPreferences.getInstance();
+    final t = prefs.getInt('batteryAlertThreshold') ?? 20;
+
+    setState(() {
+      _batteryThreshold = t;
+    });
   }
 
   Future<void> _confirmPairing() async {
-    final locatorName = _nameController.text.trim();
-    if (locatorName.isEmpty || _saving) return;
-
     setState(() => _saving = true);
 
     try {
@@ -62,10 +64,12 @@ class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
           .collection('locators')
           .doc(widget.locatorId)
           .set({
-        'name': locatorName,
+        'name': widget.locatorName,
         'active': true,
         'callEnabled': _callEnabled,
         'batteryAlarmEnabled': _batteryAlarmEnabled,
+        'batteryAlertThreshold': _batteryThreshold,
+        'gpsOffAlarmEnabled': _gpsOffAlarmEnabled,
         'geofenceAlarmEnabled': _geofenceAlarmEnabled,
         'geofenceRadius': _geofenceRadius,
         'createdAt': FieldValue.serverTimestamp(),
@@ -83,14 +87,16 @@ class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('$locatorName paired successfully'),
+          content: Text('${widget.locatorName} paired successfully'),
           duration: const Duration(seconds: 2),
         ),
       );
 
       Navigator.pop(context, true);
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+      }
     }
   }
 
@@ -155,7 +161,8 @@ class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
           color: selected ? const Color(0xFF1D4ED8) : Colors.white,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
-            color: selected ? const Color(0xFF1D4ED8) : const Color(0xFFE2E8F0),
+            color:
+                selected ? const Color(0xFF1D4ED8) : const Color(0xFFE2E8F0),
           ),
         ),
         child: Text(
@@ -171,6 +178,8 @@ class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
       appBar: AppBar(
@@ -189,105 +198,127 @@ class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           children: [
-            _sectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Locator name',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _nameController,
-                    decoration: InputDecoration(
-                      labelText: 'Name shown on requester device',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
             const SizedBox(height: 14),
             _sectionCard(
-              child: Column(
-                children: [
-                  _toggleTile(
-                    title: 'Call request',
-                    subtitle: 'Allow this locator to ask requester to call.',
-                    value: _callEnabled,
-                    onChanged: (v) => setState(() => _callEnabled = v),
-                  ),
-                  const Divider(height: 20),
-                  _toggleTile(
-                    title: 'Battery alarm',
-                    subtitle: 'Notify when locator battery becomes low.',
-                    value: _batteryAlarmEnabled,
-                    onChanged: (v) => setState(() => _batteryAlarmEnabled = v),
-                  ),
-                  const Divider(height: 20),
-                  _toggleTile(
-                    title: 'Geofence alarm',
-                    subtitle: 'Notify when locator leaves the selected area.',
-                    value: _geofenceAlarmEnabled,
-                    onChanged: (v) => setState(() => _geofenceAlarmEnabled = v),
-                  ),
-                  if (_geofenceAlarmEnabled) ...[
-                    const SizedBox(height: 10),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Geofence radius',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFF0F172A),
-                            ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        _radiusChip(100),
-                        _radiusChip(250),
-                        _radiusChip(500),
-                        _radiusChip(1000),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
+
+  child: Column(
+    children: [
+      _toggleTile(
+        title: 'Call request',
+        subtitle: 'Allow this locator to ask requester to call.',
+        value: _callEnabled,
+        onChanged: (v) => setState(() => _callEnabled = v),
+      ),
+
+      const Divider(height: 20),
+
+      _toggleTile(
+        title: 'Battery alerts',
+        subtitle: 'Notify when battery drops below selected level.',
+        value: _batteryAlarmEnabled,
+        onChanged: (v) => setState(() => _batteryAlarmEnabled = v),
+      ),
+
+      if (_batteryAlarmEnabled) ...[
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Battery alert level',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0F172A),
             ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _saving ? null : _confirmPairing,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
-                child: _saving
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text(
-                        'Confirm pairing',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-              ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [10, 15, 20, 25, 30].map((level) {
+            return ChoiceChip(
+              label: Text('$level%'),
+              selected: _batteryThreshold == level,
+              onSelected: (_) {
+                setState(() {
+                  _batteryThreshold = level;
+                });
+              },
+            );
+          }).toList(),
+        ),
+      ],
+
+      const Divider(height: 20),
+
+      _toggleTile(
+        title: 'GPS off alarm',
+        subtitle: 'Notify when locator location service is turned off.',
+        value: _gpsOffAlarmEnabled,
+        onChanged: (v) => setState(() => _gpsOffAlarmEnabled = v),
+      ),
+
+      const Divider(height: 20),
+
+      _toggleTile(
+        title: 'Geofence alarm',
+        subtitle: 'Notify when locator leaves the selected area.',
+        value: _geofenceAlarmEnabled,
+        onChanged: (v) => setState(() => _geofenceAlarmEnabled = v),
+      ),
+
+      if (_geofenceAlarmEnabled) ...[
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Geofence radius',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF0F172A),
             ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _radiusChip(100),
+            _radiusChip(250),
+            _radiusChip(500),
+            _radiusChip(1000),
+          ],
+        ),
+      ],
+    ],
+  ),
+),
+const SizedBox(height: 14),
+SizedBox(
+  width: double.infinity,
+  child: FilledButton(
+    onPressed: _saving ? null : _confirmPairing,
+    style: FilledButton.styleFrom(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+      ),
+    ),
+    child: _saving
+        ? const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : const Text(
+            'Confirm pairing',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+  ),
+),
+
+       
           ],
         ),
       ),

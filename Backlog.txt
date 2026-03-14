@@ -57,7 +57,7 @@ Locator:
 
 14 UI Polish
 
-15 locator eklerken call me , battery low bildirim izinleri
+
 
 16 geofence
 

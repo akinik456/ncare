@@ -47,6 +47,8 @@ class _RequesterScreenState extends State<RequesterScreen> {
     if (mounted) setState(() {});
   },
 );
+
+  _initBatteryDefaults();
 	
   }
 
@@ -71,6 +73,15 @@ class _RequesterScreenState extends State<RequesterScreen> {
         prefs.getBool('locator_device_warnings') ?? true;
   });
 }
+
+Future<void> _initBatteryDefaults() async {
+  final prefs = await SharedPreferences.getInstance();
+
+  if (!prefs.containsKey('batteryAlertThreshold')) {
+    await prefs.setInt('batteryAlertThreshold', 20);
+  }
+}
+
 Future<void> saveRequestAlerts(bool value) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.setBool('locator_request_alerts', value);
