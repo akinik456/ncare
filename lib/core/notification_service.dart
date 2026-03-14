@@ -66,6 +66,34 @@ static Future<void> ensureInitialized() async {
     });
   }
 
+static Future<void> show({
+  required String title,
+  required String body,
+  required String type,
+  required String locatorName,
+}) async {
+
+  await ensureInitialized();
+
+  await _fln.show(
+    _notificationId(type, locatorName),
+    title,
+    body,
+    const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'ncare_alerts',
+        'NCare Alerts',
+        channelDescription: 'Important alerts from NCare',
+        importance: Importance.high,
+        priority: Priority.high,
+        ticker: 'NCare alert',
+      ),
+    ),
+  );
+}
+  
+  
+
   static Future<void> showFromRemoteMessage(RemoteMessage message) async {
   
     await ensureInitialized();

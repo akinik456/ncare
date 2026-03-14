@@ -10,7 +10,9 @@ import 'core/role_manager.dart';
 import 'features/role/role_screen.dart';
 import 'core/locator_ui_state.dart';
 import 'core/notification_service.dart';
+import 'core/notification_gateway.dart';
 import 'core/fcm_manager.dart';
+
 
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -87,6 +89,7 @@ await flutterLocalNotificationsPlugin.initialize(initSettings);
     final locatorTopic = 'locator_$myLocatorId';
 
     FirebaseMessaging.onMessage.listen((message) async {
+	  await NotificationGateway.handle(message);
       final data = message.data;
 
       if (data['type'] != 'rl') return;

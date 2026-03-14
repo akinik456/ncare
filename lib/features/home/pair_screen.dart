@@ -5,7 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../core/identity_manager.dart';
-import '../..core/fcm_manager.dart';
+import '../../core/fcm_manager.dart';
 
 class PairScreen extends StatefulWidget {
   const PairScreen({super.key});
