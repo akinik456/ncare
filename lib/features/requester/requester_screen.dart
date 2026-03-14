@@ -10,6 +10,7 @@ import '../../core/identity_manager.dart';
 import '../../core/notification_service.dart';
 import '../setup/setup_screen.dart';
 import 'add_locator_screen.dart';
+import 'pairing_options_screen.dart';
 import 'package:intl/intl.dart';
 
 class RequesterScreen extends StatefulWidget {
@@ -528,6 +529,22 @@ return GestureDetector(
       _selectedLocatorId = locatorId;
     });
   },
+  onLongPress: () async {
+    final changed = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PairingOptionsScreen(
+          locatorId: locatorId,
+          locatorName: name,
+        ),
+      ),
+    );
+
+    if (changed == true && mounted) {
+      setState(() {});
+    }
+  },
+
   child: Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [

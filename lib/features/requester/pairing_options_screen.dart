@@ -87,7 +87,7 @@ class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${widget.locatorName} paired successfully'),
+          content: Text('${widget.locatorName} Setings updated'),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -312,11 +312,63 @@ SizedBox(
             child: CircularProgressIndicator(strokeWidth: 2),
           )
         : const Text(
-            'Confirm pairing',
+            'Save settings',
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
   ),
 ),
+
+const SizedBox(height: 20),
+
+OutlinedButton(
+child: const Text('Remove locator'),
+onPressed: _saving
+    ? null
+    : () async {
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text('Remove locator'),
+              content: const Text(
+                'Are you sure you want to remove this locator? '
+                'You can add it again later.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Remove'),
+                ),
+              ],
+            );
+          },
+        );
+
+        if (confirm != true) return;
+
+        final requesterId = await IdentityManager.getRequesterId();
+
+        await FirebaseFirestore.instance
+            .collection('requesters')
+            .doc(requesterId)
+            .collection('locators')
+            .doc(widget.locatorId)
+            .set({
+          'active': false,
+          'removedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        if (!mounted) return;
+        Navigator.pop(context, true);
+      },
+
+),
+
+
 
        
           ],

@@ -1,6 +1,6 @@
 1 req,loc isim değiştirme
 
-3 Multi requester
+2 Multi requester
 Örnek:
 child locator
    ↑
@@ -12,7 +12,7 @@ pairs/
    requesterId
    locatorId
    
-5 Konum geçmişi (tartışılacak)
+3 Konum geçmişi (tartışılacak)
 Şu an:
 
 
@@ -24,7 +24,7 @@ kaç gün tutulacak
 privacy konusu
 
 
-7 Locator bg / fg / restart testleri
+4 Locator bg / fg / restart testleri
 Test senaryoları:
 app kapalı
 ekran kilitli
@@ -34,34 +34,25 @@ uçak modu
 
 
 
-10 Marka & isim
+5 Marka & isim
 NCare geçici.
 Alternatifler konuşulacak.
 
-11 App icon
+6 App icon
 Play Store için gerekli.
 
-12 Locator silme / pasif yapma
-Requester tarafında:
 
 
-locators/
-   active:false
-   
-13 Call me (locator ring)
-Requester → locator
-
-
-type: call
-Locator:
-
-14 UI Polish
+7 UI Polish
 
 
 
-16 geofence
+8 geofence
 
-17 battery alert level
+9 gps off alert
+
+10 remote lo add
+
 
 
 
