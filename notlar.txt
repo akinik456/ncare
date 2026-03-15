@@ -71,3 +71,34 @@ Bildirim ve background davranışı için:
 
 flutter build apk --release
 daha doğru test verir.
+
+***********************************
+
+NCare dev continuation.
+
+Current state:
+
+- locator presence system (lastSeen, battery, gpsEnabled)
+- requester status UI (online / last seen, battery, GPS, distance)
+- animated online indicator
+- pairing system working
+- notification gateway implemented
+- call_me alert working
+- battery alert groundwork
+- label-based location idea planned
+
+Goal for next session:
+
+- continue development cleanly without breaking existing system. 
+
+Sohbet Kuralları;
+
+Sohbet dili türkçe 
+App ingilizce UI da sadece ingilizce kullanılacak
+Geliştirme aşaması adım adım .Bir adım için onay alınmadan bir sonrakine geçilmeyecek.ASLA!
+Gereksiz tekrarlardan kaçınılacak.
+
+Proje klasörü zip dosyası olarak gönderilecek,tüm proje dosyaları 
+incelendikten sonra sohbet başlayacak.
+
+

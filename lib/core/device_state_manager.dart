@@ -43,6 +43,16 @@ _geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
 final requesterId = await _getPairedRequesterId(locatorId);
 
 print("GF TEST REQ => $requesterId");
+
+final gfDoc = await FirebaseFirestore.instance
+    .collection('requesters')
+    .doc(requesterId)
+    .collection('locators')
+    .doc(locatorId)
+    .get();
+
+final gf = gfDoc.data();
+print("GF SETTINGS => $gf");
   } catch (_) {}
 });
 	
