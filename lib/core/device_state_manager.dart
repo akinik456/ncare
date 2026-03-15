@@ -2,6 +2,12 @@ import 'dart:async';
 
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:permission_handler/permission_handler.dart';
+import 'identity_manager.dart';
+
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../firebase_options.dart';
 
 class DeviceStateManager {
   DeviceStateManager._();
@@ -33,6 +39,10 @@ _geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
     );
 
     print("GF TEST POS => ${pos.latitude}, ${pos.longitude}");
+	final locatorId = await IdentityManager.getRequesterId();
+final requesterId = await _getPairedRequesterId(locatorId);
+
+print("GF TEST REQ => $requesterId");
   } catch (_) {}
 });
 	
@@ -72,4 +82,16 @@ _geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
     _isReady = value;
     _readyController.add(_isReady);
   }
+  
+  Future<String?> _getPairedRequesterId(String locatorId) async {
+  final doc = await FirebaseFirestore.instance
+      .collection('locators')
+      .doc(locatorId)
+      .get();
+
+  final data = doc.data();
+  if (data == null) return null;
+
+  return data['pairedRequesterId']?.toString();
+}
 }
