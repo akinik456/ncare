@@ -91,8 +91,6 @@ Future<void> _setCurrentLocationAsGeofenceCenter() async {
     );
 
     await FirebaseFirestore.instance
-        .collection('requesters')
-        .doc(requesterId)
         .collection('locators')
         .doc(widget.locatorId)
         .set({
@@ -133,8 +131,6 @@ setState(() {
           (requesterDoc.data()?['name'] ?? '').toString().trim();
 
       await FirebaseFirestore.instance
-          .collection('requesters')
-          .doc(requesterId)
           .collection('locators')
           .doc(widget.locatorId)
           .set({

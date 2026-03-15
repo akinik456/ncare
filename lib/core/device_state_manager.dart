@@ -46,8 +46,6 @@ final requesterId = await _getPairedRequesterId(locatorId);
 print("GF TEST REQ => $requesterId");
 
 final gfDoc = await FirebaseFirestore.instance
-    .collection('requesters')
-    .doc(requesterId)
     .collection('locators')
     .doc(locatorId)
     .get();
