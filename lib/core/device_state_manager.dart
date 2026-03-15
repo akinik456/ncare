@@ -18,6 +18,7 @@ class DeviceStateManager {
   bool _isReady = false;
   Timer? _ticker;
   Timer? _geoTicker;
+  bool? _gfInside;
   
   StreamSubscription<geo.ServiceStatus>? _gpsSub;
 
@@ -53,6 +54,49 @@ final gfDoc = await FirebaseFirestore.instance
 
 final gf = gfDoc.data();
 print("GF SETTINGS => $gf");
+
+
+final enabled = gf?['geofenceAlarmEnabled'] == true;
+final radius = (gf?['geofenceRadius'] as num?)?.toDouble();
+final cLat = (gf?['geofenceCenterLat'] as num?)?.toDouble();
+final cLng = (gf?['geofenceCenterLng'] as num?)?.toDouble();
+
+if (!enabled || radius == null || cLat == null || cLng == null)return;
+
+final dist = geo.Geolocator.distanceBetween(
+  pos.latitude,
+  pos.longitude,
+  cLat,
+  cLng,
+ 
+);
+
+final inside = dist <= radius;
+
+if (_gfInside == null) {
+
+  _gfInside = inside;
+  return;
+}
+
+if (_gfInside == true && inside == false) {
+
+  await FirebaseFirestore.instance
+    .collection('requesters')
+    .doc(requesterId)
+    .collection('alerts')
+    .add({
+    'type': 'geofence_exit',
+    'requesterId': requesterId,
+    'locatorId': locatorId,
+    'distance': dist,
+    'ts': FieldValue.serverTimestamp(),
+  });
+
+  print("GF EXIT ALERT => $dist");
+}
+
+_gfInside = inside;
   } catch (_) {}
 });
 	
