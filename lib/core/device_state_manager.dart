@@ -11,6 +11,8 @@ class DeviceStateManager {
 
   bool _isReady = false;
   Timer? _ticker;
+  Timer? _geoTicker;
+  
   StreamSubscription<geo.ServiceStatus>? _gpsSub;
 
   bool get isReady => _isReady;
@@ -23,6 +25,18 @@ class DeviceStateManager {
 
   void start() {
     _ticker?.cancel();
+	_geoTicker?.cancel();
+_geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
+  try {
+    final pos = await geo.Geolocator.getCurrentPosition(
+      desiredAccuracy: geo.LocationAccuracy.high,
+    );
+
+    print("GF TEST POS => ${pos.latitude}, ${pos.longitude}");
+  } catch (_) {}
+});
+	
+	
     _gpsSub?.cancel();
 
     // Initial check
