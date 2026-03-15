@@ -1,0 +1,77 @@
+locators/
+  {locatorId}/
+    name
+    lastSeen
+    battery
+    gpsEnabled
+    active
+
+    sharedSettings/
+      main
+        geofenceAlarmEnabled
+        geofences[]
+
+    pairedRequesters/
+      {requesterId}
+        active
+        pairedAt
+
+requesters/
+  {requesterId}/
+    pairedLocators/
+      {locatorId}
+        name
+        active
+        batteryAlarmEnabled
+        batteryAlertThreshold
+        gpsOffAlarmEnabled
+        callEnabled
+
+        alerts/
+          {alertId}
+            type
+            ts
+            distance
+            label
+            read
+
+requests/
+  {requestId}locators/
+  {locatorId}/
+    name
+    lastSeen
+    battery
+    gpsEnabled
+    active
+
+    sharedSettings/
+      main
+        geofenceAlarmEnabled
+        geofences[]
+
+    pairedRequesters/
+      {requesterId}
+        active
+        pairedAt
+
+requesters/
+  {requesterId}/
+    pairedLocators/
+      {locatorId}
+        name
+        active
+        batteryAlarmEnabled
+        batteryAlertThreshold
+        gpsOffAlarmEnabled
+        callEnabled
+
+        alerts/
+          {alertId}
+            type
+            ts
+            distance
+            label
+            read
+
+requests/
+  {requestId}

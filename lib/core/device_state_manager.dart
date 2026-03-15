@@ -40,7 +40,7 @@ _geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
     );
 
     print("GF TEST POS => ${pos.latitude}, ${pos.longitude}");
-	final locatorId = await IdentityManager.getRequesterId();
+	final locatorId = await IdentityManager.getLocatorId();
 final requesterId = await _getPairedRequesterId(locatorId);
 
 print("GF TEST REQ => $requesterId");

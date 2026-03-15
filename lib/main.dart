@@ -85,7 +85,7 @@ await flutterLocalNotificationsPlugin.initialize(initSettings);
   print("ROLE => $role");
 
   if (role == 'locator') {
-    final myLocatorId = await IdentityManager.getRequesterId();
+    final myLocatorId = await IdentityManager.getLocatorId();
     final locatorTopic = 'locator_$myLocatorId';
 
     FirebaseMessaging.onMessage.listen((message) async {
@@ -194,7 +194,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final requestId = data['requestId']?.toString();
   final requesterId = data['requesterId']?.toString();
   final targetLocatorId = data['locatorId']?.toString();
-  final myLocatorId = await IdentityManager.getRequesterId();
+  final myLocatorId = await IdentityManager.getLocatorId();
 
   if (type != 'rl' ||
       requestId == null ||
