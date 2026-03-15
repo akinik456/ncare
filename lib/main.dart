@@ -30,6 +30,9 @@ import 'package:battery_plus/battery_plus.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  print('ROLE => ${await RoleManager.getRole()}');
+  print('REQ ID => ${await IdentityManager.getRequesterId()}');
 
   await SystemChrome.setEnabledSystemUIMode(
     SystemUiMode.manual,
