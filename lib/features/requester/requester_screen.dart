@@ -40,6 +40,7 @@ class _RequesterScreenState extends State<RequesterScreen> with SingleTickerProv
   late Animation<double> _pulse;
   double? _myLat;
   double? _myLng;
+  Timer? _reqLocationTimer;
   
 
   @override
@@ -54,11 +55,15 @@ class _RequesterScreenState extends State<RequesterScreen> with SingleTickerProv
     if (mounted) setState(() {});
   },
 );
+  _reqLocationTimer = Timer.periodic(
+  const Duration(seconds: 15),
+  (_) => _getMyLocation(),
+  );
 	_pulseController = AnimationController(
   vsync: this,
-  duration: const Duration(seconds: 2),
+  duration: const Duration(seconds: 1),
 )..repeat(reverse: true);
-_pulse = Tween<double>(begin: 0.6, end: 1.2).animate(_pulseController);
+_pulse = Tween<double>(begin: 0.8, end: 2).animate(_pulseController);
 
   _getMyLocation();
   _initBatteryDefaults();
@@ -173,6 +178,7 @@ String formatDistance(double? distance, double acc) {
   false;
   _presenceUiTimer?.cancel();
   _pulseController.dispose();
+  _reqLocationTimer?.cancel();
    super.dispose();
   }   
 
@@ -852,24 +858,29 @@ return Row(
                   final data = snapshot.data?.data();
 
                   if (data != null) {
-                    final status = (data['status'] ?? '').toString();
+				    final status = (data['status'] ?? '').toString();
                     final lat = (data['lat'] as num?)?.toDouble();
                     final lng = (data['lng'] as num?)?.toDouble();
                     final hasFix =
                         (status == 'ok' && lat != null && lng != null);
 
                     if (hasFix && pendingRequestId != null) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (!mounted) return;
-                        setState(() {
-                          _lastRequestId = pendingRequestId;
-                          _pendingRequestId = null;
-                          _timeout = false;
-                          _lastAddress = null;
-                          _lastAddressKey = null;
-                        });
-                      });
-                    }
+  final currentPending = pendingRequestId!;
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!mounted) return;
+    setState(() {
+      _lastRequestId = currentPending;
+      _pendingRequestId = null;
+      _timeout = false;
+      _lastAddress = null;
+      _lastAddressKey = null;
+    });
+  });
+
+  
+}
+
+					
                   }
 
                   if (visibleRequestId == null && pendingRequestId != null) {

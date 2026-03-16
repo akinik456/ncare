@@ -132,8 +132,41 @@ if (role == 'locator') {
   if (enabled) {
     LocatorUiState.instance.onRequestReceived(requestId);
   }
+final locatorDoc = await FirebaseFirestore.instance
+    .collection('locators')
+    .doc(myLocatorId)
+    .get();
 
+final cachedLat = (locatorDoc.data()?['lat'] as num?)?.toDouble();
+final cachedLng = (locatorDoc.data()?['lng'] as num?)?.toDouble();
+final cachedAcc = (locatorDoc.data()?['acc'] as num?)?.toDouble();
+
+final ts = locatorDoc.data()?['ts'] as Timestamp?;
+final age = ts != null
+    ? DateTime.now().difference(ts.toDate()).inSeconds
+    : 9999;
   try {
+if (cachedLat != null &&
+    cachedLng != null &&
+    cachedAcc != null &&
+    age < 30) {
+  await FirebaseFirestore.instance
+      .collection('requesters')
+      .doc(requesterId)
+      .collection('responses')
+      .doc(requestId)
+      .set({
+    'locatorId': myLocatorId,
+    'status': 'ok',
+    'lat': cachedLat,
+    'lng': cachedLng,
+    'acc': cachedAcc,
+    'battery': level,
+    'ts': FieldValue.serverTimestamp(),
+    'via': 'cached',
+  }, SetOptions(merge: true));
+}  
+  
     final pos = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
       timeLimit: const Duration(seconds: 20),
