@@ -233,6 +233,9 @@ Future<void> _updatePresence() async {
 
   final level = await _battery.batteryLevel;
   final gpsOn = await Geolocator.isLocationServiceEnabled();
+  final pos = await Geolocator.getCurrentPosition(
+   desiredAccuracy: LocationAccuracy.high,
+  );  
 
   await FirebaseFirestore.instance
       .collection('locators')
@@ -241,6 +244,8 @@ Future<void> _updatePresence() async {
     'lastSeen': FieldValue.serverTimestamp(),
     'battery': level,
     'gpsEnabled': gpsOn,
+	'lat': pos.latitude,
+    'lng': pos.longitude,
   }, SetOptions(merge: true));
   
   print('PRESENCE => battery=$level gps=$gpsOn');

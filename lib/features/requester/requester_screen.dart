@@ -84,7 +84,7 @@ Future<void> _getMyLocation() async {
     _myLat = pos.latitude;
     _myLng = pos.longitude;
   });
-
+print('myLat $_myLat , myLng $_myLng');
 }
   Future<void> _initRequesterId() async {
     final id = await IdentityManager.getRequesterId();
@@ -643,7 +643,7 @@ final lat = (data?['lat'] as num?)?.toDouble();
 final lng = (data?['lng'] as num?)?.toDouble();	  
 double? distance;
 
-if (_myLat != null && lat != null) {
+if (_myLat != null && _myLng != null && lat != null && lng != null) {
   distance = Geolocator.distanceBetween(
     _myLat!,
     _myLng!,
@@ -651,6 +651,8 @@ if (_myLat != null && lat != null) {
     lng!,
   );
 }
+print('lat=$lat lng=$lng');
+print('distance=$distance');
 return Row(
   children: [
     online
