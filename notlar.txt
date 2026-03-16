@@ -3,6 +3,41 @@ DUjInJ6jpSU6TfTvfVBR1sUpTu7LTDixZVCmppwcTetn9wSzkLjrrvD-ZzhHiGH8OI0
 
 NEW FCM TOKEN => f3w5ksPXR5ynHy1sJcva-7:APA91bGsDH4-7we4SpqVqPmXizfyI3afqyDcPB2aaunFKOQXrIfLAW4Tfu8M7RPJ0dSnDyiC2CE9awmbrZJ7oNwYKdl7HZqHAXmIWp0FKKH-qIov-Z6jZcA
 
+**************************
+Care
+PassW
+BLE
+Stalk
+F150
+
+HUD
+Speed
+PLC
+Robot
+Protect
+
+
+**************************
+
+Find them.
+Before you worry.
+
+Peace of mind.
+On demand.
+
+Pay once.Use forever.
+
+Where they are.
+When it matters.
+
+Know.
+Don't guess.
+
+One tap.
+One location.
+No questions.
+
+**************************
 
 Logları temizle
 adb logcat -c

@@ -11,24 +11,23 @@ export const onRequestCreated = onDocumentCreated(
   async (event) => {
     const requesterId = event.params.requesterId;
     const requestId = event.params.requestId;
-
     const data = event.data?.data();
-    const locatorId = data?.locatorId?.toString();
 
+    const locatorId = data?.locatorId?.toString();
     if (!locatorId) {
       console.log("NO LOCATOR ID", requesterId, requestId);
       return;
     }
 
     const locatorTopic = `locator_${locatorId}`;
-	
-	const requesterDoc = await admin.firestore()
-   .collection("requesters")
-   .doc(requesterId)
-   .get();
+
+    const requesterDoc = await admin.firestore()
+      .collection("requesters")
+      .doc(requesterId)
+      .get();
 
     const requesterName =
-    requesterDoc.data()?.name?.toString() || "Requester";	
+      requesterDoc.data()?.name?.toString() || "Requester";
 
     console.log(
       "REQUEST TRIGGERED",
@@ -45,9 +44,9 @@ export const onRequestCreated = onDocumentCreated(
         requestId,
         requesterId,
         locatorId,
-		requesterName,
+        requesterName,
       },
-	  android: { priority: "high" },
+      android: { priority: "high" },
     });
   },
 );
@@ -60,50 +59,51 @@ export const onAlertCreated = onDocumentCreated(
   async (event) => {
     const requesterId = event.params.requesterId;
     const alertId = event.params.alertId;
-
     const data = event.data?.data();
+
     const type = data?.type?.toString();
     const locatorId = data?.locatorId?.toString() ?? "";
     const locatorName = data?.locatorName?.toString() ?? "Locator";
+    const level = data?.level?.toString() ?? data?.battery?.toString() ?? "";
 
     let title = "";
-	let body = "";
+    let body = "";
 
-	if (type === "call_me") {
-	  title = "Call request";
-	  body = `${locatorName} wants you to call`;
-	} else if (type === "gps_off") {
-	  title = "GPS disabled";
-	  body = `${locatorName} turned GPS off`;
-	} else if (type === "battery_low") {
-	  const level = data?.battery?.toString() ?? "";
-	  title = "Battery alert";
-	  body = `${locatorName} battery is low${level.isNotEmpty ? ` (${level}%)` : ""}`;
-	} else if (type === "geofence_exit") {
-	  title = "Geofence alert";
-	  body = `${locatorName} left the selected area`;
-	} else {
-	  console.log("ALERT IGNORED", requesterId, alertId, type);
-	  return;
-	}
+    if (type === "call_me") {
+      title = "Call request";
+      body = `${locatorName} wants you to call`;
+    } else if (type === "gps_off") {
+      title = "GPS disabled";
+      body = `${locatorName} turned GPS off`;
+    } else if (type === "battery_low") {
+      title = "Battery alert";
+      body = `${locatorName} battery is low${level ? ` (${level}%)` : ""}`;
+    } else if (type === "geofence_exit") {
+      title = "Geofence alert";
+      body = `${locatorName} left the selected area`;
+    } else {
+      console.log("ALERT IGNORED", requesterId, alertId, type);
+      return;
+    }
 
     await admin.messaging().send({
-	  topic: requesterId,
-	  data: {
-		type: type ?? "",
-		alertId,
-		requesterId,
-		locatorId,
-		locatorName,
-	  },
-	  notification: {
-		title,
-		body,
-	  },
-	  android: {
-		priority: "high",
-		collapseKey: type ?? "alert",
-	  },
-	});
+      topic: requesterId,
+      data: {
+        type: type ?? "",
+        alertId,
+        requesterId,
+        locatorId,
+        locatorName,
+        level,
+      },
+      notification: {
+        title,
+        body,
+      },
+      android: {
+        priority: "high",
+        collapseKey: type ?? "alert",
+      },
+    });
   },
 );

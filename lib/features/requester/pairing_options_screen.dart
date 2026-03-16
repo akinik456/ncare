@@ -42,7 +42,12 @@ class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
   }
 
   Future<void> _loadBatteryThreshold() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await 
+	SharedPreferences.getInstance();
+	
+	_batteryAlarmEnabled = 
+	  prefs.getBool('batteryAlarmEnabled') ?? true;
+	  
     final t = prefs.getInt('batteryAlertThreshold') ?? 20;
 
     setState(() {
@@ -140,53 +145,61 @@ setState(() {
     }
   }
 }
-  Future<void> _confirmPairing() async {
-    setState(() => _saving = true);
+Future<void> _confirmPairing() async {
+  setState(() => _saving = true);
 
-    try {
-      final requesterId = await IdentityManager.getRequesterId();
+  try {
+    final requesterId = await IdentityManager.getRequesterId();
 
-final requesterDoc = await FirebaseFirestore.instance
-    .collection('requesters')
-    .doc(requesterId)
-    .get();
+    final requesterDoc = await FirebaseFirestore.instance
+        .collection('requesters')
+        .doc(requesterId)
+        .get();
 
-final requesterName =
-    (requesterDoc.data()?['name'] ?? '').toString().trim();
+    final requesterName =
+        (requesterDoc.data()?['name'] ?? '').toString().trim();
 
-final locatorDoc = await FirebaseFirestore.instance
-    .collection('locators')
-    .doc(widget.locatorId)
-    .get();
+    final locatorDoc = await FirebaseFirestore.instance
+        .collection('locators')
+        .doc(widget.locatorId)
+        .get();
 
-final locatorName =
-    (locatorDoc.data()?['name'] ?? 'Locator').toString().trim();
+    final locatorName =
+        (locatorDoc.data()?['name'] ?? 'Locator').toString().trim();
 
-await FirebaseFirestore.instance
-    .collection('requesters')
-    .doc(requesterId)
-    .collection('locators')
-    .doc(widget.locatorId)
-    .set({
-  'name': locatorName,
-  'active': true,
-  'callEnabled': _callEnabled,
-  'batteryAlarmEnabled': _batteryAlarmEnabled,
-  'batteryAlertThreshold': _batteryThreshold,
-  'gpsOffAlarmEnabled': _gpsOffAlarmEnabled,
-  'geofenceAlarmEnabled': _geofenceAlarmEnabled,
-  'geofenceRadius': _geofenceRadius,
-  'createdAt': FieldValue.serverTimestamp(),
-}, SetOptions(merge: true));
+    await FirebaseFirestore.instance
+        .collection('requesters')
+        .doc(requesterId)
+        .collection('locators')
+        .doc(widget.locatorId)
+        .set({
+      'name': locatorName,
+      'active': true,
+      'callEnabled': _callEnabled,
+      'batteryAlarmEnabled': _batteryAlarmEnabled,
+      'batteryAlertThreshold': _batteryThreshold,
+      'gpsOffAlarmEnabled': _gpsOffAlarmEnabled,
+      'geofenceAlarmEnabled': _geofenceAlarmEnabled,
+      'geofenceRadius': _geofenceRadius,
+      'createdAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
 
-      Navigator.pop(context, true);
-    } finally {
-      if (mounted) {
-        setState(() => _saving = false);
-      }
+    await FirebaseFirestore.instance
+        .collection('locators')
+        .doc(widget.locatorId)
+        .set({
+      'pairedRequesterId': requesterId,
+      'pairedRequesterName': requesterName,
+    }, SetOptions(merge: true));
+
+    if (!mounted) return;
+    Navigator.pop(context, true);
+  } finally {
+    if (mounted) {
+      setState(() => _saving = false);
     }
   }
-
+}
   Widget _sectionCard({required Widget child}) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -300,41 +313,51 @@ await FirebaseFirestore.instance
       const Divider(height: 20),
 
       _toggleTile(
-        title: 'Battery alerts',
-        subtitle: 'Notify when battery drops below selected level.',
-        value: _batteryAlarmEnabled,
-        onChanged: (v) => setState(() => _batteryAlarmEnabled = v),
-      ),
+  title: 'Battery alerts',
+  subtitle: 'Notify when battery drops below selected level.',
+  value: _batteryAlarmEnabled,
+  onChanged: (v) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('batteryAlarmEnabled', v);
 
-      if (_batteryAlarmEnabled) ...[
-        const SizedBox(height: 10),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Battery alert level',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [10, 15, 20, 25, 30].map((level) {
-            return ChoiceChip(
-              label: Text('$level%'),
-              selected: _batteryThreshold == level,
-              onSelected: (_) {
-                setState(() {
-                  _batteryThreshold = level;
-                });
-              },
-            );
-          }).toList(),
-        ),
-      ],
+    setState(() {
+      _batteryAlarmEnabled = v;
+    });
+	print("prefs set");
+  },
+),
+if (_batteryAlarmEnabled) ...[
+  const SizedBox(height: 10),
+  Align(
+    alignment: Alignment.centerLeft,
+    child: Text(
+      'Battery alert level',
+      style: theme.textTheme.titleSmall?.copyWith(
+        fontWeight: FontWeight.w800,
+        color: const Color(0xFF0F172A),
+      ),
+    ),
+  ),
+  const SizedBox(height: 10),
+  Wrap(
+    spacing: 10,
+    runSpacing: 10,
+    children: [10, 15, 20, 25, 30].map((level) {
+      return ChoiceChip(
+        label: Text('$level%'),
+        selected: _batteryThreshold == level,
+        onSelected: (_) async {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt('batteryAlertThreshold', level);
+
+          setState(() {
+            _batteryThreshold = level;
+          });
+        },
+      );
+    }).toList(),
+  ),
+],
 
       const Divider(height: 20),
 
