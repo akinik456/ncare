@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:permission_handler/permission_handler.dart';
 import 'identity_manager.dart';
-
+import 'alert_engine.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -139,6 +139,9 @@ _gfInside = inside;
         .collection('locators')
         .doc(locatorId)
         .get();
+		
+	final locatorName =
+    (locatorDoc.data()?['name'] ?? 'Locator').toString();
 
     final requesterId =
         (locatorDoc.data()?['pairedRequesterId'] ?? '').toString().trim();
@@ -156,24 +159,36 @@ _gfInside = inside;
         (settingsDoc.data()?['gpsOffAlarmEnabled'] ?? false) == true;
 
     if (!gpsEnabled && gpsOffAlarmEnabled && !gpsSent) {
-      await FirebaseFirestore.instance
-          .collection('requesters')
-          .doc(requesterId)
-          .collection('alerts')
-          .add({
-        'type': 'gps_off',
-        'locatorId': locatorId,
-        'locatorName':
-            (locatorDoc.data()?['name'] ?? 'Locator').toString(),
-        'ts': FieldValue.serverTimestamp(),
-      });
 
-      await prefs.setBool('gpsOffAlertSent', true);
-    }
+	final allowed = await AlertEngine.shouldSend(
+		requesterId: requesterId,
+		locatorId: locatorId,
+		alertType: 'gps_off',
+	  );
+
+	  if (!allowed) return;
+
+	  await AlertEngine.send(
+		requesterId: requesterId,
+		locatorId: locatorId,
+		locatorName: locatorName,
+		alertType: 'gps_off',
+	  );
+
+	  await prefs.setBool('gpsOffAlertSent', true);
+	}
+
 
     if (gpsEnabled && gpsSent) {
-      await prefs.setBool('gpsOffAlertSent', false);
-    }
+
+	  await AlertEngine.clear(
+		requesterId: requesterId,
+		locatorId: locatorId,
+		alertType: 'gps_off',
+	  );
+
+	  await prefs.setBool('gpsOffAlertSent', false);
+	}
   } catch (e) {
     print('GPS OFF ALERT ERROR => $e');
   }
