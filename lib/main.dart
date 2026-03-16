@@ -86,93 +86,94 @@ await flutterLocalNotificationsPlugin.initialize(initSettings);
 	
   final role = await RoleManager.getRole();
   print("ROLE => $role");
+  
+String? myLocatorId;
 
-  if (role == 'locator') {
-    final myLocatorId = await IdentityManager.getRequesterId();
-    final locatorTopic = 'locator_$myLocatorId';
-
-    FirebaseMessaging.onMessage.listen((message) async {
-	  await NotificationGateway.handle(message);
-      final data = message.data;
-
-      if (data['type'] != 'rl') return;
-	  
-
-      final requestId = data['requestId']?.toString();
-      final requesterId = data['requesterId']?.toString();
-      final targetLocatorId = data['locatorId']?.toString();
-      final battery = Battery();
-      final level = await battery.batteryLevel;
-	  
-	  
-	  
-      if (requestId == null ||
-          requestId.isEmpty ||
-          requesterId == null ||
-          requesterId.isEmpty) {
-        return;
-      }
-
-      if (targetLocatorId == null ||
-          targetLocatorId.isEmpty ||
-          targetLocatorId != myLocatorId) {
-        print("FG SKIP => target=$targetLocatorId mine=$myLocatorId");
-        return;
-      }
-	  final prefs = await SharedPreferences.getInstance();
-      final enabled = prefs.getBool('locator_request_alerts') ?? true;
-
-       if (enabled){
-      LocatorUiState.instance.onRequestReceived(requestId);
-		}
-      try {
-        final pos = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 20),
-        );
-
-        await FirebaseFirestore.instance
-            .collection('requesters')
-            .doc(requesterId)
-            .collection('responses')
-            .doc(requestId)
-            .set({
-          'locatorId': myLocatorId,
-          'status': 'ok',
-          'lat': pos.latitude,
-          'lng': pos.longitude,
-          'acc': pos.accuracy,
-		  'battery': level,
-          'ts': FieldValue.serverTimestamp(),
-          'via': 'fg',
-        }, SetOptions(merge: true));
-
-        LocatorUiState.instance.onSentOk();
-
-        print("FG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
-      } catch (e) {
-        await FirebaseFirestore.instance
-            .collection('requesters')
-            .doc(requesterId)
-            .collection('responses')
-            .doc(requestId)
-            .set({
-          'locatorId': myLocatorId,
-          'status': 'error',
-          'error': e.toString(),
-          'ts': FieldValue.serverTimestamp(),
-          'via': 'fg',
-        }, SetOptions(merge: true));
-
-        LocatorUiState.instance.reset();
-      }
-    });
-  } else {
-    print("LOCATOR FLOW SKIPPED => role=$role");
-	
+if (role == 'locator') {
+  myLocatorId = await IdentityManager.getRequesterId();
+  final locatorTopic = 'locator_$myLocatorId';
+} else {
+  print("LOCATOR FLOW SKIPPED => role=$role");
   final requesterId = await IdentityManager.getRequesterId();
+}  
 
+  FirebaseMessaging.onMessage.listen((message) async {
+  await NotificationGateway.handle(message);
+
+  if (role != 'locator') return;
+
+  final data = message.data;
+  if (data['type'] != 'rl') return;
+
+  final requestId = data['requestId']?.toString();
+  final requesterId = data['requesterId']?.toString();
+  final targetLocatorId = data['locatorId']?.toString();
+
+  final battery = Battery();
+  final level = await battery.batteryLevel;
+
+  if (requestId == null ||
+      requestId.isEmpty ||
+      requesterId == null ||
+      requesterId.isEmpty) {
+    return;
   }
+
+  if (targetLocatorId == null ||
+      targetLocatorId.isEmpty ||
+      targetLocatorId != myLocatorId) {
+    print("FG SKIP => target=$targetLocatorId mine=$myLocatorId");
+    return;
+  }
+
+  final prefs = await SharedPreferences.getInstance();
+  final enabled = prefs.getBool('locator_request_alerts') ?? true;
+
+  if (enabled) {
+    LocatorUiState.instance.onRequestReceived(requestId);
+  }
+
+  try {
+    final pos = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+      timeLimit: const Duration(seconds: 20),
+    );
+
+    await FirebaseFirestore.instance
+        .collection('requesters')
+        .doc(requesterId)
+        .collection('responses')
+        .doc(requestId)
+        .set({
+      'locatorId': myLocatorId,
+      'status': 'ok',
+      'lat': pos.latitude,
+      'lng': pos.longitude,
+      'acc': pos.accuracy,
+      'battery': level,
+      'ts': FieldValue.serverTimestamp(),
+      'via': 'fg',
+    }, SetOptions(merge: true));
+
+    LocatorUiState.instance.onSentOk();
+    print("FG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
+  } catch (e) {
+    await FirebaseFirestore.instance
+        .collection('requesters')
+        .doc(requesterId)
+        .collection('responses')
+        .doc(requestId)
+        .set({
+      'locatorId': myLocatorId,
+      'status': 'error',
+      'error': e.toString(),
+      'ts': FieldValue.serverTimestamp(),
+      'via': 'fg',
+    }, SetOptions(merge: true));
+
+    LocatorUiState.instance.reset();
+  }
+});
 
   runApp(NCareApp(setupDone: setupDone));
 }

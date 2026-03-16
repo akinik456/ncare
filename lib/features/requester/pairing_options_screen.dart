@@ -38,6 +38,7 @@ class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
     super.initState();
     _loadBatteryThreshold();
 	_loadGeofenceCenter();
+	_loadExistingSettings();
   }
 
   Future<void> _loadBatteryThreshold() async {
@@ -65,6 +66,29 @@ Future<void> _loadGeofenceCenter() async {
     _geofenceCenterLng = (data?['geofenceCenterLng'] as num?)?.toDouble();
   });
 }  
+
+Future<void> _loadExistingSettings() async {
+  final requesterId = await IdentityManager.getRequesterId();
+
+  final doc = await FirebaseFirestore.instance
+      .collection('requesters')
+      .doc(requesterId)
+      .collection('locators')
+      .doc(widget.locatorId)
+      .get();
+
+  final data = doc.data();
+  if (data == null) return;
+
+  setState(() {
+    _callEnabled = (data['callEnabled'] ?? true) == true;
+    _batteryAlarmEnabled = (data['batteryAlarmEnabled'] ?? true) == true;
+    _gpsOffAlarmEnabled = (data['gpsOffAlarmEnabled'] ?? false) == true;
+    _geofenceAlarmEnabled = (data['geofenceAlarmEnabled'] ?? false) == true;
+    _geofenceRadius = (data['geofenceRadius'] ?? 250) as int;
+    _batteryThreshold = (data['batteryAlertThreshold'] ?? 20) as int;
+  });
+}
   
 Future<void> _setCurrentLocationAsGeofenceCenter() async {
   setState(() => _savingCenter = true);
@@ -122,47 +146,38 @@ setState(() {
     try {
       final requesterId = await IdentityManager.getRequesterId();
 
-      final requesterDoc = await FirebaseFirestore.instance
-          .collection('requesters')
-          .doc(requesterId)
-          .get();
+final requesterDoc = await FirebaseFirestore.instance
+    .collection('requesters')
+    .doc(requesterId)
+    .get();
 
-      final requesterName =
-          (requesterDoc.data()?['name'] ?? '').toString().trim();
+final requesterName =
+    (requesterDoc.data()?['name'] ?? '').toString().trim();
 
-      await FirebaseFirestore.instance
-	      .collection('requesters')
-          .doc(requesterId)
-          .collection('locators')
-          .doc(widget.locatorId)
-          .set({
-        'name': widget.locatorName,
-        'active': true,
-        'callEnabled': _callEnabled,
-        'batteryAlarmEnabled': _batteryAlarmEnabled,
-        'batteryAlertThreshold': _batteryThreshold,
-        'gpsOffAlarmEnabled': _gpsOffAlarmEnabled,
-        'geofenceAlarmEnabled': _geofenceAlarmEnabled,
-        'geofenceRadius': _geofenceRadius,
-        'createdAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+final locatorDoc = await FirebaseFirestore.instance
+    .collection('locators')
+    .doc(widget.locatorId)
+    .get();
 
-      await FirebaseFirestore.instance
-          .collection('locators')
-          .doc(widget.locatorId)
-          .set({
-        'pairedRequesterId': requesterId,
-        'pairedRequesterName': requesterName,
-      }, SetOptions(merge: true));
+final locatorName =
+    (locatorDoc.data()?['name'] ?? 'Locator').toString().trim();
 
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${widget.locatorName} Setings updated'),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+await FirebaseFirestore.instance
+    .collection('requesters')
+    .doc(requesterId)
+    .collection('locators')
+    .doc(widget.locatorId)
+    .set({
+  'name': locatorName,
+  'active': true,
+  'callEnabled': _callEnabled,
+  'batteryAlarmEnabled': _batteryAlarmEnabled,
+  'batteryAlertThreshold': _batteryThreshold,
+  'gpsOffAlarmEnabled': _gpsOffAlarmEnabled,
+  'geofenceAlarmEnabled': _geofenceAlarmEnabled,
+  'geofenceRadius': _geofenceRadius,
+  'createdAt': FieldValue.serverTimestamp(),
+}, SetOptions(merge: true));
 
       Navigator.pop(context, true);
     } finally {

@@ -66,23 +66,44 @@ export const onAlertCreated = onDocumentCreated(
     const locatorId = data?.locatorId?.toString() ?? "";
     const locatorName = data?.locatorName?.toString() ?? "Locator";
 
-    if (type !== "call_me") {
-      console.log("ALERT IGNORED", requesterId, alertId, type);
-      return;
-    }
+    let title = "";
+	let body = "";
 
-    console.log("CALL_ME ALERT", requesterId, alertId, locatorId, locatorName);
+	if (type === "call_me") {
+	  title = "Call request";
+	  body = `${locatorName} wants you to call`;
+	} else if (type === "gps_off") {
+	  title = "GPS disabled";
+	  body = `${locatorName} turned GPS off`;
+	} else if (type === "battery_low") {
+	  const level = data?.battery?.toString() ?? "";
+	  title = "Battery alert";
+	  body = `${locatorName} battery is low${level.isNotEmpty ? ` (${level}%)` : ""}`;
+	} else if (type === "geofence_exit") {
+	  title = "Geofence alert";
+	  body = `${locatorName} left the selected area`;
+	} else {
+	  console.log("ALERT IGNORED", requesterId, alertId, type);
+	  return;
+	}
 
     await admin.messaging().send({
-      topic: requesterId,
-      data: {
-        type: "call_me",
-        alertId,
-        requesterId,
-        locatorId,
-        locatorName,
-      },
-      android: { priority: "high" ,
-	  });
+	  topic: requesterId,
+	  data: {
+		type: type ?? "",
+		alertId,
+		requesterId,
+		locatorId,
+		locatorName,
+	  },
+	  notification: {
+		title,
+		body,
+	  },
+	  android: {
+		priority: "high",
+		collapseKey: type ?? "alert",
+	  },
+	});
   },
 );

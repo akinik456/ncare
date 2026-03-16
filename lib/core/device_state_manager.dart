@@ -7,6 +7,7 @@ import 'identity_manager.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../firebase_options.dart';
 
 class DeviceStateManager {
@@ -123,11 +124,60 @@ _gfInside = inside;
   }
 
   Future<void> _checkState() async {
-    final perm = await Permission.locationWhenInUse.status;
-    final gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
+  final perm = await Permission.locationWhenInUse.status;
+  final gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
 
-    _updateReady(perm.isGranted && gpsEnabled);
+  _updateReady(perm.isGranted && gpsEnabled);
+
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final gpsSent = prefs.getBool('gpsOffAlertSent') ?? false;
+
+    final locatorId = await IdentityManager.getRequesterId();
+
+    final locatorDoc = await FirebaseFirestore.instance
+        .collection('locators')
+        .doc(locatorId)
+        .get();
+
+    final requesterId =
+        (locatorDoc.data()?['pairedRequesterId'] ?? '').toString().trim();
+
+    if (requesterId.isEmpty) return;
+
+    final settingsDoc = await FirebaseFirestore.instance
+        .collection('requesters')
+        .doc(requesterId)
+        .collection('locators')
+        .doc(locatorId)
+        .get();
+
+    final gpsOffAlarmEnabled =
+        (settingsDoc.data()?['gpsOffAlarmEnabled'] ?? false) == true;
+
+    if (!gpsEnabled && gpsOffAlarmEnabled && !gpsSent) {
+      await FirebaseFirestore.instance
+          .collection('requesters')
+          .doc(requesterId)
+          .collection('alerts')
+          .add({
+        'type': 'gps_off',
+        'locatorId': locatorId,
+        'locatorName':
+            (locatorDoc.data()?['name'] ?? 'Locator').toString(),
+        'ts': FieldValue.serverTimestamp(),
+      });
+
+      await prefs.setBool('gpsOffAlertSent', true);
+    }
+
+    if (gpsEnabled && gpsSent) {
+      await prefs.setBool('gpsOffAlertSent', false);
+    }
+  } catch (e) {
+    print('GPS OFF ALERT ERROR => $e');
   }
+}
 
   void _updateReady(bool value) {
     if (_isReady == value) return;
