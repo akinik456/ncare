@@ -148,16 +148,23 @@ String formatLastSeen(DateTime? lastSeen) {
   return "Last seen ${diff.inDays}d ago";
 }
 
-String formatDistance(double? meters) {
-  if (meters == null) return '-';
+String formatDistance(double? distance, double acc) {
+  if (distance == null) return "-";
 
-  if (meters < 1000) {
-    return '${meters.toStringAsFixed(0)} m';
+  // NEARBY
+  if (distance <= acc + 30) {
+    return "NEARBY";
   }
 
-  return '${(meters / 1000).toStringAsFixed(1)} km';
-}
+  // KM
+  if (distance >= 1000) {
+    final km = distance / 1000;
+    return "${km.toStringAsFixed(1)} km ±${(acc / 1000).toStringAsFixed(2)}";
+  }
 
+  // METERS
+  return "${distance.round()} m ±${acc.round()}";
+}
 
   
   @override
@@ -641,6 +648,8 @@ return GestureDetector(
 	  
 final lat = (data?['lat'] as num?)?.toDouble();
 final lng = (data?['lng'] as num?)?.toDouble();	  
+final acc = (data?['acc'] as num?)?.toDouble() ?? 0;	
+
 double? distance;
 
 if (_myLat != null && _myLng != null && lat != null && lng != null) {
@@ -651,6 +660,17 @@ if (_myLat != null && _myLng != null && lat != null && lng != null) {
     lng!,
   );
 }
+
+String distanceLabel;
+
+if (distance == null) {
+  distanceLabel = "-";
+} else if (distance <= acc + 30) {
+  distanceLabel = "NEARBY";
+} else {
+  distanceLabel = "${distance.round()} m ±${acc.round()}";
+}
+
 print('lat=$lat lng=$lng');
 print('distance=$distance');
 return Row(
@@ -718,7 +738,7 @@ return Row(
     if (distance != null) ...[
       const SizedBox(width: 12),
       Text(
-        formatDistance(distance),
+        formatDistance(distance,acc),
         style: const TextStyle(
           color: Colors.white70,
           fontSize: 12,

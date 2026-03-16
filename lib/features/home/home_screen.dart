@@ -246,6 +246,7 @@ Future<void> _updatePresence() async {
     'gpsEnabled': gpsOn,
 	'lat': pos.latitude,
     'lng': pos.longitude,
+	'acc': pos.accuracy, 
   }, SetOptions(merge: true));
   
   print('PRESENCE => battery=$level gps=$gpsOn');
