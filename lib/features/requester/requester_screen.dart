@@ -865,20 +865,28 @@ return Row(
                         (status == 'ok' && lat != null && lng != null);
 
                     if (hasFix && pendingRequestId != null) {
-  final currentPending = pendingRequestId!;
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!mounted) return;
-    setState(() {
-      _lastRequestId = currentPending;
-      _pendingRequestId = null;
-      _timeout = false;
-      _lastAddress = null;
-      _lastAddressKey = null;
-    });
-  });
+					  final currentPending = pendingRequestId!;
 
-  
-}
+					  WidgetsBinding.instance.addPostFrameCallback((_) async {
+						if (!mounted) return;
+
+						await FirebaseFirestore.instance
+							.collection('requesters')
+							.doc(requesterId)
+							.collection('requests')
+							.doc(currentPending)
+							.delete();
+
+						if (!mounted) return;
+						setState(() {
+						  _lastRequestId = currentPending;
+						  _pendingRequestId = null;
+						  _timeout = false;
+						  _lastAddress = null;
+						  _lastAddressKey = null;
+						});
+					  });
+					}
 
 					
                   }
