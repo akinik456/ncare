@@ -14,6 +14,7 @@ import '../../core/identity_manager.dart';
 import '../setup/setup_screen.dart';
 import '../../core/locator_settings_reader.dart';
 import '../../core/fcm_manager.dart';
+import '../../core/location_helper.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -266,10 +267,12 @@ Future<void> _updatePresence() async {
 
   final level = await _battery.batteryLevel;
   final gpsOn = await Geolocator.isLocationServiceEnabled();
-  final pos = await Geolocator.getCurrentPosition(
-   desiredAccuracy: LocationAccuracy.high,
-  );  
-
+  final pos = await LocationService.getCurrentLocationSafe(
+  accuracy: LocationAccuracy.high,
+  timeLimit: const Duration(seconds: 20),
+);
+		if(pos == null) return; 
+  
   await FirebaseFirestore.instance
       .collection('locators')
       .doc(locatorId)

@@ -12,7 +12,7 @@ import 'core/locator_ui_state.dart';
 import 'core/notification_service.dart';
 import 'core/notification_gateway.dart';
 import 'core/fcm_manager.dart';
-
+import 'core/location_helper.dart';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -169,11 +169,12 @@ if (cachedLat != null &&
   }, SetOptions(merge: true));
 }  
   
-    final pos = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-      timeLimit: const Duration(seconds: 20),
-    );
-
+    final pos = await LocationService.getCurrentLocationSafe(
+  accuracy: LocationAccuracy.high,
+  timeLimit: const Duration(seconds: 20),
+);
+		if(pos == null) return;
+	
     // cleanup BEFORE fresh write (only here)
 final responsesRef = FirebaseFirestore.instance
     .collection('requesters')
@@ -352,12 +353,12 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
         await snapshot.docs[i].reference.delete();
       }
     }
-
-    final pos = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-      timeLimit: const Duration(seconds: 20),
-    );
-
+    final pos = await LocationService.getCurrentLocationSafe(
+  accuracy: LocationAccuracy.high,
+  timeLimit: const Duration(seconds: 20),
+);
+		if(pos == null) return;
+    
     await responseRef.set({
       'locatorId': myLocatorId,
       'status': 'ok',

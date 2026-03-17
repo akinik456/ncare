@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/identity_manager.dart';
 import '../../core/notification_service.dart';
+import '../../core/location_helper.dart';
 import '../setup/setup_screen.dart';
 import 'add_locator_screen.dart';
 import 'pairing_options_screen.dart';
@@ -65,7 +66,7 @@ class _RequesterScreenState extends State<RequesterScreen> with SingleTickerProv
 )..repeat(reverse: true);
 _pulse = Tween<double>(begin: 0.8, end: 2).animate(_pulseController);
 
-  _getMyLocation();
+  //_getMyLocation();
   _initBatteryDefaults();
 	
   }
@@ -81,10 +82,12 @@ Future<void> _getMyLocation() async {
     return;
   }
 
-  final pos = await Geolocator.getCurrentPosition(
-    desiredAccuracy: LocationAccuracy.high,
-  );
-
+  final pos = await LocationService.getCurrentLocationSafe(
+  accuracy: LocationAccuracy.high,
+  timeLimit: const Duration(seconds: 20),
+);
+		if(pos == null) return;
+  
   setState(() {
     _myLat = pos.latitude;
     _myLng = pos.longitude;

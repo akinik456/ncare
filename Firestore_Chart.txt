@@ -8,7 +8,7 @@
 	REQUESTERS(requesters)
 		requesterId
 			ALERTS(alerts)
-				alertId -> (level,locatorId,locatorName,ts,type: "battery_low") , (distance,locatorId,requesterId,ts,type: "geofence_exit") , 
+				alertId -> (level,locatorId,locatorName,ts,type: "battery_low") , (distance,locatorId,requesterId,ts,type: "geofence_exit") , (locatorId,locatorName,ts,type: "gps_off")
 			LOCATORS(locators)
 				locatorId
 					RESPONSES(responses)

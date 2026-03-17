@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../core/identity_manager.dart';
-
+import '../../core/location_helper.dart';
 class PairingOptionsScreen extends StatefulWidget {
   final String locatorId;
   final String locatorName;
@@ -115,10 +115,12 @@ Future<void> _setCurrentLocationAsGeofenceCenter() async {
       return;
     }
 
-    final pos = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-
+    final pos = await LocationService.getCurrentLocationSafe(
+  accuracy: LocationAccuracy.high,
+  timeLimit: const Duration(seconds: 20),
+);
+		if(pos == null) return;
+    
     await FirebaseFirestore.instance
 	    .collection('requesters')
         .doc(requesterId)

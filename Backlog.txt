@@ -47,11 +47,8 @@ Play Store için gerekli.
 
 
 
-8 geofence
 
-9 gps off alert
-
-10 remote lo add
+10 remote locator add
 
 11 her locator ün kendi son adresi olmalı , loc değişince ya kendi son adresi
 gösterilmeli ya da silinmeli

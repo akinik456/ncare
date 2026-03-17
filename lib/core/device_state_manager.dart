@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:permission_handler/permission_handler.dart';
 import 'identity_manager.dart';
+import 'location_helper.dart';
 import 'alert_engine.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -36,9 +37,11 @@ class DeviceStateManager {
 	_geoTicker?.cancel();
 _geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
   try {
-    final pos = await geo.Geolocator.getCurrentPosition(
-      desiredAccuracy: geo.LocationAccuracy.high,
-    );
+    final pos = await LocationService.getCurrentLocationSafe(
+  accuracy: geo.LocationAccuracy.high,
+  timeLimit: const Duration(seconds: 20),
+);
+		if(pos == null) return;
 
     print("GF TEST POS => ${pos.latitude}, ${pos.longitude}");
 	final locatorId = await IdentityManager.getRequesterId();
@@ -66,15 +69,35 @@ print("enabled:$enabled,radius:$radius,cLat:$cLat,cLng:$cLng");
 
 if (!enabled || radius == null || cLat == null || cLng == null)return;
 
-final dist = geo.Geolocator.distanceBetween(
-  pos.latitude,
-  pos.longitude,
-  cLat,
-  cLng,
- 
-);
+double? dist;
 
-final inside = dist <= radius;
+final gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
+
+if (gpsEnabled &&
+    pos.latitude != null &&
+    pos.longitude != null &&
+    cLat != null &&
+    cLng != null) {
+  dist = geo.Geolocator.distanceBetween(
+    pos.latitude!,
+    pos.longitude!,
+    cLat,
+    cLng,
+  );
+} else {
+  dist = null;
+}
+
+
+//final dist = 0;//geo.Geolocator.distanceBetween(
+  //pos.latitude,
+  //pos.longitude,
+  //cLat,
+  //cLng,
+ 
+//);
+
+final inside = dist != null && dist <= radius;
 
 print("distance:$dist , radius:$radius");
 
