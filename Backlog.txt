@@ -53,6 +53,8 @@ Play Store için gerekli.
 11 her locator ün kendi son adresi olmalı , loc değişince ya kendi son adresi
 gösterilmeli ya da silinmeli
 
+12 start da subscribe için takılabiliyor , sık oluyor. 
+
 
 
 

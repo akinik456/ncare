@@ -87,16 +87,7 @@ if (gpsEnabled &&
 } else {
   dist = null;
 }
-
-
-//final dist = 0;//geo.Geolocator.distanceBetween(
-  //pos.latitude,
-  //pos.longitude,
-  //cLat,
-  //cLng,
- 
-//);
-
+                                                                                                                       
 final inside = dist != null && dist <= radius;
 
 print("distance:$dist , radius:$radius");

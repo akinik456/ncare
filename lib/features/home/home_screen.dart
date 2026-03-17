@@ -15,6 +15,7 @@ import '../setup/setup_screen.dart';
 import '../../core/locator_settings_reader.dart';
 import '../../core/fcm_manager.dart';
 import '../../core/location_helper.dart';
+import '../../core/alert_engine.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -65,13 +66,14 @@ Future<void> _createBatteryAlert(int level) async {
         .collection('requesters')
         .doc(requesterId)
         .collection('alerts')
-        .add({
+		.doc('battery_low_$locatorId')
+        .set({
       'type': 'battery_low',
       'locatorId': locatorId,
       'locatorName': displayname ?? 'Locator',
-      'level': level,
+      'battery': level,
       'ts': FieldValue.serverTimestamp(),
-    });
+    },SetOptions(merge:true));
 
     print("BATTERY ALERT CREATED => $level%");
   } catch (e) {
@@ -213,12 +215,22 @@ Future<void> _startBatteryMonitor() async {
   _batteryTimer = Timer.periodic(const Duration(minutes: 1), (timer) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+	  final batterysent = prefs.getBool('batteryAlertSent') ?? false;
+	  
+
+
+      final level = await _battery.batteryLevel;
+
+      	  
       final locatorId = await IdentityManager.getRequesterId();
 
       final locatorDoc = await FirebaseFirestore.instance
           .collection('locators')
           .doc(locatorId)
           .get();
+	  
+	  final locatorName =
+      (locatorDoc.data()?['name'] ?? 'Locator').toString(); 		  
 
       final requesterId =
           (locatorDoc.data()?['pairedRequesterId'] ?? '').toString().trim();
@@ -231,33 +243,48 @@ Future<void> _startBatteryMonitor() async {
           .collection('locators')
           .doc(locatorId)
           .get();
-
-      final enabled =
-          (settingsDoc.data()?['batteryAlarmEnabled'] ?? false) == true;
-      if (!enabled) return;
-
-      final threshold =
+		  
+	  final threshold =
           (settingsDoc.data()?['batteryAlertThreshold'] ?? 20) as int;
+		  
+      final batteryAlarmEnabled =
+          (settingsDoc.data()?['batteryAlarmEnabled'] ?? false) == true;
+		  
+	  if (level <= threshold && batteryAlarmEnabled && !batterysent) {
 
-      final level = await _battery.batteryLevel;
+	  final allowed = await AlertEngine.shouldSend(
+		requesterId: requesterId,
+		locatorId: locatorId,
+		alertType: 'battery_low',
+	  );
 
-      final sent = prefs.getBool('batteryAlertSent') ?? false;
+	  if (!allowed) return;
 
-      if (_lastBatteryLevel == level) return;
-      _lastBatteryLevel = level;
+	  await AlertEngine.send(
+		requesterId: requesterId,
+		locatorId: locatorId,
+		locatorName: locatorName,
+		alertType: 'battery_low',
+	  );
 
-      if (level <= threshold && !sent) {
-        print("BATTERY ALERT TRIGGER $level");
-        await _createBatteryAlert(level);
-        await prefs.setBool('batteryAlertSent', true);
-      }
+	  await prefs.setBool('batteryAlertSent', true);
+	}
+  
+    if (level > threshold && batterysent) {
 
-      if (level > threshold && sent) {
-        await prefs.setBool('batteryAlertSent', false);
-      }
-    } catch (e) {
+	  await AlertEngine.clear(
+		requesterId: requesterId,
+		locatorId: locatorId,
+		alertType: 'battery_low',
+	  );
+
+	  await prefs.setBool('batteryAlertSent', false);
+	}
+}catch (e) {
       print("BATTERY MONITOR ERROR => $e");
     }
+		  
+      
   });
 }
 
