@@ -47,6 +47,8 @@ final requesterId = await _getPairedRequesterId(locatorId);
 print("GF TEST REQ => $requesterId");
 
 final gfDoc = await FirebaseFirestore.instance
+    .collection('requesters')
+    .doc(requesterId)
     .collection('locators')
     .doc(locatorId)
     .get();
@@ -60,6 +62,8 @@ final radius = (gf?['geofenceRadius'] as num?)?.toDouble();
 final cLat = (gf?['geofenceCenterLat'] as num?)?.toDouble();
 final cLng = (gf?['geofenceCenterLng'] as num?)?.toDouble();
 
+print("enabled:$enabled,radius:$radius,cLat:$cLat,cLng:$cLng");
+
 if (!enabled || radius == null || cLat == null || cLng == null)return;
 
 final dist = geo.Geolocator.distanceBetween(
@@ -71,6 +75,8 @@ final dist = geo.Geolocator.distanceBetween(
 );
 
 final inside = dist <= radius;
+
+print("distance:$dist , radius:$radius");
 
 if (_gfInside == null) {
 
