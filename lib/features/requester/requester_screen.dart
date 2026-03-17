@@ -849,9 +849,13 @@ return Row(
             if (pendingRequestId != null || visibleRequestId != null)
               StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
-                    .collection('requesters')
-                    .doc(requesterId)
-                    .collection('responses')
+	  .collection('requesters')
+      .doc(requesterId)
+	  .collection('locators')
+      .doc(_selectedLocatorId)
+      .collection('responses')
+      
+                    		
                     .doc(pendingRequestId ?? visibleRequestId)
                     .snapshots(),
                 builder: (context, snapshot) {
@@ -910,8 +914,10 @@ return Row(
                   return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                     stream: FirebaseFirestore.instance
                         .collection('requesters')
-                        .doc(requesterId)
-                        .collection('responses')
+      .doc(requesterId)
+	  .collection('locators')
+      .doc(_selectedLocatorId)
+      .collection('responses')
                         .doc(displayDocId)
                         .snapshots(),
                     builder: (context, visibleSnapshot) {

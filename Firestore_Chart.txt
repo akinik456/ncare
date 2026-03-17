@@ -1,0 +1,21 @@
+
+
+	COLLECTION , document
+
+	LOCATORS(locators)
+		locatorId  -> (acc,battery,geofenceCenterLat,geofenceCenterLng,gpsEnabled,lastSeen,lat,lng,name,pairedRequesterId,pairedRequesterId)                
+	
+	REQUESTERS(requesters)
+		requesterId
+			ALERTS(alerts)
+				alertId -> (level,locatorId,locatorName,ts,type: "battery_low") , (distance,locatorId,requesterId,ts,type: "geofence_exit") , 
+			LOCATORS(locators)
+				locatorId
+					RESPONSES(responses)
+						requestId -> (acc,battery,lat,lng,locatorId,status,ts)
+			REQUESTS(requests)
+				requestId
+				
+			
+				
+			

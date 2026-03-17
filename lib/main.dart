@@ -153,6 +153,8 @@ if (cachedLat != null &&
   await FirebaseFirestore.instance
       .collection('requesters')
       .doc(requesterId)
+	  .collection('locators')
+      .doc(myLocatorId)
       .collection('responses')
       .doc(requestId)
       .set({
@@ -172,12 +174,34 @@ if (cachedLat != null &&
       timeLimit: const Duration(seconds: 20),
     );
 
-    await FirebaseFirestore.instance
+    // cleanup BEFORE fresh write (only here)
+final responsesRef = FirebaseFirestore.instance
+    .collection('requesters')
+    .doc(requesterId)
+    .collection('locators')
+    .doc(myLocatorId)
+    .collection('responses');
+
+final snapshot = await responsesRef
+    .orderBy('ts', descending: false)
+    .get();
+
+if (snapshot.docs.length >= 3) {
+  final toDelete = snapshot.docs.length - 2;
+  for (var i = 0; i < toDelete; i++) {
+    await snapshot.docs[i].reference.delete();
+  }
+}
+	
+	
+	await FirebaseFirestore.instance
         .collection('requesters')
-        .doc(requesterId)
-        .collection('responses')
-        .doc(requestId)
-        .set({
+      .doc(requesterId)
+	  .collection('locators')
+      .doc(myLocatorId)
+      .collection('responses')
+      .doc(requestId)
+      .set({
       'locatorId': myLocatorId,
       'status': 'ok',
       'lat': pos.latitude,
@@ -193,10 +217,12 @@ if (cachedLat != null &&
   } catch (e) {
     await FirebaseFirestore.instance
         .collection('requesters')
-        .doc(requesterId)
-        .collection('responses')
-        .doc(requestId)
-        .set({
+      .doc(requesterId)
+	  .collection('locators')
+      .doc(myLocatorId)
+      .collection('responses')
+      .doc(requestId)
+      .set({
       'locatorId': myLocatorId,
       'status': 'error',
       'error': e.toString(),
@@ -214,11 +240,9 @@ if (cachedLat != null &&
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
-
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-  
 
   final role = await RoleManager.getRole();
   if (role != 'locator') {
@@ -247,16 +271,50 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     print("BG SKIP => target=$targetLocatorId mine=$myLocatorId");
     return;
   }
-  
-  await NotificationService.showFromRemoteMessage(message); 
+
+  await NotificationService.showFromRemoteMessage(message);
 
   final responseRef = FirebaseFirestore.instance
       .collection('requesters')
       .doc(requesterId)
+      .collection('locators')
+      .doc(myLocatorId)
       .collection('responses')
       .doc(requestId);
 
   try {
+    final locatorDoc = await FirebaseFirestore.instance
+        .collection('locators')
+        .doc(myLocatorId)
+        .get();
+
+    final cachedLat = (locatorDoc.data()?['lat'] as num?)?.toDouble();
+    final cachedLng = (locatorDoc.data()?['lng'] as num?)?.toDouble();
+    final cachedAcc = (locatorDoc.data()?['acc'] as num?)?.toDouble();
+    final ts = locatorDoc.data()?['ts'] as Timestamp?;
+    final age = ts != null
+        ? DateTime.now().difference(ts.toDate()).inSeconds
+        : 9999;
+
+    final battery = Battery();
+    final level = await battery.batteryLevel;
+
+    if (cachedLat != null &&
+        cachedLng != null &&
+        cachedAcc != null &&
+        age < 30) {
+      await responseRef.set({
+        'locatorId': myLocatorId,
+        'status': 'ok',
+        'lat': cachedLat,
+        'lng': cachedLng,
+        'acc': cachedAcc,
+        'battery': level,
+        'ts': FieldValue.serverTimestamp(),
+        'via': 'cached_bg',
+      }, SetOptions(merge: true));
+    }
+
     final gpsOn = await Geolocator.isLocationServiceEnabled();
     if (!gpsOn) {
       await responseRef.set({
@@ -277,20 +335,38 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       return;
     }
 
+    final responsesRef = FirebaseFirestore.instance
+        .collection('requesters')
+        .doc(requesterId)
+        .collection('locators')
+        .doc(myLocatorId)
+        .collection('responses');
+
+    final snapshot = await responsesRef
+        .orderBy('ts', descending: false)
+        .get();
+
+    if (snapshot.docs.length >= 3) {
+      final toDelete = snapshot.docs.length - 2;
+      for (var i = 0; i < toDelete; i++) {
+        await snapshot.docs[i].reference.delete();
+      }
+    }
+
     final pos = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
       timeLimit: const Duration(seconds: 20),
     );
-final battery = Battery();
-      final level = await battery.batteryLevel;
+
     await responseRef.set({
       'locatorId': myLocatorId,
       'status': 'ok',
       'lat': pos.latitude,
       'lng': pos.longitude,
       'acc': pos.accuracy,
-	  'battery': level,
+      'battery': level,
       'ts': FieldValue.serverTimestamp(),
+      'via': 'bg',
     }, SetOptions(merge: true));
 
     print("BG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
@@ -302,7 +378,6 @@ final battery = Battery();
       'ts': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
-  
 }
 
 class NCareApp extends StatelessWidget {
