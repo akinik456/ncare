@@ -9,6 +9,8 @@ PassW
 BLE
 Stalk
 F150
+insta
+etrade
 
 HUD
 Speed

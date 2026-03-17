@@ -33,91 +33,85 @@ class DeviceStateManager {
   }
 
   void start() {
-    _ticker?.cancel();
-	_geoTicker?.cancel();
-_geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
-  try {
-    final pos = await LocationService.getCurrentLocationSafe(
-  accuracy: geo.LocationAccuracy.high,
-  timeLimit: const Duration(seconds: 20),
-);
-		if(pos == null) return;
+  _ticker?.cancel();
+  _geoTicker?.cancel();
 
-    print("GF TEST POS => ${pos.latitude}, ${pos.longitude}");
-	final locatorId = await IdentityManager.getRequesterId();
-final requesterId = await _getPairedRequesterId(locatorId);
+  _geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
+    try {
+      final pos = await LocationService.getCurrentLocationSafe(
+        accuracy: geo.LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 20),
+      );
+      if (pos == null) return;
 
-print("GF TEST REQ => $requesterId");
+      final locatorId = await IdentityManager.getRequesterId();
+      final requesterId = await _getPairedRequesterId(locatorId);
+      if (requesterId == null || requesterId.isEmpty) return;
 
-final gfDoc = await FirebaseFirestore.instance
-    .collection('requesters')
-    .doc(requesterId)
-    .collection('locators')
-    .doc(locatorId)
-    .get();
+      final gfDoc = await FirebaseFirestore.instance
+          .collection('requesters')
+          .doc(requesterId)
+          .collection('locators')
+          .doc(locatorId)
+          .get();
 
-final gf = gfDoc.data();
-print("GF SETTINGS => $gf");
+      final gf = gfDoc.data();
 
+      final enabled = gf?['geofenceAlarmEnabled'] == true;
+      final radius = (gf?['geofenceRadius'] as num?)?.toDouble();
+      final cLat = (gf?['geofenceCenterLat'] as num?)?.toDouble();
+      final cLng = (gf?['geofenceCenterLng'] as num?)?.toDouble();
 
-final enabled = gf?['geofenceAlarmEnabled'] == true;
-final radius = (gf?['geofenceRadius'] as num?)?.toDouble();
-final cLat = (gf?['geofenceCenterLat'] as num?)?.toDouble();
-final cLng = (gf?['geofenceCenterLng'] as num?)?.toDouble();
+      if (!enabled || radius == null || cLat == null || cLng == null) return;
 
-print("enabled:$enabled,radius:$radius,cLat:$cLat,cLng:$cLng");
+      final dist = geo.Geolocator.distanceBetween(
+        pos.latitude,
+        pos.longitude,
+        cLat,
+        cLng,
+      );
 
-if (!enabled || radius == null || cLat == null || cLng == null)return;
+      final inside = dist <= radius;
 
-double? dist;
+      if (_gfInside == null) {
+        _gfInside = inside;
+        return;
+      }
 
-final gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
+      if (_gfInside == true && inside == false) {
+        await FirebaseFirestore.instance
+            .collection('requesters')
+            .doc(requesterId)
+            .collection('alerts')
+            .doc('geofence_exit_$locatorId')
+            .set({
+          'type': 'geofence_exit',
+          'requesterId': requesterId,
+          'locatorId': locatorId,
+          'distance': dist,
+          'ts': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
 
-if (gpsEnabled &&
-    pos.latitude != null &&
-    pos.longitude != null &&
-    cLat != null &&
-    cLng != null) {
-  dist = geo.Geolocator.distanceBetween(
-    pos.latitude!,
-    pos.longitude!,
-    cLat,
-    cLng,
-  );
-} else {
-  dist = null;
-}
-                                                                                                                       
-final inside = dist != null && dist <= radius;
+        print("GF EXIT ALERT => $dist");
+      }
 
-print("distance:$dist , radius:$radius");
+      if (_gfInside == false && inside == true) {
+        await FirebaseFirestore.instance
+            .collection('requesters')
+            .doc(requesterId)
+            .collection('alerts')
+            .doc('geofence_exit_$locatorId')
+            .delete();
 
-if (_gfInside == null) {
+        print("GF RE-ENTER => alert cleared");
+      }
 
-  _gfInside = inside;
-  return;
-}
-
-if (_gfInside == true && inside == false) {
-
-  await FirebaseFirestore.instance
-    .collection('requesters')
-    .doc(requesterId)
-    .collection('alerts')
-    .add({
-    'type': 'geofence_exit',
-    'requesterId': requesterId,
-    'locatorId': locatorId,
-    'distance': dist,
-    'ts': FieldValue.serverTimestamp(),
+      _gfInside = inside;
+    } catch (e) {
+      print("GF ERROR => $e");
+    }
   });
 
-  print("GF EXIT ALERT => $dist");
-}
-
-_gfInside = inside;
-  } catch (_) {}
-});
 	
 	
     _gpsSub?.cancel();
