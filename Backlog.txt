@@ -41,20 +41,16 @@ Alternatifler konuşulacak.
 6 App icon
 Play Store için gerekli.
 
-
-
 7 UI Polish
 
+8 remote locator add
 
-
-
-10 remote locator add
-
-11 her locator ün kendi son adresi olmalı , loc değişince ya kendi son adresi
+9 her locator ün kendi son adresi olmalı , loc değişince ya kendi son adresi
 gösterilmeli ya da silinmeli
 
-12 start da subscribe için takılabiliyor , sık oluyor. 
+10 start da subscribe için takılabiliyor , sık oluyor. 
 
+11 pairing locator onay
 
 
 

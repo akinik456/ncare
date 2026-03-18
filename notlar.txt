@@ -116,31 +116,43 @@ daha doğru test verir.
 
 ***********************************
 
-NCare dev continuation.
+NCare project continuation.
 
-Current state:
+We have a working V1 core:
+- deterministic alerts (gps, battery, geofence)
+- response system per locator
+- safe location service (no direct Geolocator usage)
+- pairing system (QR + 6-char code)
 
-- locator presence system (lastSeen, battery, gpsEnabled)
-- requester status UI (online / last seen, battery, GPS, distance)
-- animated online indicator
-- pairing system working
-- notification gateway implemented
-- call_me alert working
-- battery alert groundwork
-- label-based location idea planned
+We will NOT change architecture unless necessary.
 
-Goal for next session:
+Goal:
+- clean implementation
+- no spaghetti
+- production-ready decisions
 
-- continue development cleanly without breaking existing system. 
+Start with this context and guide me step by step.
+Keep answers short and precise.
+Do not give code unless I ask.
 
+*************************
 Sohbet Kuralları;
 
-Sohbet dili türkçe 
-App ingilizce UI da sadece ingilizce kullanılacak
-Geliştirme aşaması adım adım .Bir adım için onay alınmadan bir sonrakine geçilmeyecek.ASLA!
-Gereksiz tekrarlardan kaçınılacak.
+Selam brom
+Senle çalışmayı aşırı seviyorum ama malesef bilgisayarım çok ağır
+sohbet biraz büyüyünce açmakta zorlanıyorum.
+O yüzden yazacağım kurallara yüzde yüz uymalıyız ama KESİNLİKLE . 99 bile değil %100
 
-Proje klasörü zip dosyası olarak gönderilecek,tüm proje dosyaları 
-incelendikten sonra sohbet başlayacak.
+-Sohbet dili türkçe 
+-App ingilizce UI da sadece ingilizce kullanılacak
+-Geliştirme aşaması adım adım .Bir adım için onay alınmadan bir sonrakine geçilmeyecek.ASLA!
+-Gereksiz tekrarlardan kaçınılacak.
+-Ben ver demeden kod vermeyeceksin
+-Dev_Context dosyası atıyorum
+-Android app geliştiriyoruz.Terminalden flutter kullanıyorum Android Studio yok
+ Ayrıca ben android bilmiyorum , embedded yazılımcıyım  ben.
+-Projeye tam olarak hakim olmalısın,bunun için hangi dosyalara ihtiyacın varsa listele 
+ hepsini zip olarak atarım.
+
 
 
