@@ -65,6 +65,9 @@ export const onAlertCreated = onDocumentCreated(
     const locatorId = data?.locatorId?.toString() ?? "";
     const locatorName = data?.locatorName?.toString() ?? "Locator";
     const level = data?.level?.toString() ?? data?.battery?.toString() ?? "";
+    const placeName = data?.placeName?.toString() ?? "Place";
+    const distance = data?.distance?.toString() ?? "";
+    const radiusMeters = data?.radiusMeters?.toString() ?? "";
 
     let title = "";
     let body = "";
@@ -81,25 +84,15 @@ export const onAlertCreated = onDocumentCreated(
     } else if (type === "geofence_exit") {
       title = "Geofence alert";
       body = `${locatorName} left the selected area`;
-    }else if (type.startsWith("place_arrive")) {
-	  title = "Arrived";
-
-	  const placeName = data?.placeName || "Place";
-	  body = `Arrived at ${placeName}`;
-
-	} else if (type.startsWith("place_left")) {
-	  title = "Left";
-
-	  const placeName = data?.placeName || "Place";
-	  const distance = data?.distance;
-
-	  if (distance != null) {
-		body = `Left ${placeName} (${Math.round(distance)}m)`;
-	  } else {
-		body = `Left ${placeName}`;
-	  }
-	} 
-	else {
+    } else if (type?.startsWith("place_arrive")) {
+      title = "Arrived";
+      body = `${locatorName} arrived at ${placeName}`;
+    } else if (type?.startsWith("place_left")) {
+      title = "Left";
+      body = distance
+        ? `${locatorName} left ${placeName} (${Math.round(Number(distance))}m)`
+        : `${locatorName} left ${placeName}`;
+    } else {
       console.log("ALERT IGNORED", requesterId, alertId, type);
       return;
     }
@@ -113,9 +106,9 @@ export const onAlertCreated = onDocumentCreated(
         locatorId,
         locatorName,
         level,
-		placeName: data?.placeName?.toString() ?? "",
-        distance: data?.distance?.toString() ?? "",
-        radiusMeters: data?.radiusMeters?.toString() ?? "",
+        placeName,
+        distance,
+        radiusMeters,
       },
       notification: {
         title,
