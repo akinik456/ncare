@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../core/identity_manager.dart';
 import '../../core/location_helper.dart';
+import 'add_place_screen.dart';
 class PairingOptionsScreen extends StatefulWidget {
   final String locatorId;
   final String locatorName;
@@ -149,6 +150,44 @@ setState(() {
     }
   }
 }
+
+Future<int> _getPlaceCount() async {
+  final requesterId = await IdentityManager.getRequesterId();
+  final snap = await FirebaseFirestore.instance
+      .collection('requesters')
+      .doc(requesterId)
+      .collection('locators')
+      .doc(widget.locatorId)
+      .collection('places')
+      .get();
+  return snap.docs.length;
+}
+
+Future<void> _openAddPlace() async {
+  final placeCount = await _getPlaceCount();
+  if (placeCount >= 3) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Maximum 3 places allowed')),
+    );
+    return;
+  }
+
+  if (!mounted) return;
+  final added = await Navigator.of(context).push<bool>(
+    MaterialPageRoute(
+      builder: (_) => AddPlaceScreen(
+        locatorId: widget.locatorId,
+        locatorName: widget.locatorName,
+      ),
+    ),
+  );
+
+  if (added == true && mounted) {
+    setState(() {});
+  }
+}
+
 Future<void> _confirmPairing() async {
   setState(() => _saving = true);
 
@@ -277,6 +316,216 @@ Future<void> _confirmPairing() async {
           ),
         ),
       ),
+    );
+  }
+
+
+
+  Future<CollectionReference<Map<String, dynamic>>> _placesRef() async {
+    final requesterId = await IdentityManager.getRequesterId();
+    return FirebaseFirestore.instance
+        .collection('requesters')
+        .doc(requesterId)
+        .collection('locators')
+        .doc(widget.locatorId)
+        .collection('places');
+  }
+
+  Widget _placeTile(Map<String, dynamic> data) {
+    final name = (data['name'] ?? 'Place').toString().trim();
+    final address = (data['address'] ?? '').toString().trim();
+    final enabled = (data['enabled'] ?? true) == true;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0E7FF),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.place_rounded,
+              color: Color(0xFF1D4ED8),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  address.isEmpty ? 'Address not available' : address,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: enabled ? const Color(0xFFDCFCE7) : const Color(0xFFE2E8F0),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              enabled ? 'Enabled' : 'Disabled',
+              style: TextStyle(
+                color: enabled ? const Color(0xFF166534) : const Color(0xFF475569),
+                fontWeight: FontWeight.w700,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _placesSection() {
+    return FutureBuilder<CollectionReference<Map<String, dynamic>>>(
+      future: _placesRef(),
+      builder: (context, refSnap) {
+        if (!refSnap.hasData) {
+          return _sectionCard(
+            child: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          );
+        }
+
+        final ref = refSnap.data!;
+        return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: ref.orderBy('createdAt', descending: false).snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return _sectionCard(
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              );
+            }
+
+            final docs = snapshot.data?.docs ?? const [];
+            final placeCount = docs.length;
+            final canAdd = placeCount < 3;
+
+            return _sectionCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Saved places',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE2E8F0),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '$placeCount / 3',
+                          style: const TextStyle(
+                            color: Color(0xFF334155),
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Save up to 3 places from the locator current location.',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (docs.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: const Text(
+                        'No places saved yet.',
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    )
+                  else
+                    ...docs.map((doc) => _placeTile(doc.data())),
+                  const SizedBox(height: 4),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: canAdd
+                          ? () async {
+                              final saved = await Navigator.push<bool>(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => AddPlaceScreen(
+                                    locatorId: widget.locatorId,
+                                    locatorName: widget.locatorName,
+                                  ),
+                                ),
+                              );
+
+                              if (saved == true && mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Place list updated')),
+                                );
+                              }
+                            }
+                          : null,
+                      icon: const Icon(Icons.add_location_alt_rounded),
+                      label: Text(canAdd ? 'Add place' : 'Maximum 3 places reached'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -430,6 +679,8 @@ Text(
   ),
 ),
 const SizedBox(height: 14),
+_placesSection(),
+const SizedBox(height: 14),
 SizedBox(
   width: double.infinity,
   child: FilledButton(
@@ -497,34 +748,7 @@ onPressed: _saving
           'removedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
 
-        final locatorRef = FirebaseFirestore.instance
-            .collection('locators')
-            .doc(widget.locatorId);
-
-        final locatorSnap = await locatorRef.get();
-        final locatorData = locatorSnap.data() ?? <String, dynamic>{};
-
-        final updates = <String, dynamic>{};
-
-        if ((locatorData['pairedRequesterId'] ?? '').toString() == requesterId) {
-          updates['pairedRequesterId'] = FieldValue.delete();
-          updates['pairedRequesterName'] = FieldValue.delete();
-        }
-
-        if ((locatorData['pendingPairRequesterId'] ?? '').toString() == requesterId) {
-          updates['pendingPairRequesterId'] = FieldValue.delete();
-          updates['pendingPairRequesterName'] = FieldValue.delete();
-          updates['pendingPairCreatedAt'] = FieldValue.delete();
-        }
-
-        if (updates.isNotEmpty) {
-          await locatorRef.set(updates, SetOptions(merge: true));
-        }
-
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Locator removed')),
-        );
         Navigator.pop(context, true);
       },
 

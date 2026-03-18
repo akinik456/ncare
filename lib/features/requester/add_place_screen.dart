@@ -1,0 +1,340 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
+
+import '../../core/identity_manager.dart';
+
+class AddPlaceScreen extends StatefulWidget {
+  final String locatorId;
+  final String locatorName;
+
+  const AddPlaceScreen({
+    super.key,
+    required this.locatorId,
+    required this.locatorName,
+  });
+
+  @override
+  State<AddPlaceScreen> createState() => _AddPlaceScreenState();
+}
+
+class _AddPlaceScreenState extends State<AddPlaceScreen> {
+  final TextEditingController _nameController = TextEditingController();
+
+  bool _loading = true;
+  bool _saving = false;
+  String? _error;
+  String? _address;
+  double? _lat;
+  double? _lng;
+  double? _accuracy;
+  DateTime? _locationAt;
+  int _nextIndex = 1;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final placesSnap = await FirebaseFirestore.instance
+          .collection('requesters')
+          .doc(await IdentityManager.getRequesterId())
+          .collection('locators')
+          .doc(widget.locatorId)
+          .collection('places')
+          .get();
+
+      _nextIndex = placesSnap.docs.length + 1;
+      _nameController.text = 'Place $_nextIndex';
+
+      final locatorDoc = await FirebaseFirestore.instance
+          .collection('locators')
+          .doc(widget.locatorId)
+          .get();
+
+      final data = locatorDoc.data();
+      if (data == null) {
+        _error = 'Locator not found';
+        return;
+      }
+
+      _lat = (data['lat'] as num?)?.toDouble();
+      _lng = (data['lng'] as num?)?.toDouble();
+      _accuracy = (data['acc'] as num?)?.toDouble();
+      final ts = data['lastSeen'];
+      if (ts is Timestamp) {
+        _locationAt = ts.toDate();
+      }
+
+      if (_lat == null || _lng == null) {
+        _error = 'Locator location is not available yet';
+        return;
+      }
+
+      try {
+        final placemarks = await placemarkFromCoordinates(_lat!, _lng!);
+        if (placemarks.isNotEmpty) {
+          final p = placemarks.first;
+          final parts = <String?>[
+            p.name,
+            p.street,
+            p.subLocality,
+            p.locality,
+            p.administrativeArea,
+            p.country,
+          ].where((e) => e != null && e!.trim().isNotEmpty).cast<String>().toList();
+          _address = parts.toSet().join(', ');
+        }
+      } catch (_) {
+        _address = null;
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  bool get _isFresh {
+    if (_locationAt == null) return false;
+    return DateTime.now().difference(_locationAt!).inSeconds <= 60;
+  }
+
+  String get _ageText {
+    if (_locationAt == null) return 'Unknown';
+    final secs = DateTime.now().difference(_locationAt!).inSeconds;
+    if (secs < 0) return '0 sec';
+    return '$secs sec ago';
+  }
+
+  bool get _canSave =>
+      !_saving &&
+      _lat != null &&
+      _lng != null &&
+      _isFresh;
+
+  Future<int> _getPlaceCount(String requesterId) async {
+    final snap = await FirebaseFirestore.instance
+        .collection('requesters')
+        .doc(requesterId)
+        .collection('locators')
+        .doc(widget.locatorId)
+        .collection('places')
+        .get();
+    return snap.docs.length;
+  }
+
+  Future<void> _save() async {
+    if (!_canSave) return;
+
+    setState(() => _saving = true);
+    try {
+      final requesterId = await IdentityManager.getRequesterId();
+      final placeCount = await _getPlaceCount(requesterId);
+      if (placeCount >= 3) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Maximum 3 places allowed')),
+        );
+        return;
+      }
+
+      final name = _nameController.text.trim().isEmpty
+          ? 'Place $_nextIndex'
+          : _nameController.text.trim();
+
+      await FirebaseFirestore.instance
+          .collection('requesters')
+          .doc(requesterId)
+          .collection('locators')
+          .doc(widget.locatorId)
+          .collection('places')
+          .add({
+        'name': name,
+        'lat': _lat,
+        'lng': _lng,
+        'address': (_address ?? '').trim(),
+        'radiusMeters': 180,
+        'enabled': true,
+        'lastState': 'unknown',
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Place saved')),
+      );
+      Navigator.pop(context, true);
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  Widget _infoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 96,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: const Color(0xFFF1F5F9),
+        surfaceTintColor: Colors.transparent,
+        title: const Text(
+          'Add place',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF0F172A),
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x120F172A),
+                          blurRadius: 18,
+                          offset: Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.locatorName,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Save a place from the locator current location.',
+                          style: TextStyle(
+                            color: Color(0xFF64748B),
+                            height: 1.35,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        TextField(
+                          controller: _nameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Place name',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        if (_error != null) ...[
+                          Text(
+                            _error!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ] else ...[
+                          _infoRow('Latitude', _lat!.toStringAsFixed(6)),
+                          _infoRow('Longitude', _lng!.toStringAsFixed(6)),
+                          _infoRow('Address', (_address == null || _address!.isEmpty) ? 'Address not available' : _address!),
+                          _infoRow('Accuracy', _accuracy == null ? '-' : '${_accuracy!.toStringAsFixed(0)} m'),
+                          _infoRow('Location age', _ageText),
+                          const SizedBox(height: 8),
+                          if (!_isFresh)
+                            const Text(
+                              'Location is too old. Wait for a fresh locator update.',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _canSave ? _save : null,
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      child: _saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text(
+                              'Save place',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}

@@ -52,6 +52,8 @@ gösterilmeli ya da silinmeli
 
 11 pairing locator onay
 
+12 batteryAlarmEnabled , batteryAlertThreshold Firestore da isimleri kontrol et ya english ya da türkçe
+
 
 
 
