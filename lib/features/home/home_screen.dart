@@ -340,6 +340,190 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+
+  Future<void> _approvePendingPair() async {
+    if (locatorId == null || locatorId!.isEmpty) return;
+
+    try {
+      final docRef = FirebaseFirestore.instance.collection('locators').doc(locatorId);
+      final snap = await docRef.get();
+      final data = snap.data();
+      if (data == null) return;
+
+      final pendingRequesterId =
+          (data['pendingPairRequesterId'] ?? '').toString().trim();
+      final pendingRequesterName =
+          (data['pendingPairRequesterName'] ?? '').toString().trim();
+
+      if (pendingRequesterId.isEmpty) return;
+
+      await docRef.set({
+        'pairedRequesterId': pendingRequesterId,
+        'pairedRequesterName': pendingRequesterName,
+        'pendingPairRequesterId': FieldValue.delete(),
+        'pendingPairRequesterName': FieldValue.delete(),
+        'pendingPairCreatedAt': FieldValue.delete(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pairing approved'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      print('APPROVE PENDING PAIR ERROR => $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to approve pairing'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _rejectPendingPair() async {
+    if (locatorId == null || locatorId!.isEmpty) return;
+
+    try {
+      await FirebaseFirestore.instance.collection('locators').doc(locatorId).set({
+        'pendingPairRequesterId': FieldValue.delete(),
+        'pendingPairRequesterName': FieldValue.delete(),
+        'pendingPairCreatedAt': FieldValue.delete(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pairing rejected'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      print('REJECT PENDING PAIR ERROR => $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to reject pairing'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Widget _buildPendingPairCard(ThemeData theme, Map<String, dynamic>? data) {
+    final pendingRequesterId =
+        (data?['pendingPairRequesterId'] ?? '').toString().trim();
+    final pendingRequesterName =
+        (data?['pendingPairRequesterName'] ?? '').toString().trim();
+
+    if (pendingRequesterId.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final displayName = pendingRequesterName.isNotEmpty
+        ? pendingRequesterName
+        : 'Requester';
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x120F172A),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFEDD5),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.person_add_alt_1_rounded,
+                  color: Color(0xFFEA580C),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Pending Pair Request',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$displayName wants to pair with this locator.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: const Color(0xFF475569),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _rejectPendingPair,
+                  icon: const Icon(Icons.close_rounded),
+                  label: const Text('Reject'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFB91C1C),
+                    side: const BorderSide(color: Color(0xFFFECACA)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _approvePendingPair,
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Approve'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F766E),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPairCodeCard(ThemeData theme, String code) {
     return Container(
       padding: const EdgeInsets.all(18),
@@ -673,9 +857,18 @@ class _HomeScreenState extends State<HomeScreen> {
                               (data?['pairedRequesterName'] ?? '').toString().trim();
 
                           final paired = requesterName.isNotEmpty;
+                          final hasPendingPair =
+                              (data?['pendingPairRequesterId'] ?? '')
+                                  .toString()
+                                  .trim()
+                                  .isNotEmpty;
 
                           return Column(
                             children: [
+                              if (hasPendingPair) ...[
+                                _buildPendingPairCard(theme, data),
+                                const SizedBox(height: 12),
+                              ],
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 14,

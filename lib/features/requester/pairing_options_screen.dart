@@ -497,7 +497,34 @@ onPressed: _saving
           'removedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
 
+        final locatorRef = FirebaseFirestore.instance
+            .collection('locators')
+            .doc(widget.locatorId);
+
+        final locatorSnap = await locatorRef.get();
+        final locatorData = locatorSnap.data() ?? <String, dynamic>{};
+
+        final updates = <String, dynamic>{};
+
+        if ((locatorData['pairedRequesterId'] ?? '').toString() == requesterId) {
+          updates['pairedRequesterId'] = FieldValue.delete();
+          updates['pairedRequesterName'] = FieldValue.delete();
+        }
+
+        if ((locatorData['pendingPairRequesterId'] ?? '').toString() == requesterId) {
+          updates['pendingPairRequesterId'] = FieldValue.delete();
+          updates['pendingPairRequesterName'] = FieldValue.delete();
+          updates['pendingPairCreatedAt'] = FieldValue.delete();
+        }
+
+        if (updates.isNotEmpty) {
+          await locatorRef.set(updates, SetOptions(merge: true));
+        }
+
         if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Locator removed')),
+        );
         Navigator.pop(context, true);
       },
 

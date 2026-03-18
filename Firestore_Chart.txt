@@ -3,7 +3,7 @@
 	COLLECTION , document
 
 	LOCATORS(locators)
-		locatorId  -> (acc,battery,geofenceCenterLat,geofenceCenterLng,gpsEnabled,lastSeen,lat,lng,name,pairedRequesterId,pairedRequesterId)                
+		locatorId  -> (acc,battery,geofenceCenterLat,geofenceCenterLng,gpsEnabled,lastSeen,lat,lng,name,pairedRequesterId)                
 	
 	REQUESTERS(requesters)
 		requesterId
