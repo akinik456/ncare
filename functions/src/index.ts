@@ -19,6 +19,25 @@ export const onRequestCreated = onDocumentCreated(
       return;
     }
 
+    const locatorDoc = await admin.firestore()
+      .collection("locators")
+      .doc(locatorId)
+      .get();
+
+    const pairedRequesterId =
+      locatorDoc.data()?.pairedRequesterId?.toString() ?? "";
+
+    if (pairedRequesterId != requesterId) {
+      console.log(
+        "REQUEST BLOCKED: NOT PAIRED",
+        requesterId,
+        requestId,
+        locatorId,
+        pairedRequesterId,
+      );
+      return;
+    }
+
     const locatorTopic = `locator_${locatorId}`;
 
     const requesterDoc = await admin.firestore()

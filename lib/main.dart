@@ -125,6 +125,16 @@ if (role == 'locator') {
     print("FG SKIP => target=$targetLocatorId mine=$myLocatorId");
     return;
   }
+ 
+  final stillPaired = await _isStillPaired(
+  locatorId: myLocatorId!,
+  requesterId: requesterId,
+);
+
+if (!stillPaired) {
+  print("FG RL BLOCKED => requester not paired");
+  return;
+}
 
   final prefs = await SharedPreferences.getInstance();
   final enabled = prefs.getBool('locator_request_alerts') ?? true;
@@ -272,6 +282,15 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     print("BG SKIP => target=$targetLocatorId mine=$myLocatorId");
     return;
   }
+final stillPaired = await _isStillPaired(
+  locatorId: myLocatorId!,
+  requesterId: requesterId,
+);
+
+if (!stillPaired) {
+  print("BG RL BLOCKED => requester not paired");
+  return;
+}
 
   await NotificationService.showFromRemoteMessage(message);
 
@@ -380,6 +399,21 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     }, SetOptions(merge: true));
   }
 }
+Future<bool> _isStillPaired({
+  required String locatorId,
+  required String requesterId,
+}) async {
+  final locatorDoc = await FirebaseFirestore.instance
+      .collection('locators')
+      .doc(locatorId)
+      .get();
+
+  final pairedRequesterId =
+      locatorDoc.data()?['pairedRequesterId']?.toString() ?? '';
+
+  return pairedRequesterId == requesterId;
+}
+
 
 class NCareApp extends StatelessWidget {
   final bool setupDone;

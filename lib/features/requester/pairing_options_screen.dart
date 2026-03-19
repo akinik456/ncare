@@ -331,7 +331,18 @@ Future<void> _confirmPairing() async {
         .collection('places');
   }
 
-  Widget _placeTile(Map<String, dynamic> data) {
+
+  Future<void> _setPlaceEnabled({
+    required String placeId,
+    required bool enabled,
+  }) async {
+    final ref = await _placesRef();
+    await ref.doc(placeId).set({
+      'enabled': enabled,
+    }, SetOptions(merge: true));
+  }
+
+  Widget _placeTile(String placeId, Map<String, dynamic> data) {
     final name = (data['name'] ?? 'Place').toString().trim();
     final address = (data['address'] ?? '').toString().trim();
     final enabled = (data['enabled'] ?? true) == true;
@@ -383,20 +394,28 @@ Future<void> _confirmPairing() async {
             ),
           ),
           const SizedBox(width: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: enabled ? const Color(0xFFDCFCE7) : const Color(0xFFE2E8F0),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              enabled ? 'Enabled' : 'Disabled',
-              style: TextStyle(
-                color: enabled ? const Color(0xFF166534) : const Color(0xFF475569),
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
+          Column(
+            children: [
+              Switch.adaptive(
+                value: enabled,
+                onChanged: (v) async {
+                  await _setPlaceEnabled(
+                    placeId: placeId,
+                    enabled: v,
+                  );
+                },
               ),
-            ),
+              Text(
+                enabled ? 'Enabled' : 'Disabled',
+                style: TextStyle(
+                  color: enabled
+                      ? const Color(0xFF166534)
+                      : const Color(0xFF475569),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -492,7 +511,7 @@ Future<void> _confirmPairing() async {
                       ),
                     )
                   else
-                    ...docs.map((doc) => _placeTile(doc.data())),
+                    ...docs.map((doc) => _placeTile(doc.id, doc.data())),
                   const SizedBox(height: 4),
                   SizedBox(
                     width: double.infinity,
@@ -528,6 +547,87 @@ Future<void> _confirmPairing() async {
       },
     );
   }
+
+
+
+Future<void> _removeLocator() async {
+  final confirm = await showDialog<bool>(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Remove locator'),
+        content: const Text(
+          'Are you sure you want to remove this locator? You can add it again later.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      );
+    },
+  );
+
+  if (confirm != true) return;
+
+  setState(() => _saving = true);
+
+  try {
+    final requesterId = await IdentityManager.getRequesterId();
+    final firestore = FirebaseFirestore.instance;
+    final locatorRef = firestore.collection('locators').doc(widget.locatorId);
+    final requesterLocatorRef = firestore
+        .collection('requesters')
+        .doc(requesterId)
+        .collection('locators')
+        .doc(widget.locatorId);
+
+    final locatorSnap = await locatorRef.get();
+    final locatorData = locatorSnap.data() ?? <String, dynamic>{};
+
+    final updates = <String, dynamic>{};
+
+    if ((locatorData['pairedRequesterId'] ?? '').toString() == requesterId) {
+      updates['pairedRequesterId'] = FieldValue.delete();
+      updates['pairedRequesterName'] = FieldValue.delete();
+    }
+
+    if ((locatorData['pendingPairRequesterId'] ?? '').toString() == requesterId) {
+      updates['pendingPairRequesterId'] = FieldValue.delete();
+      updates['pendingPairRequesterName'] = FieldValue.delete();
+      updates['pendingPairCreatedAt'] = FieldValue.delete();
+    }
+
+    final batch = firestore.batch();
+
+    batch.set(
+      requesterLocatorRef,
+      {
+        'active': false,
+        'removedAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+
+    if (updates.isNotEmpty) {
+      batch.set(locatorRef, updates, SetOptions(merge: true));
+    }
+
+    await batch.commit();
+
+    if (!mounted) return;
+    Navigator.pop(context, true);
+  } finally {
+    if (mounted) {
+      setState(() => _saving = false);
+    }
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -708,49 +808,7 @@ const SizedBox(height: 20),
 
 OutlinedButton(
 child: const Text('Remove locator'),
-onPressed: _saving
-    ? null
-    : () async {
-        final confirm = await showDialog<bool>(
-          context: context,
-          builder: (context) {
-            return AlertDialog(
-              title: const Text('Remove locator'),
-              content: const Text(
-                'Are you sure you want to remove this locator? '
-                'You can add it again later.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  child: const Text('Remove'),
-                ),
-              ],
-            );
-          },
-        );
-
-        if (confirm != true) return;
-
-        final requesterId = await IdentityManager.getRequesterId();
-
-        await FirebaseFirestore.instance
-            .collection('requesters')
-            .doc(requesterId)
-            .collection('locators')
-            .doc(widget.locatorId)
-            .set({
-          'active': false,
-          'removedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-
-        if (!mounted) return;
-        Navigator.pop(context, true);
-      },
+onPressed: _saving ? null : _removeLocator,
 
 ),
 

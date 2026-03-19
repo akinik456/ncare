@@ -922,242 +922,264 @@ return Row(
             if (pendingRequestId != null || visibleRequestId != null)
               StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
-	  .collection('requesters')
-      .doc(requesterId)
-	  .collection('locators')
-      .doc(_selectedLocatorId)
-      .collection('responses')
-      
-                    		
-                    .doc(pendingRequestId ?? visibleRequestId)
+                    .collection('locators')
+                    .doc(_selectedLocatorId)
                     .snapshots(),
-                builder: (context, snapshot) {
-                  final data = snapshot.data?.data();
+                builder: (context, locatorSnapshot) {
+                  final locatorData = locatorSnapshot.data?.data();
+                  final pairedRequesterId =
+                      locatorData?['pairedRequesterId']?.toString() ?? '';
+                  final isStillPaired = pairedRequesterId == requesterId;
 
-                  if (data != null) {
-				    final status = (data['status'] ?? '').toString();
-                    final lat = (data['lat'] as num?)?.toDouble();
-                    final lng = (data['lng'] as num?)?.toDouble();
-                    final hasFix =
-                        (status == 'ok' && lat != null && lng != null);
-
-                    if (hasFix && pendingRequestId != null) {
-					  final currentPending = pendingRequestId!;
-
-					  WidgetsBinding.instance.addPostFrameCallback((_) async {
-						if (!mounted) return;
-
-						await FirebaseFirestore.instance
-							.collection('requesters')
-							.doc(requesterId)
-							.collection('requests')
-							.doc(currentPending)
-							.delete();
-
-						if (!mounted) return;
-						setState(() {
-						  _lastRequestId = currentPending;
-						  _pendingRequestId = null;
-						  _timeout = false;
-						  _lastAddress = null;
-						  _lastAddressKey = null;
-						});
-					  });
-					}
-
-					
-                  }
-
-                  if (visibleRequestId == null && pendingRequestId != null) {
-                    // Henüz daha önce hiç sonuç yoksa ve yeni cevap da gelmediyse
-                    if (data == null) {
-                      return const SizedBox();
-                    }
-                  }
-
-                  if (visibleRequestId == null && pendingRequestId == null) {
-                    return const SizedBox();
-                  }
-
-                  final displayDocId = _lastRequestId ?? visibleRequestId;
-                  if (displayDocId == null) {
+                  if (!isStillPaired) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!mounted) return;
+                      setState(() {
+                        _pendingRequestId = null;
+                        _lastRequestId = null;
+                        _timeout = false;
+                        _lastAddress = null;
+                        _lastAddressKey = null;
+                      });
+                    });
                     return const SizedBox();
                   }
 
                   return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                     stream: FirebaseFirestore.instance
                         .collection('requesters')
-      .doc(requesterId)
-	  .collection('locators')
-      .doc(_selectedLocatorId)
-      .collection('responses')
-                        .doc(displayDocId)
+                        .doc(requesterId)
+                        .collection('locators')
+                        .doc(_selectedLocatorId)
+                        .collection('responses')
+                        .doc(pendingRequestId ?? visibleRequestId)
                         .snapshots(),
-                    builder: (context, visibleSnapshot) {
-                      final visibleData = visibleSnapshot.data?.data();
+                    builder: (context, snapshot) {
+                      final data = snapshot.data?.data();
 
-                      if (visibleData == null) {
+                      if (data != null) {
+                        final status = (data['status'] ?? '').toString();
+                        final lat = (data['lat'] as num?)?.toDouble();
+                        final lng = (data['lng'] as num?)?.toDouble();
+                        final hasFix =
+                            (status == 'ok' && lat != null && lng != null);
+
+                        if (hasFix && pendingRequestId != null) {
+                          final currentPending = pendingRequestId!;
+                          WidgetsBinding.instance.addPostFrameCallback((_) async {
+                            if (!mounted) return;
+
+                            await FirebaseFirestore.instance
+                                .collection('requesters')
+                                .doc(requesterId)
+                                .collection('requests')
+                                .doc(currentPending)
+                                .delete();
+
+                            if (!mounted) return;
+
+                            setState(() {
+                              _lastRequestId = currentPending;
+                              _pendingRequestId = null;
+                              _timeout = false;
+                              _lastAddress = null;
+                              _lastAddressKey = null;
+                            });
+                          });
+                        }
+                      }
+
+                      if (visibleRequestId == null && pendingRequestId != null) {
+                        if (data == null) {
+                          return const SizedBox();
+                        }
+                      }
+
+                      if (visibleRequestId == null && pendingRequestId == null) {
                         return const SizedBox();
                       }
 
-                      final status = (visibleData['status'] ?? '').toString();
-                      final lat = (visibleData['lat'] as num?)?.toDouble();
-                      final lng = (visibleData['lng'] as num?)?.toDouble();
-                      final acc = (visibleData['acc'] as num?)?.toDouble();
-                      final ts = visibleData['ts'] as Timestamp?;
-                      final battery =
-                          (visibleData['battery'] as num?)?.toInt();
-
-                      final hasFix =
-                          (status == 'ok' && lat != null && lng != null);
-					  final online = ts != null &&
-								DateTime.now().difference(ts.toDate()).inSeconds<=60;
-								
-                      if (!hasFix) {
-                        return _StatusCard(
-                          icon: Icons.sync_problem_rounded,
-                          iconBg: const Color(0xFFFEF2F2),
-                          iconColor: const Color(0xFFDC2626),
-                          title: 'Response received',
-                          subtitle:
-                              'Status: $status\nWaiting for valid location...',
-                        );
+                      final displayDocId = _lastRequestId ?? visibleRequestId;
+                      if (displayDocId == null) {
+                        return const SizedBox();
                       }
 
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        _resolveAddress(lat!, lng!);
-                      });
+                      return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                        stream: FirebaseFirestore.instance
+                            .collection('requesters')
+                            .doc(requesterId)
+                            .collection('locators')
+                            .doc(_selectedLocatorId)
+                            .collection('responses')
+                            .doc(displayDocId)
+                            .snapshots(),
+                        builder: (context, visibleSnapshot) {
+                          final visibleData = visibleSnapshot.data?.data();
 
-                      return Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x120F172A),
-                              blurRadius: 18,
-                              offset: Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFDCFCE7),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Icon(
-                                    Icons.location_on_rounded,
-                                    color: Color(0xFF16A34A),
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Text(
-                                  'Location result',
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: const Color(0xFF0F172A),
-                                  ),
+                          if (visibleData == null) {
+                            return const SizedBox();
+                          }
+
+                          final status = (visibleData['status'] ?? '').toString();
+                          final lat = (visibleData['lat'] as num?)?.toDouble();
+                          final lng = (visibleData['lng'] as num?)?.toDouble();
+                          final acc = (visibleData['acc'] as num?)?.toDouble();
+                          final ts = visibleData['ts'] as Timestamp?;
+                          final battery =
+                              (visibleData['battery'] as num?)?.toInt();
+
+                          final hasFix =
+                              (status == 'ok' && lat != null && lng != null);
+                          final online =
+                              ts != null &&
+                              DateTime.now().difference(ts.toDate()).inSeconds <= 60;
+
+                          if (!hasFix) {
+                            return _StatusCard(
+                              icon: Icons.sync_problem_rounded,
+                              iconBg: const Color(0xFFFEF2F2),
+                              iconColor: const Color(0xFFDC2626),
+                              title: 'Response received',
+                              subtitle:
+                                  'Status: $status\nWaiting for valid location...',
+                            );
+                          }
+
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _resolveAddress(lat!, lng!);
+                          });
+
+                          return Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color(0x120F172A),
+                                  blurRadius: 18,
+                                  offset: Offset(0, 8),
                                 ),
                               ],
                             ),
-                            if (_lastAddress != null) ...[
-                              const SizedBox(height: 12),
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF8FAFC),
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(
-                                    color: const Color(0xFFE2E8F0),
-                                  ),
-                                ),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
                                   children: [
-                                    const Padding(
-                                      padding: EdgeInsets.only(top: 2),
-                                      child: Icon(
-                                        Icons.place_rounded,
-                                        color: Color(0xFF1D4ED8),
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFDCFCE7),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(
+                                        Icons.location_on_rounded,
+                                        color: Color(0xFF16A34A),
+                                        size: 20,
                                       ),
                                     ),
                                     const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        _lastAddress!,
-                                        style: theme.textTheme.bodyMedium
-                                            ?.copyWith(
-                                          color: const Color(0xFF0F172A),
-                                          height: 1.4,
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                    Text(
+                                      'Location result',
+                                      style: theme.textTheme.titleSmall?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: const Color(0xFF0F172A),
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                            ],
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 8,
-                              children: [
-                                _MiniInfo(
-                                  icon: Icons.gps_fixed_rounded,
-                                  text: acc != null
-                                      ? 'Accuracy ${acc.toStringAsFixed(0)} m'
-                                      : 'Accuracy -',
-                                ),
-                                if (battery != null)
-                                  _MiniInfo(
-                                    icon: Icons.battery_full,
-                                    text: 'Battery $battery%',
+                                if (_lastAddress != null) ...[
+                                  const SizedBox(height: 12),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF8FAFC),
+                                      borderRadius: BorderRadius.circular(18),
+                                      border: Border.all(
+                                        color: const Color(0xFFE2E8F0),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Padding(
+                                          padding: EdgeInsets.only(top: 2),
+                                          child: Icon(
+                                            Icons.place_rounded,
+                                            color: Color(0xFF1D4ED8),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            _lastAddress!,
+                                            style: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                              color: const Color(0xFF0F172A),
+                                              height: 1.4,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-															
-								  
-                                _MiniInfo(
-                                  icon: Icons.circle,
-                                  text: online ? "Online" :  lastSeenText(ts!) ,
+                                ],
+                                const SizedBox(height: 12),
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 8,
+                                  children: [
+                                    _MiniInfo(
+                                      icon: Icons.gps_fixed_rounded,
+                                      text: acc != null
+                                          ? 'Accuracy ${acc.toStringAsFixed(0)} m'
+                                          : 'Accuracy -',
+                                    ),
+                                    if (battery != null)
+                                      _MiniInfo(
+                                        icon: Icons.battery_full,
+                                        text: 'Battery $battery%',
+                                      ),
+                                    _MiniInfo(
+                                      icon: Icons.circle,
+                                      text: online ? 'Online' : lastSeenText(ts!),
+                                    ),
+                                  ],
                                 ),
-								
+                                const SizedBox(height: 14),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => _openInMaps(lat, lng),
+                                    icon: const Icon(Icons.map_rounded),
+                                    label: const Text('Open in Maps'),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF1D4ED8),
+                                      side: const BorderSide(
+                                        color: Color(0xFFBFDBFE),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 14,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(18),
+                                      ),
+                                      textStyle: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
-                            const SizedBox(height: 14),
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                onPressed: () => _openInMaps(lat, lng),
-                                icon: const Icon(Icons.map_rounded),
-                                label: const Text('Open in Maps'),
-                                style: OutlinedButton.styleFrom(
-                                  foregroundColor: const Color(0xFF1D4ED8),
-                                  side: const BorderSide(
-                                      color: Color(0xFFBFDBFE)),
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(18),
-                                  ),
-                                  textStyle: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
+                          );
+                        },
                       );
                     },
                   );
