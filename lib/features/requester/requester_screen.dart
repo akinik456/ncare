@@ -926,24 +926,47 @@ return Row(
                     .doc(_selectedLocatorId)
                     .snapshots(),
                 builder: (context, locatorSnapshot) {
-                  final locatorData = locatorSnapshot.data?.data();
-                  final pairedRequesterId =
-                      locatorData?['pairedRequesterId']?.toString() ?? '';
-                  final isStillPaired = pairedRequesterId == requesterId;
+				  if (locatorSnapshot.connectionState == ConnectionState.waiting) {
+					return const SizedBox();
+				  }
 
-                  if (!isStillPaired) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (!mounted) return;
-                      setState(() {
-                        _pendingRequestId = null;
-                        _lastRequestId = null;
-                        _timeout = false;
-                        _lastAddress = null;
-                        _lastAddressKey = null;
-                      });
-                    });
-                    return const SizedBox();
-                  }
+				  if (locatorSnapshot.hasError) {
+					return const SizedBox();
+				  }
+
+				  if (!locatorSnapshot.hasData || locatorSnapshot.data == null) {
+					return const SizedBox();
+				  }
+
+				  final locatorDoc = locatorSnapshot.data!;
+				  if (!locatorDoc.exists) {
+					return const SizedBox();
+				  }
+
+				  final locatorData = locatorDoc.data();
+				  if (locatorData == null) {
+					return const SizedBox();
+				  }
+
+				  final pairedRequesterId =
+					  locatorData['pairedRequesterId']?.toString();
+
+				  final isStillPaired =
+					  pairedRequesterId != null && pairedRequesterId == requesterId;
+
+				  if (!isStillPaired) {
+					WidgetsBinding.instance.addPostFrameCallback((_) {
+					  if (!mounted) return;
+					  setState(() {
+						_pendingRequestId = null;
+						_lastRequestId = null;
+						_timeout = false;
+						_lastAddress = null;
+						_lastAddressKey = null;
+					  });
+					});
+					return const SizedBox();
+				  }
 
                   return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                     stream: FirebaseFirestore.instance
@@ -955,15 +978,32 @@ return Row(
                         .doc(pendingRequestId ?? visibleRequestId)
                         .snapshots(),
                     builder: (context, snapshot) {
-                      final data = snapshot.data?.data();
+					
+					if (snapshot.connectionState == ConnectionState.waiting) {
+							return const SizedBox();
+						  }
 
-                      if (data != null) {
-                        final status = (data['status'] ?? '').toString();
-                        final lat = (data['lat'] as num?)?.toDouble();
-                        final lng = (data['lng'] as num?)?.toDouble();
-                        final hasFix =
-                            (status == 'ok' && lat != null && lng != null);
+						  if (snapshot.hasError) {
+							return const SizedBox();
+						  }
 
+						  if (!snapshot.hasData || snapshot.data == null) {
+							return const SizedBox();
+						  }
+							final responseDoc = snapshot.data!;
+						  if (!responseDoc.exists) {
+							return const SizedBox();
+						  }
+
+						  final data = responseDoc.data();
+						  if (data == null) {
+							return const SizedBox();
+						  }				
+							final status = (data['status'] ?? '').toString();
+						  final lat = (data['lat'] as num?)?.toDouble();
+						  final lng = (data['lng'] as num?)?.toDouble();
+						  final hasFix = (status == 'ok' && lat != null && lng != null);				
+                     
                         if (hasFix && pendingRequestId != null) {
                           final currentPending = pendingRequestId!;
                           WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -987,7 +1027,7 @@ return Row(
                             });
                           });
                         }
-                      }
+                      
 
                       if (visibleRequestId == null && pendingRequestId != null) {
                         if (data == null) {

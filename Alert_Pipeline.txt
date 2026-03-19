@@ -1,0 +1,82 @@
+Battery alert akışı
+1) Tetikleme
+Locator tarafında battery seviyesi izleniyor.
+Threshold altına düşünce sistem bir alert üretme kararı veriyor.
+Burada genelde işin sahibi:
+home_screen içindeki monitor başlatma veya
+device_state_manager / AlertEngine
+2) Alert oluşturma
+Bu alert büyük ihtimalle AlertEngine.send(...) ile Firestore’a yazılıyor.
+Tipik olarak:
+requester hedefleniyor
+type = battery_low
+locatorId
+locatorName
+battery ya da level
+Yani önce notification değil, önce Firestore alert doc oluşuyor.
+3) Cloud Function devreye giriyor
+index.ts içindeki onAlertCreated bunu dinliyor:
+Plain text
+Kodu kopyala
+requesters/{requesterId}/alerts/{alertId}
+Yeni alert gelince:
+type okuyor
+battery_low ise
+title üretiyor
+body üretiyor
+Mesela mantık olarak:
+title: Battery alert
+body: <locatorName> battery is low (15%)
+Sonra FCM gönderiyor.
+4) FCM requester cihaza geliyor
+Burada iki katman var:
+notification_gateway
+Bunu ben “mesajı karşılayan kapı” gibi düşünüyorum.
+Görevi:
+remote message’ı almak
+type’ı çözmek
+doğru local notification akışına vermek
+Yani daha çok: routing / parsing katmanı
+notification_service
+Bu da gerçek bildirim gösteren katman.
+Görevi:
+title/body hazırlamak veya son halini almak
+local notification basmak
+channel/id/presentation işlerini yapmak
+Yani: render / show katmanı
+Kısacası görev paylaşımı
+AlertEngine
+“Alarmı üret ve Firestore’a yaz”
+index.ts
+“Firestore alertini FCM’e çevir”
+notification_gateway
+“FCM mesajını al, tipine göre yönlendir”
+notification_service
+“Telefonda görünen bildirimi bas”
+Battery örneği tek satır zincir
+Battery düştü
+→ AlertEngine.send(type: battery_low)
+→ Firestore alert doc oluştu
+→ index.ts / onAlertCreated çalıştı
+→ FCM requester topic/device’a gitti
+→ notification_gateway mesajı aldı
+→ notification_service local notification gösterdi
+Neden iki dosya var?
+Senin sorduğun kritik nokta bu.
+Tek dosya da olabilirdi ama ikiye bölmek daha temiz:
+notification_gateway = gelen mesajı anlama
+notification_service = bildirimi gösterme
+Bu ayrım güzel aslında.
+Özellikle yeni alert tipleri eklerken işe yarıyor.
+Pratik debug mantığı
+Battery alert bildirim gelmiyorsa sırayla bakılır:
+Firestore’a battery_low düştü mü
+index.ts bunu gördü mü
+FCM payload geldi mi
+notification_gateway type’ı tanıdı mı
+notification_service show etti mi
+En kısa özet
+Battery alert aslında 4 aşamalı pipeline:
+detect → persist → push → display
+İstersen bir sonraki mesajda bunu NCare için
+gps_off / geofence_exit / place_left / call_me dahil mini tablo halinde çıkarayım.

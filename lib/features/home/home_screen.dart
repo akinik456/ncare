@@ -50,39 +50,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _startBatteryMonitor();
   }
 
-  Future<void> _createBatteryAlert(int level) async {
-    try {
-      final locatorId = await IdentityManager.getRequesterId();
-
-      final locatorDoc = await FirebaseFirestore.instance
-          .collection('locators')
-          .doc(locatorId)
-          .get();
-
-      final requesterId =
-          (locatorDoc.data()?['pairedRequesterId'] ?? '').toString().trim();
-
-      if (requesterId.isEmpty) return;
-
-      await FirebaseFirestore.instance
-          .collection('requesters')
-          .doc(requesterId)
-          .collection('alerts')
-          .doc('battery_low_$locatorId')
-          .set({
-        'type': 'battery_low',
-        'locatorId': locatorId,
-        'locatorName': displayname ?? 'Locator',
-        'battery': level,
-        'ts': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      print('BATTERY ALERT CREATED => $level%');
-    } catch (e) {
-      print('BATTERY ALERT ERROR => $e');
-    }
-  }
-
   @override
   void dispose() {
     _presenceTimer?.cancel();
@@ -261,6 +228,9 @@ class _HomeScreenState extends State<HomeScreen> {
             locatorId: locatorId,
             locatorName: locatorName,
             alertType: 'battery_low',
+			extra: {
+				'battery': level,
+			},
           );
 
           await prefs.setBool('batteryAlertSent', true);

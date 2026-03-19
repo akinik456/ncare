@@ -14,15 +14,12 @@ pairs/
    
 3 Konum geçmişi (tartışılacak)
 Şu an:
-
-
 responses/requestId
 Kalıcı.
 Ama konuşmamız gereken:
 geçmiş tutulacak mı
 kaç gün tutulacak
 privacy konusu
-
 
 4 Locator bg / fg / restart testleri
 Test senaryoları:
@@ -31,8 +28,6 @@ ekran kilitli
 restart
 internet gidip gelmesi
 uçak modu
-
-
 
 5 Marka & isim
 NCare geçici.
@@ -43,17 +38,13 @@ Play Store için gerekli.
 
 7 UI Polish
 
-8 remote locator add
-
-9 her locator ün kendi son adresi olmalı , loc değişince ya kendi son adresi
+8 her locator ün kendi son adresi olmalı , loc değişince ya kendi son adresi
 gösterilmeli ya da silinmeli
 
-10 start da subscribe için takılabiliyor , sık oluyor. 
+9 start da subscribe için takılabiliyor , sık oluyor. 
 
-11 pairing locator onay
+10 batteryAlarmEnabled , batteryAlertThreshold Firestore da isimleri kontrol et ya english ya da türkçe
 
-12 batteryAlarmEnabled , batteryAlertThreshold Firestore da isimleri kontrol et ya english ya da türkçe
-
-
+11 locator rl notification toggle
 
 

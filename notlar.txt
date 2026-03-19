@@ -118,22 +118,39 @@ daha doğru test verir.
 
 NCare project continuation.
 
-We have a working V1 core:
-- deterministic alerts (gps, battery, geofence)
-- response system per locator
-- safe location service (no direct Geolocator usage)
-- pairing system (QR + 6-char code)
+We have:
+- deterministic alerts (gps, battery, geofence, multi-place)
+- pairing with approval
+- request/response system
+- place system (max 3, shared per locator)
+- notification pipeline (FCM + local)
+- strict pairing validation (cloud + locator + requester)
 
-We will NOT change architecture unless necessary.
+We are starting MULTI REQUESTER support.
 
-Goal:
-- clean implementation
-- no spaghetti
-- production-ready decisions
+Current model:
+- 1 requester → multiple locators
+- we are converting to:
+  - 1 locator → multiple requesters
 
-Start with this context and guide me step by step.
-Keep answers short and precise.
-Do not give code unless I ask.
+Decisions:
+- pairing stored as:
+  locators/{locatorId}/paired_requesters/{requesterId}
+- each requester has independent:
+  - alert settings
+  - request/response flow
+- places are shared per locator (max 3)
+- any requester can overwrite places
+
+Rules:
+- step by step only
+- no code unless requested
+- short answers
+- no architecture change unless necessary
+
+We will start by identifying all single-requester assumptions in the code.
+
+Wait for my instruction before next step.
 
 *************************
 Sohbet Kuralları;
@@ -155,4 +172,59 @@ O yüzden yazacağım kurallara yüzde yüz uymalıyız ama KESİNLİKLE . 99 bi
  hepsini zip olarak atarım.
 
 
+**************************************
+
+NCare V1 TEST CHECKLIST
+🔗 Pairing
+[ ] QR ile pairing request gönder
+[ ] Code ile pairing request gönder
+[ ] Locator approve → requester listede görünür
+[ ] Reject → requester’da görünmez
+[ ] Remove → iki taraf da temizlenir
+[ ] Remove sonrası RL çalışmaz (çok kritik)
+📡 Request / Response (RL)
+[ ] Request gönder → locator alıyor mu
+[ ] Locator response dönüyor mu
+[ ] Requester konumu görüyor mu
+[ ] Timeout çalışıyor mu
+[ ] Unpaired durumda request ignore ediliyor mu
+🔔 Alerts (Genel)
+[ ] gps_off
+[ ] battery_low
+[ ] call_me
+[ ] geofence_exit
+Hepsi için:
+[ ] Firestore’a düşüyor mu
+[ ] FCM geliyor mu
+[ ] Local notification çıkıyor mu
+📍 Places (Multi-point)
+[ ] Add place çalışıyor mu
+[ ] Address doğru geliyor mu
+[ ] Accuracy / age mantıklı mı
+[ ] Max 3 limit çalışıyor mu
+[ ] Toggle enable/disable çalışıyor mu
+📍 Place Alerts
+[ ] inside → arrive alert
+[ ] outside → left alert
+[ ] 120sn cooldown çalışıyor mu
+[ ] placeName notification’da doğru mu
+🔐 Security (EN KRİTİK)
+[ ] Unpair sonrası:
+[ ] RL gitmiyor
+[ ] Locator cevap vermiyor
+[ ] Requester response kabul etmiyor
+[ ] Eski requestId ile exploit yok
+📱 UI / UX
+[ ] Loading state’ler düzgün mü
+[ ] Boş state’ler düzgün mü
+[ ] Crash var mı
+[ ] Geri gelince state bozuluyor mu
+🔁 Edge Cases
+[ ] İnternet gidip gelince sistem toparlıyor mu
+[ ] App kill → restart → state doğru mu
+[ ] Aynı anda 2 request atınca ne oluyor
+[ ] GPS jitter spam yapıyor mu
+🎯 Test stratejisi
+Önce happy path
+sonra break etmeye çalış
 

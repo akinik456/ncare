@@ -730,51 +730,7 @@ if (_batteryAlarmEnabled) ...[
         onChanged: (v) => setState(() => _geofenceAlarmEnabled = v),
       ),
 
-      if (_geofenceAlarmEnabled) ...[
-        const SizedBox(height: 10),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Geofence radius',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            _radiusChip(100),
-            _radiusChip(250),
-            _radiusChip(500),
-            _radiusChip(1000),
-          ],
-        ),
-		const SizedBox(height: 14),
-SizedBox(
-  width: double.infinity,
-  child: OutlinedButton.icon(
-    onPressed: _savingCenter ? null : _setCurrentLocationAsGeofenceCenter,
-    icon: const Icon(Icons.my_location_rounded),
-    label: Text(
-      _savingCenter
-          ? 'Saving center...'
-          : 'Use my current location as center',
-    ),
-  ),
-),
-const SizedBox(height: 8),
-Text(
-  (_geofenceCenterLat != null && _geofenceCenterLng != null)
-      ? 'Center saved'
-      : 'Center not set',
-  style: Theme.of(context).textTheme.bodySmall,
-),
-
-      ],
+      
     ],
   ),
 ),

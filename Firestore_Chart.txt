@@ -1,4 +1,4 @@
-
+locators/{locatorId}/paired_requesters/{requesterId}
 
 COLLECTION , document
 

@@ -137,9 +137,9 @@ static Future<void> show({
     } else if (type == 'battery_low') {
       title = 'Battery alert';
       body = '$locatorName battery is low';
-    } else if (type == 'geofence_exit') {
-      title = 'Geofence alert';
-      body = '$locatorName left the selected area';
+    } else if (type == 'gps_off') {
+      title = 'GPS alert';
+      body = '$locatorName GPS is OFF';
     } else if (type.startsWith('place_arrive')) {
       title = 'Arrived';
       body = '$locatorName arrived at $placeName';
