@@ -8,8 +8,9 @@ class IdentityManager {
     var id = prefs.getString('requesterId');
     if (id != null && id.isNotEmpty) return id;
 
-    id = const Uuid().v4();
-    await prefs.setString('requesterId', id);
+    id =  "TEST_REQUESTER_1";
+    //id =  const Uuid().v4(); 
+	await prefs.setString('requesterId', id);
     return id;
   }
 }

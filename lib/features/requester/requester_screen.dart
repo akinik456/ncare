@@ -1007,16 +1007,7 @@ return Row(
                         if (hasFix && pendingRequestId != null) {
                           final currentPending = pendingRequestId!;
                           WidgetsBinding.instance.addPostFrameCallback((_) async {
-                            if (!mounted) return;
-
-                            await FirebaseFirestore.instance
-                                .collection('requesters')
-                                .doc(requesterId)
-                                .collection('requests')
-                                .doc(currentPending)
-                                .delete();
-
-                            if (!mounted) return;
+                            if (!mounted) return;                           
 
                             setState(() {
                               _lastRequestId = currentPending;

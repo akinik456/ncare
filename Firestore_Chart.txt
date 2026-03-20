@@ -13,16 +13,18 @@ requesterId
 			-> battery_low_locatorId (locatorId,locatorName: "..",ts:,type: "battery_low")
 			-> Id (locatorId,locatorName: "..",ts:,type: "call_me") 
 		
+	REQUESTS(requests)
+		requestId->(locatorId,ts,type: "rl")
+	
 	LOCATORS(locators)
 	locatorId ->(active,batteryAlarmEnabled,batteryAlertThreshold,callEnabled,createdAt,geofenceAlarmEnabled,geofenceCenterLat,geofenceCenterLng,name,pairedAt,removedAt)
 		PLACES(places)
 		placeId->(address,createdAt,enabled,lastState,Lat,Lng,name,radiusMeters)
 	
-	RESPONSES(responses)
+		RESPONSES(responses)
 		requestId -> (acc,battery,lat,lng,locatorId,status,ts,via: "FG")
 	
-	REQUESTS(requests)
-		requestId->(locatorId,ts,type: "rl")
+	
 				
 			
 				

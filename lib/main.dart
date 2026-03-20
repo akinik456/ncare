@@ -185,28 +185,9 @@ if (cachedLat != null &&
 );
 		if(pos == null) return;
 	
-    // cleanup BEFORE fresh write (only here)
-final responsesRef = FirebaseFirestore.instance
-    .collection('requesters')
-    .doc(requesterId)
-    .collection('locators')
-    .doc(myLocatorId)
-    .collection('responses');
-
-final snapshot = await responsesRef
-    .orderBy('ts', descending: false)
-    .get();
-
-if (snapshot.docs.length >= 3) {
-  final toDelete = snapshot.docs.length - 2;
-  for (var i = 0; i < toDelete; i++) {
-    await snapshot.docs[i].reference.delete();
-  }
-}
-	
-	
+    
 	await FirebaseFirestore.instance
-        .collection('requesters')
+      .collection('requesters')
       .doc(requesterId)
 	  .collection('locators')
       .doc(myLocatorId)
@@ -227,7 +208,7 @@ if (snapshot.docs.length >= 3) {
     print("FG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
   } catch (e) {
     await FirebaseFirestore.instance
-        .collection('requesters')
+      .collection('requesters')
       .doc(requesterId)
 	  .collection('locators')
       .doc(myLocatorId)
@@ -355,24 +336,9 @@ if (!stillPaired) {
       return;
     }
 
-    final responsesRef = FirebaseFirestore.instance
-        .collection('requesters')
-        .doc(requesterId)
-        .collection('locators')
-        .doc(myLocatorId)
-        .collection('responses');
 
-    final snapshot = await responsesRef
-        .orderBy('ts', descending: false)
-        .get();
 
-    if (snapshot.docs.length >= 3) {
-      final toDelete = snapshot.docs.length - 2;
-      for (var i = 0; i < toDelete; i++) {
-        await snapshot.docs[i].reference.delete();
-      }
-    }
-    final pos = await LocationService.getCurrentLocationSafe(
+  final pos = await LocationService.getCurrentLocationSafe(
   accuracy: LocationAccuracy.high,
   timeLimit: const Duration(seconds: 20),
 );
