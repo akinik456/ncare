@@ -215,14 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
             (settingsDoc.data()?['batteryAlarmEnabled'] ?? false) == true;
 
         if (level <= threshold && batteryAlarmEnabled && !batterysent) {
-          final allowed = await AlertEngine.shouldSend(
-            requesterId: requesterId,
-            locatorId: locatorId,
-            alertType: 'battery_low',
-          );
-
-          if (!allowed) return;
-
+          
           await AlertEngine.send(
             requesterId: requesterId,
             locatorId: locatorId,
@@ -237,12 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
 
         if (level > threshold && batterysent) {
-          await AlertEngine.clear(
-            requesterId: requesterId,
-            locatorId: locatorId,
-            alertType: 'battery_low',
-          );
-
+          
           await prefs.setBool('batteryAlertSent', false);
         }
       } catch (e) {

@@ -53,6 +53,14 @@ class AlertEngine {
         .collection('requesters')
         .doc(requesterId)
         .collection('alerts');
+	
+   if (alertType == 'battery_low') {
+  final eventDocId =
+      '${alertType}_${locatorId}_${DateTime.now().millisecondsSinceEpoch}';
+  await alertsRef.doc(eventDocId).set(data);
+  return;
+}	
+		
 
     if (alertType == 'gps_off') {
   final eventDocId =
