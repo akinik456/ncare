@@ -59,10 +59,22 @@ class AlertEngine {
       '${alertType}_${locatorId}_${DateTime.now().millisecondsSinceEpoch}';
   await alertsRef.doc(eventDocId).set(data);
   return;
-}	
-		
+}		
 
     if (alertType == 'gps_off') {
+  final eventDocId =
+      '${alertType}_${locatorId}_${DateTime.now().millisecondsSinceEpoch}';
+  await alertsRef.doc(eventDocId).set(data);
+  return;
+}
+
+if (alertType.startsWith('place_arrive_')) {
+  final eventDocId =
+      '${alertType}_${locatorId}_${DateTime.now().millisecondsSinceEpoch}';
+  await alertsRef.doc(eventDocId).set(data);
+  return;
+}
+if (alertType.startsWith('place_left_')) {
   final eventDocId =
       '${alertType}_${locatorId}_${DateTime.now().millisecondsSinceEpoch}';
   await alertsRef.doc(eventDocId).set(data);

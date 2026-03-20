@@ -281,30 +281,22 @@ class DeviceStateManager {
       if (!canTransition) continue;
 
       final transitionType =
-          lastState == 'outside' && newState == 'inside' ? 'arrive' : 'left';
-      final currentAlertType = 'place_${transitionType}_${placeDoc.id}';
-      final oppositeAlertType =
-          transitionType == 'arrive' ? 'place_left_${placeDoc.id}' : 'place_arrive_${placeDoc.id}';
+    lastState == 'outside' && newState == 'inside' ? 'arrive' : 'left';
+final currentAlertType = 'place_${transitionType}_${placeDoc.id}';
 
-      await AlertEngine.clear(
-        requesterId: requesterId,
-        locatorId: locatorId,
-        alertType: oppositeAlertType,
-      );
-
-      await AlertEngine.send(
-        requesterId: requesterId,
-        locatorId: locatorId,
-        locatorName: locatorName,
-        alertType: currentAlertType,
-        extra: {
-          'subtype': transitionType,
-          'placeId': placeDoc.id,
-          'placeName': placeName,
-          'distance': dist,
-          'radiusMeters': radiusMeters,
-        },
-      );
+await AlertEngine.send(
+  requesterId: requesterId,
+  locatorId: locatorId,
+  locatorName: locatorName,
+  alertType: currentAlertType,
+  extra: {
+    'subtype': transitionType,
+    'placeId': placeDoc.id,
+    'placeName': placeName,
+    'distance': dist,
+    'radiusMeters': radiusMeters,
+  },
+);
 
       await placeDoc.reference.set({
         'lastState': newState,
