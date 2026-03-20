@@ -2,6 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'device_state_manager.dart';
 
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'device_state_manager.dart';
+
 class AlertEngine {
   static String _docId(String type, String locatorId) {
     return '${type}_$locatorId';
@@ -46,12 +49,19 @@ class AlertEngine {
       ...?extra,
     };
 
-    await FirebaseFirestore.instance
+    final alertsRef = FirebaseFirestore.instance
         .collection('requesters')
         .doc(requesterId)
-        .collection('alerts')
-        .doc(_docId(alertType, locatorId))
-        .set(data);
+        .collection('alerts');
+
+    if (alertType == 'gps_off') {
+  final eventDocId =
+      '${alertType}_${locatorId}_${DateTime.now().millisecondsSinceEpoch}';
+  await alertsRef.doc(eventDocId).set(data);
+  return;
+}
+
+    await alertsRef.doc(_docId(alertType, locatorId)).set(data);
   }
 
   static Future<void> clear({

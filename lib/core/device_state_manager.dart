@@ -115,15 +115,7 @@ class DeviceStateManager {
           (settingsDoc.data()?['gpsOffAlarmEnabled'] ?? false) == true;
 
       if (!gpsEnabled && gpsOffAlarmEnabled && !gpsSent) {
-        final allowed = await AlertEngine.shouldSend(
-          requesterId: requesterId,
-          locatorId: locatorId,
-          alertType: 'gps_off',
-        );
-
-        if (!allowed) return;
-
-        await AlertEngine.send(
+          await AlertEngine.send(
           requesterId: requesterId,
           locatorId: locatorId,
           locatorName: locatorName,
@@ -134,14 +126,9 @@ class DeviceStateManager {
       }
 
       if (gpsEnabled && gpsSent) {
-        await AlertEngine.clear(
-          requesterId: requesterId,
-          locatorId: locatorId,
-          alertType: 'gps_off',
-        );
-
-        await prefs.setBool('gpsOffAlertSent', false);
-      }
+	  await prefs.setBool('gpsOffAlertSent', false);
+	  }      
+      
     } catch (e) {
       print('GPS OFF ALERT ERROR => $e');
     }

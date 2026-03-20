@@ -119,38 +119,30 @@ daha doğru test verir.
 NCare project continuation.
 
 We have:
-- deterministic alerts (gps, battery, geofence, multi-place)
-- pairing with approval
-- request/response system
-- place system (max 3, shared per locator)
-- notification pipeline (FCM + local)
-- strict pairing validation (cloud + locator + requester)
+- deterministic alerts (gps, battery, place)
+- request/response system (stable)
+- pairing system with approval
+- multi locator working
+- shared requester (multi-device) working
 
-We are starting MULTI REQUESTER support.
+Critical decisions:
+- NO DELETE policy (24h retention)
+- alerts are event-based (no clear/delete)
+- same requesterId can be used on multiple devices
+- request/response will be device-separated (next step)
 
-Current model:
-- 1 requester → multiple locators
-- we are converting to:
-  - 1 locator → multiple requesters
-
-Decisions:
-- pairing stored as:
-  locators/{locatorId}/paired_requesters/{requesterId}
-- each requester has independent:
-  - alert settings
-  - request/response flow
-- places are shared per locator (max 3)
-- any requester can overwrite places
+Goal:
+- stabilize system
+- complete multi-device separation
+- prepare for production
 
 Rules:
 - step by step only
 - no code unless requested
-- short answers
 - no architecture change unless necessary
+- short and precise answers
 
-We will start by identifying all single-requester assumptions in the code.
-
-Wait for my instruction before next step.
+We continue from here.
 
 *************************
 Sohbet Kuralları;

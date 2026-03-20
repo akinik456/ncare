@@ -499,17 +499,7 @@ onPressed: () async {
       .collection('alerts')
       .where('type', isEqualTo: 'call_me')
       .get();
-
-  final batch = FirebaseFirestore.instance.batch();
-
-  for (final doc in snap.docs) {
-    final data = doc.data();
-    if ((data['locatorId'] ?? '').toString() == locatorId) {
-      batch.delete(doc.reference);
-    }
-  }
-
-  await batch.commit();
+  
 },
 
           child: const Text('DISMISS'),
