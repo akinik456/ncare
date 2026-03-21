@@ -47,7 +47,17 @@ export const onRequestCreated = onDocumentCreated(
 
     const requesterName =
       requesterDoc.data()?.name?.toString() || "Requester";
+	  
+	const requestDoc = await admin.firestore()
+	  .collection('requesters')
+	  .doc(requesterId)
+	  .collection('requests')
+	  .doc(requestId)
+	  .get();
 
+    const requestData = requestDoc.data() || {};  
+    const requestDeviceId = requestData.requestDeviceId || "";
+	
     console.log(
       "REQUEST TRIGGERED",
       requesterId,
@@ -64,6 +74,7 @@ export const onRequestCreated = onDocumentCreated(
         requesterId,
         locatorId,
         requesterName,
+		requestDeviceId,
       },
       android: { priority: "high" },
     });
