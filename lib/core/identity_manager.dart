@@ -2,14 +2,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 class IdentityManager {
-  static Future<String> getRequesterId() async {
+  static Future<String> getOrCreateDeviceId() async {
     final prefs = await SharedPreferences.getInstance();
 
     var id = prefs.getString('requesterId');
     if (id != null && id.isNotEmpty) return id;
 
-    id =  "TEST_REQUESTER_1";
-    //id =  const Uuid().v4(); 
+    //id =  "TEST_REQUESTER_1";
+    id =  const Uuid().v4(); 
 	await prefs.setString('requesterId', id);
     return id;
   }

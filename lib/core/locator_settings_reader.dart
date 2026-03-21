@@ -21,7 +21,7 @@ class LocatorSettings {
 
 class LocatorSettingsReader {
   static Future<LocatorSettings?> load() async {
-  final locatorId = await IdentityManager.getRequesterId();
+  final locatorId = await IdentityManager.getOrCreateDeviceId();
 
   final locatorDoc = await FirebaseFirestore.instance
       .collection('locators')

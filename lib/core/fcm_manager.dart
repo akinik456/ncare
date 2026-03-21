@@ -6,7 +6,7 @@ import 'role_manager.dart';
 class FcmManager {
   static Future<void> ensureSubscriptions() async {
     final role = await RoleManager.getRole();
-    final myId = await IdentityManager.getRequesterId();
+    final myId = await IdentityManager.getOrCreateDeviceId();
 
     if (role == 'locator') {
       final topic = 'locator_$myId';

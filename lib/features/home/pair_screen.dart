@@ -58,7 +58,7 @@ class _PairScreenState extends State<PairScreen> {
 		  }
 		  
 		  final locatorId = await 		  
-		  IdentityManager.getRequesterId();
+		  IdentityManager.getOrCreateDeviceId();
 		  		  
 		  await FirebaseFirestore.instance
 			.collection('requesters')

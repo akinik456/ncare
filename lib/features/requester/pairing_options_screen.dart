@@ -56,7 +56,7 @@ class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
     });
   }
 Future<void> _loadGeofenceCenter() async {
-  final requesterId = await IdentityManager.getRequesterId();
+  final requesterId = await IdentityManager.getOrCreateDeviceId();
   final doc = await FirebaseFirestore.instance
       .collection('requesters')
       .doc(requesterId)
@@ -74,7 +74,7 @@ Future<void> _loadGeofenceCenter() async {
 }  
 
 Future<void> _loadExistingSettings() async {
-  final requesterId = await IdentityManager.getRequesterId();
+  final requesterId = await IdentityManager.getOrCreateDeviceId();
 
   final doc = await FirebaseFirestore.instance
       .collection('requesters')
@@ -100,7 +100,7 @@ Future<void> _setCurrentLocationAsGeofenceCenter() async {
   setState(() => _savingCenter = true);
 
   try {
-    final requesterId = await IdentityManager.getRequesterId();
+    final requesterId = await IdentityManager.getOrCreateDeviceId();
 
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
@@ -152,7 +152,7 @@ setState(() {
 }
 
 Future<int> _getPlaceCount() async {
-  final requesterId = await IdentityManager.getRequesterId();
+  final requesterId = await IdentityManager.getOrCreateDeviceId();
   final snap = await FirebaseFirestore.instance
       .collection('requesters')
       .doc(requesterId)
@@ -192,7 +192,7 @@ Future<void> _confirmPairing() async {
   setState(() => _saving = true);
 
   try {
-    final requesterId = await IdentityManager.getRequesterId();
+    final requesterId = await IdentityManager.getOrCreateDeviceId();
 
     final requesterDoc = await FirebaseFirestore.instance
         .collection('requesters')
@@ -322,7 +322,7 @@ Future<void> _confirmPairing() async {
 
 
   Future<CollectionReference<Map<String, dynamic>>> _placesRef() async {
-    final requesterId = await IdentityManager.getRequesterId();
+    final requesterId = await IdentityManager.getOrCreateDeviceId();
     return FirebaseFirestore.instance
         .collection('requesters')
         .doc(requesterId)
@@ -578,7 +578,7 @@ Future<void> _removeLocator() async {
   setState(() => _saving = true);
 
   try {
-    final requesterId = await IdentityManager.getRequesterId();
+    final requesterId = await IdentityManager.getOrCreateDeviceId();
     final firestore = FirebaseFirestore.instance;
     final locatorRef = firestore.collection('locators').doc(widget.locatorId);
     final requesterLocatorRef = firestore

@@ -39,7 +39,7 @@ class _NameScreenState extends State<NameScreen> {
     setState(() => saving = true);
 
     if (role == "requester") {
-      final id = await IdentityManager.getRequesterId();
+      final id = await IdentityManager.getOrCreateDeviceId();
 
       await FirebaseFirestore.instance
           .collection('requesters')
@@ -55,7 +55,7 @@ class _NameScreenState extends State<NameScreen> {
         MaterialPageRoute(builder: (_) => const RequesterScreen()),
       );
     } else {
-      final id = await IdentityManager.getRequesterId();
+      final id = await IdentityManager.getOrCreateDeviceId();
 
       await FirebaseFirestore.instance
           .collection('locators')

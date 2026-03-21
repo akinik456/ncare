@@ -43,7 +43,7 @@ class DeviceStateManager {
         );
         if (pos == null) return;
 
-        final locatorId = await IdentityManager.getRequesterId();
+        final locatorId = await IdentityManager.getOrCreateDeviceId();
         final requesterId = await _getPairedRequesterId(locatorId);
         if (requesterId == null || requesterId.isEmpty) return;
 
@@ -90,7 +90,7 @@ class DeviceStateManager {
       final prefs = await SharedPreferences.getInstance();
       final gpsSent = prefs.getBool('gpsOffAlertSent') ?? false;
 
-      final locatorId = await IdentityManager.getRequesterId();
+      final locatorId = await IdentityManager.getOrCreateDeviceId();
 
       final locatorDoc = await FirebaseFirestore.instance
           .collection('locators')

@@ -17,7 +17,7 @@ class _LocatorNameScreenState extends State<LocatorNameScreen> {
 
 Future<void> _save() async {
   try {
-    final requesterId = await IdentityManager.getRequesterId();
+    final requesterId = await IdentityManager.getOrCreateDeviceId();
     final locatorId = widget.locatorId.toString();
 
     print("REQUESTER ID => $requesterId");

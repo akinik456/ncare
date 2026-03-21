@@ -52,7 +52,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     try {
       final placesSnap = await FirebaseFirestore.instance
           .collection('requesters')
-          .doc(await IdentityManager.getRequesterId())
+          .doc(await IdentityManager.getOrCreateDeviceId())
           .collection('locators')
           .doc(widget.locatorId)
           .collection('places')
@@ -145,7 +145,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
 
     setState(() => _saving = true);
     try {
-      final requesterId = await IdentityManager.getRequesterId();
+      final requesterId = await IdentityManager.getOrCreateDeviceId();
       final placeCount = await _getPlaceCount(requesterId);
       if (placeCount >= 3) {
         if (!mounted) return;

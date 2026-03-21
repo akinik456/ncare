@@ -58,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _initLocatorId() async {
-    final id = await IdentityManager.getRequesterId();
+    final id = await IdentityManager.getOrCreateDeviceId();
     final generatedCode = _generatePairCode(id);
 
     if (!mounted) return;
@@ -73,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadRequesterName() async {
-    final locatorId = await IdentityManager.getRequesterId();
+    final locatorId = await IdentityManager.getOrCreateDeviceId();
 
     final doc = await FirebaseFirestore.instance
         .collection('locators')
@@ -91,7 +91,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadLocatorName() async {
-    final locatorId = await IdentityManager.getRequesterId();
+    final locatorId = await IdentityManager.getOrCreateDeviceId();
     final doc = await FirebaseFirestore.instance
         .collection('locators')
         .doc(locatorId)
@@ -144,7 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    final locatorId = await IdentityManager.getRequesterId();
+    final locatorId = await IdentityManager.getOrCreateDeviceId();
 
     final locatorDoc = await FirebaseFirestore.instance
         .collection('locators')
@@ -187,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final level = await _battery.batteryLevel;
         _lastBatteryLevel = level;
 
-        final locatorId = await IdentityManager.getRequesterId();
+        final locatorId = await IdentityManager.getOrCreateDeviceId();
 
         final locatorDoc = await FirebaseFirestore.instance
             .collection('locators')
@@ -240,7 +240,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _updatePresence() async {
-    final locatorId = await IdentityManager.getRequesterId();
+    final locatorId = await IdentityManager.getOrCreateDeviceId();
     final currentPairCode = _generatePairCode(locatorId);
 
     if (pairCode != currentPairCode && mounted) {

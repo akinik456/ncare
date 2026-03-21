@@ -24,7 +24,7 @@ class _PairRequestScreenState extends State<PairRequestScreen> {
     setState(() => _sending = true);
 
     try {
-      final requesterId = await IdentityManager.getRequesterId();
+      final requesterId = await IdentityManager.getOrCreateDeviceId();
 
       final requesterDoc = await FirebaseFirestore.instance
           .collection('requesters')

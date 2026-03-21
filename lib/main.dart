@@ -32,7 +32,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   print('ROLE => ${await RoleManager.getRole()}');
-  print('REQ ID => ${await IdentityManager.getRequesterId()}');
+  print('REQ ID => ${await IdentityManager.getOrCreateDeviceId()}');
 
   await SystemChrome.setEnabledSystemUIMode(
     SystemUiMode.manual,
@@ -90,11 +90,11 @@ await flutterLocalNotificationsPlugin.initialize(initSettings);
 String? myLocatorId;
 
 if (role == 'locator') {
-  myLocatorId = await IdentityManager.getRequesterId();
+  myLocatorId = await IdentityManager.getOrCreateDeviceId();
   final locatorTopic = 'locator_$myLocatorId';
 } else {
   print("LOCATOR FLOW SKIPPED => role=$role");
-  final requesterId = await IdentityManager.getRequesterId();
+  final requesterId = await IdentityManager.getOrCreateDeviceId();
 }  
 
   FirebaseMessaging.onMessage.listen((message) async {
@@ -247,7 +247,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final requestId = data['requestId']?.toString();
   final requesterId = data['requesterId']?.toString();
   final targetLocatorId = data['locatorId']?.toString();
-  final myLocatorId = await IdentityManager.getRequesterId();
+  final myLocatorId = await IdentityManager.getOrCreateDeviceId();
 
   if (type != 'rl' ||
       requestId == null ||

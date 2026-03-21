@@ -96,7 +96,7 @@ Future<void> _getMyLocation() async {
 print('myLat $_myLat , myLng $_myLng');
 }
   Future<void> _initRequesterId() async {
-    final id = await IdentityManager.getRequesterId();
+    final id = await IdentityManager.getOrCreateDeviceId();
     if (!mounted) return;
 
     setState(() {
