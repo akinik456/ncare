@@ -14,6 +14,8 @@ import '../setup/setup_screen.dart';
 import 'add_locator_screen.dart';
 import 'pairing_options_screen.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/services.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 class RequesterScreen extends StatefulWidget {
   const RequesterScreen({super.key});
@@ -115,6 +117,11 @@ print('myLat $_myLat , myLng $_myLng');
   setState(() {
     _groupId = gid ?? requesterId;
   });
+}
+
+String shortCode(String id) {
+  final clean = id.replaceAll('-', '').toUpperCase();
+  return "${clean.substring(0,4)}-${clean.substring(4,8)}";
 }
   
   void _listenApprovedLocators() {
@@ -416,9 +423,51 @@ void _listenCallAlerts() {
 	  final formatted = DateFormat('d MMM yyyy • HH:mm').format(time);
 	  return 'Last seen $formatted';
 	}
+
+void _showQrDialog(String groupId) {
+  showDialog(
+    context: context,
+    builder: (_) => Dialog(
+      backgroundColor: Colors.white,
+      insetPadding: const EdgeInsets.all(20),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "GROUP QR",
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 18,
+              ),
+            ),
+            const SizedBox(height: 16),
+            QrImageView(
+              data: groupId,
+              version: QrVersions.auto,
+              size: 240,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              shortCode(groupId),
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}	
+	
 	
   @override
   Widget build(BuildContext context) {
+  final displayId = _groupId ?? requesterId;
+  
     if (requesterId == null) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
@@ -467,7 +516,7 @@ void _listenCallAlerts() {
         child: ListView(
 		padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           children: [
-		  if (_groupId != null)
+if (_groupId != null)
 Container(
   margin: const EdgeInsets.only(bottom: 12),
   padding: const EdgeInsets.all(16),
@@ -488,28 +537,48 @@ Container(
       ),
       const SizedBox(height: 6),
       Text(
-        _groupId!,
+        shortCode(_groupId!),
         style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 1.2,
+          fontSize: 22,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.5,
         ),
       ),
       const SizedBox(height: 12),
-      Container(
+
+  GestureDetector(
+  onTap: () => _showQrDialog(_groupId!),      
+  child:Container(
         height: 120,
         width: double.infinity,
         decoration: BoxDecoration(
           color: const Color(0xFFF1F5F9),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const Center(
-          child: Text("QR HERE"),
-        ),
+        
+
+  child: Center(
+    child: QrImageView(
+      data: _groupId!,
+      version: QrVersions.auto,
+      size: 100,
+    ),
+  ),
+),
+),
+      
+
+      const SizedBox(height: 8),
+
+      TextButton(
+        onPressed: () {
+          Clipboard.setData(ClipboardData(text: _groupId!));
+        },
+        child: const Text("COPY"),
       ),
     ],
   ),
-),
+),		  
 		  
 		  
 		  
@@ -1324,7 +1393,7 @@ class _StatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
+    
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
