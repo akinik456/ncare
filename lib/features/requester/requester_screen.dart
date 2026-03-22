@@ -16,6 +16,7 @@ import 'pairing_options_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 class RequesterScreen extends StatefulWidget {
   const RequesterScreen({super.key});
@@ -115,7 +116,7 @@ print('myLat $_myLat , myLng $_myLng');
   final gid = prefs.getString('groupId');
 
   setState(() {
-    _groupId = gid ?? requesterId;
+    
   });
 }
 
@@ -462,6 +463,42 @@ void _showQrDialog(String groupId) {
     ),
   );
 }	
+
+Future<void> _joinGroup() async {
+  final result = await Navigator.push<String>(
+    context,
+    MaterialPageRoute(
+      builder: (_) => const _GroupQrScanner(),
+    ),
+  );
+
+  if (result == null || result.isEmpty) return;
+
+  final deviceId = await IdentityManager.getOrCreateDeviceId();
+  final now = FieldValue.serverTimestamp();
+
+  await IdentityManager.setLocalGroupId(result);
+
+  await FirebaseFirestore.instance
+      .collection('groups')
+      .doc(result)
+      .collection('devices')
+      .doc(deviceId)
+      .set({
+    'deviceId': deviceId,
+    'groupId': result,
+    'role': 'requester',
+    'joinedAt': now,
+    'active': true,
+    'isMaster': false,
+  });
+
+  setState(() {
+    _groupId = result;
+  });
+}
+
+
 	
 	
   @override
@@ -579,8 +616,7 @@ Container(
     ],
   ),
 ),		  
-		  
-		  
+  
 		  
 		  
 		  if (_callRequestFrom != null)
@@ -633,7 +669,17 @@ onPressed: () async {
       ],
     ),
   ),
-
+//if (_groupId == null) ...[
+  const SizedBox(height: 8),
+  SizedBox(
+    width: double.infinity,
+    child: OutlinedButton.icon(
+      onPressed: _joinGroup,
+      icon: const Icon(Icons.qr_code_scanner),
+      label: const Text("Join group"),
+    ),
+  ),
+//],		  
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -1431,6 +1477,37 @@ class _StatusCard extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
         ],
+      ),
+    );
+  }
+}
+class _GroupQrScanner extends StatefulWidget {
+  const _GroupQrScanner();
+
+  @override
+  State<_GroupQrScanner> createState() => _GroupQrScannerState();
+}
+
+class _GroupQrScannerState extends State<_GroupQrScanner> {
+  bool _handled = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("Scan group QR")),
+      body: MobileScanner(
+        onDetect: (capture) {
+          if (_handled) return;
+
+          final barcodes = capture.barcodes;
+          if (barcodes.isEmpty) return;
+
+          final code = barcodes.first.rawValue;
+          if (code == null || code.isEmpty) return;
+
+          _handled = true;
+          Navigator.pop(context, code);
+        },
       ),
     );
   }
