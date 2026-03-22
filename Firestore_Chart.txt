@@ -27,5 +27,137 @@ requesterId
 	
 				
 			
-				
-			
+*********************************
+
+LOCATORS
+  locatorId
+    name
+    createdAt
+    pairCode
+    groupId
+    joinedAt
+    active
+
+REQUESTERS
+  requesterId
+    name
+    createdAt
+    groupId
+    joinedAt
+    active
+
+GROUPS
+  groupId
+    createdAt
+    isPaid
+    trialExpiresAt
+    maxDevicesCount
+    groupMasterDeviceId
+
+    DEVICES
+      deviceId
+        deviceId
+        role                // requester | locator
+        requesterId         // varsa
+        locatorId           // varsa
+        name
+        joinedAt
+        active
+        isMaster
+
+    LOCATORS
+      locatorId
+        locatorId
+        name
+        joinedAt
+        active
+
+        REQUESTERS
+          requesterId
+            requesterId
+            name
+            joinedAt
+            active
+
+        REQUESTS
+          requestId
+            type
+            requesterId
+            requesterDeviceId
+            locatorId
+            ts
+
+        RESPONSES
+          requestId
+            status
+            requesterId
+            requesterDeviceId
+            locatorId
+            lat
+            lng
+            acc
+            battery
+            via
+            ts
+
+        ALERTS
+          alertId
+            type
+            requesterId
+            requesterDeviceId
+            locatorId
+            locatorName
+            placeName
+            distance
+            radiusMeters
+            battery
+            ts
+
+
+Mantık
+LOCATORS
+Cihazın ana kimliği burada
+Locator bağımsız da durabilir
+REQUESTERS
+Requester’ın ana kimliği burada
+Requester bağımsız da durabilir
+GROUPS/{groupId}
+Grubun merkezi
+GROUPS/{groupId}/DEVICES
+Bu group’a bağlı tüm fiziksel cihazlar
+GROUPS/{groupId}/LOCATORS/{locatorId}
+Asıl aktif çalışma alanı
+Bunun altında:
+bu locator’a bağlı requesterlar
+requestler
+response’lar
+alertler
+Neden bu iyi
+group mantığı var
+locator merkezli çalışma korunuyor
+req/loc haberleşmesi locator altında
+request/response device separation korunuyor
+aynı group birden fazla locator taşıyabiliyor
+satınalma group seviyesinde yönetilebilir
+limit cihaz sayısına göre sayılabilir
+Çok kısa akış
+Yeni grup kur
+requester olur
+requesterId oluşur
+deviceId oluşur
+groupId oluşur
+group master olur
+Skip
+requester veya locator standalone başlar
+groupId boş olabilir
+Pairing
+standalone cihaz bir group’a katılır
+groupId alır
+ilgili GROUPS/{groupId} altına eklenir
+Çalışma
+request/response/alerts
+GROUPS/{groupId}/LOCATORS/{locatorId} altında akar
+Benim dikkat çekmek istediğim tek nokta
+REQUESTERS ve LOCATORS kökte dursun.
+Silmeyelim.
+Bu debug ve kimlik açısından büyük rahatlık sağlar

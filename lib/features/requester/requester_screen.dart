@@ -28,6 +28,7 @@ class _RequesterScreenState extends State<RequesterScreen> with SingleTickerProv
   String? _lastAddress;
   String? _lastAddressKey;
   String? requesterId;
+  String? _groupId;
   String? _selectedLocatorId;
   bool _timeout = false;
   String? _callRequestFrom;
@@ -71,6 +72,7 @@ _pulse = Tween<double>(begin: 0.8, end: 2).animate(_pulseController);
   _initBatteryDefaults();
 	
   }
+  
 Future<void> _getMyLocation() async {
 
   LocationPermission permission = await Geolocator.checkPermission();
@@ -104,8 +106,16 @@ print('myLat $_myLat , myLng $_myLng');
     });
     _listenCallAlerts();
     _listenApprovedLocators();
+	_loadGroupId();
   }
-  
+  Future<void> _loadGroupId() async {
+  final prefs = await SharedPreferences.getInstance();
+  final gid = prefs.getString('groupId');
+
+  setState(() {
+    _groupId = gid ?? requesterId;
+  });
+}
   
   void _listenApprovedLocators() {
     final id = requesterId;
@@ -457,6 +467,53 @@ void _listenCallAlerts() {
         child: ListView(
 		padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
           children: [
+		  if (_groupId != null)
+Container(
+  margin: const EdgeInsets.only(bottom: 12),
+  padding: const EdgeInsets.all(16),
+  decoration: BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(20),
+    border: Border.all(color: const Color(0xFFE2E8F0)),
+  ),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        "GROUP",
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          color: Color(0xFF0F172A),
+        ),
+      ),
+      const SizedBox(height: 6),
+      Text(
+        _groupId!,
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.2,
+        ),
+      ),
+      const SizedBox(height: 12),
+      Container(
+        height: 120,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Center(
+          child: Text("QR HERE"),
+        ),
+      ),
+    ],
+  ),
+),
+		  
+		  
+		  
+		  
 		  if (_callRequestFrom != null)
   Container(
     margin: const EdgeInsets.only(bottom: 12),

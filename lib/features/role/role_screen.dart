@@ -1,16 +1,31 @@
 
 import 'package:flutter/material.dart';
 import '../../core/role_manager.dart';
-import '../home/home_screen.dart';
-import '../requester/requester_screen.dart';
-import '../locator/locator_permission_screen.dart';
 import '../setup/name_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class RoleScreen extends StatelessWidget {
   const RoleScreen({super.key});
 
+  Future<void> _startNewGroup(BuildContext context) async {
+  
+    await RoleManager.setRole("requester");
+	final prefs = await SharedPreferences.getInstance();
+	await prefs.setBool('isCreatingGroup', true);
+    
+	if (!context.mounted) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => const NameScreen()),
+    );
+  }
+
   Future<void> _select(BuildContext context, String role) async {
     await RoleManager.setRole(role);
+	
+	final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isCreatingGroup', false);
 
     if (!context.mounted) return;
 
@@ -148,6 +163,17 @@ class RoleScreen extends StatelessWidget {
                       onTap: () => _select(context, "requester"),
                     ),
 
+                    const SizedBox(height: 16),
+
+                    _RoleCard(
+                      icon: Icons.group_add_rounded,
+                      title: 'Create New Group',
+                      subtitle:
+                          'Start a new group on this device. This device will continue as requester.',
+                      accent: const Color(0xFF7C3AED),
+                      onTap: () => _startNewGroup(context),
+                    ),
+
                     const SizedBox(height: 24),
 
                     Container(
@@ -176,7 +202,7 @@ class RoleScreen extends StatelessWidget {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'This screen is only for selecting the device role. Existing app logic remains unchanged.',
+                              'Create New Group is only a UI entry point for now. Group Firestore flow will be added step by step.',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 height: 1.45,
                                 color: const Color(0xFF64748B),
