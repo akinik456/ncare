@@ -314,6 +314,9 @@ class _HomeScreenState extends State<HomeScreen> {
           (data['pendingPairRequesterName'] ?? '').toString().trim();
 
       if (pendingRequesterId.isEmpty) return;
+	  
+	  final groupId = data['pendingPairGroupId'];
+	  
 
       await docRef.set({
         'pairedRequesterId': pendingRequesterId,
@@ -322,6 +325,19 @@ class _HomeScreenState extends State<HomeScreen> {
         'pendingPairRequesterName': FieldValue.delete(),
         'pendingPairCreatedAt': FieldValue.delete(),
       }, SetOptions(merge: true));
+	  
+	  await FirebaseFirestore.instance
+  .collection('groups')
+  .doc(groupId)
+  .collection('devices')
+  .doc(locatorId)
+  .set({
+    'deviceId': locatorId,
+    'groupId': groupId,
+    'role': 'locator',
+    'joinedAt': FieldValue.serverTimestamp(),
+    'active': true,
+});
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

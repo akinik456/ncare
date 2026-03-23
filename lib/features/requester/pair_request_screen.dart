@@ -21,6 +21,11 @@ class _PairRequestScreenState extends State<PairRequestScreen> {
   bool _sending = false;
 
   Future<void> _sendPairRequest() async {
+    final groupId = await IdentityManager.getLocalGroupId();
+	if(groupId == null || groupId!.isEmpty){
+	return;
+	}
+    
     setState(() => _sending = true);
 
     try {
@@ -40,6 +45,7 @@ class _PairRequestScreenState extends State<PairRequestScreen> {
           .set({
         'pendingPairRequesterId': requesterId,
         'pendingPairRequesterName': requesterName,
+		'pendingPairGroupId': groupId,
         'pendingPairCreatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
