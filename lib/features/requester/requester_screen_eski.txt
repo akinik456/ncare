@@ -46,6 +46,7 @@ class _RequesterScreenState extends State<RequesterScreen> with SingleTickerProv
   double? _myLat;
   double? _myLng;
   Timer? _reqLocationTimer;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _approvedLocatorSub;
   
 
   @override
@@ -107,6 +108,7 @@ print('myLat $_myLat , myLng $_myLng');
       requesterId = id;
     });
     _listenCallAlerts();
+    _listenApprovedLocators();
 	_loadGroupId();
   }
   Future<void> _loadGroupId() async {
@@ -123,7 +125,71 @@ String shortCode(String id) {
   return "${clean.substring(0,4)}-${clean.substring(4,8)}";
 }
   
+  void _listenApprovedLocators() {
+    final id = requesterId;
+    if (id == null || id.isEmpty) return;
 
+    _approvedLocatorSub?.cancel();
+    _approvedLocatorSub = FirebaseFirestore.instance
+        .collection('locators')
+        .where('pairedRequesterId', isEqualTo: id)
+        .snapshots()
+        .listen((snapshot) {
+      for (final doc in snapshot.docs) {
+        _syncApprovedLocator(doc);
+      }
+    });
+  }
+
+  Future<void> _syncApprovedLocator(
+    QueryDocumentSnapshot<Map<String, dynamic>> locatorDoc,
+  ) async {
+    final id = requesterId;
+    if (id == null || id.isEmpty) return;
+
+    final locatorId = locatorDoc.id;
+    final locatorData = locatorDoc.data();
+    final locatorName = (locatorData['name'] ?? 'Locator').toString().trim();
+
+    final requesterLocatorRef = FirebaseFirestore.instance
+        .collection('requesters')
+        .doc(id)
+        .collection('locators')
+        .doc(locatorId);
+
+    final requesterLocatorDoc = await requesterLocatorRef.get();
+    final requesterLocatorData = requesterLocatorDoc.data();
+    final isAlreadyActive = requesterLocatorData?['active'] == true;
+    final existingName = (requesterLocatorData?['name'] ?? '').toString().trim();
+
+    if (isAlreadyActive && existingName == locatorName) {
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final batteryThreshold = prefs.getInt('batteryAlertThreshold') ?? 20;
+
+    await requesterLocatorRef.set({
+      'name': locatorName,
+      'active': true,
+      'callEnabled': requesterLocatorData?['callEnabled'] ?? true,
+      'batteryAlarmEnabled': requesterLocatorData?['batteryAlarmEnabled'] ?? true,
+      'batteryAlertThreshold': requesterLocatorData?['batteryAlertThreshold'] ?? batteryThreshold,
+      'gpsOffAlarmEnabled': requesterLocatorData?['gpsOffAlarmEnabled'] ?? false,
+      'geofenceAlarmEnabled': requesterLocatorData?['geofenceAlarmEnabled'] ?? false,
+      'geofenceRadius': requesterLocatorData?['geofenceRadius'] ?? 250,
+      'createdAt': requesterLocatorData?['createdAt'] ?? FieldValue.serverTimestamp(),
+      'pairedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    if (!mounted || isAlreadyActive) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(content: Text('$locatorName paired')),
+    );
+  }
 
 Future<void> _loadAlertSettings() async {
   final prefs = await SharedPreferences.getInstance();
@@ -203,6 +269,7 @@ String formatDistance(double? distance, double acc) {
   _presenceUiTimer?.cancel();
   _pulseController.dispose();
   _reqLocationTimer?.cancel();
+  _approvedLocatorSub?.cancel();
    super.dispose();
   }   
 
@@ -711,51 +778,45 @@ onPressed: () async {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: (_groupId == null || _groupId!.isEmpty)
-    ? null
-    : FirebaseFirestore.instance
-        .collection('groups')
-        .doc(_groupId)
-        .collection('devices')
-        .where('role', isEqualTo: 'locator')
-        .where('active', isEqualTo: true)
-        .snapshots(),
-builder: (context, snapshot) {
-  final docs = snapshot.data?.docs ?? [];
+                      stream: FirebaseFirestore.instance
+                          .collection('requesters')
+                          .doc(requesterId)
+                          .collection('locators')
+                          .where('active', isEqualTo: true)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        final docs = snapshot.data?.docs ?? [];
 
-  if (docs.isEmpty) {
-    return Text(
-      _groupId == null ? 'Create or join a group first' : 'No locator',
-      style: theme.textTheme.titleMedium?.copyWith(
-        color: Colors.white,
-        fontWeight: FontWeight.w700,
-      ),
-    );
-  }
+                        if (docs.isEmpty) {
+                          return Text(
+                            'No locator',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          );
+                        }
 
-  final hasSelected = docs.any((doc) => doc.id == _selectedLocatorId);
+                        final hasSelected =
+                            docs.any((doc) => doc.id == _selectedLocatorId);
 
-  if (!hasSelected) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      setState(() {
-        _selectedLocatorId = docs.first.id;
-      });
-    });
-  }
+                        if (!hasSelected) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (!mounted) return;
+                            setState(() {
+                              _selectedLocatorId = docs.first.id;
+                            });
+                          });
+                        }
 
-  return Wrap(
-    spacing: 8,
-    runSpacing: 8,
-    children: docs.map((doc) {
-      final deviceData = doc.data();
-      final locatorId = doc.id;
-      final name =
-          (deviceData['name'] ?? deviceData['deviceId'] ?? locatorId)
-              .toString();
-
-      final selected = locatorId == _selectedLocatorId;
-
+                        return Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: docs.map((doc) {
+                            final locatorId = doc.id;
+                            final name =
+                                (doc.data()['name'] ?? locatorId).toString();
+                            final selected = locatorId == _selectedLocatorId;
 
 return GestureDetector(
   onTap: () {
