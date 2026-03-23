@@ -112,6 +112,7 @@ if (role == 'locator') {
   final targetLocatorId = data['locatorId']?.toString();
   final requestDeviceId =
     (data['requestDeviceId'] ?? '').toString().trim();
+	print("requestDeviceId:$requestDeviceId");
   
   
   final battery = Battery();
@@ -182,6 +183,7 @@ if (cachedLat != null &&
 .doc(requestId)
       .set({
     'locatorId': myLocatorId,
+	'requestDeviceId': requestDeviceId,
     'status': 'ok',
     'lat': cachedLat,
     'lng': cachedLng,
@@ -208,6 +210,7 @@ if (cachedLat != null &&
 .doc(requestId)
       .set({
       'locatorId': myLocatorId,
+	  'requestDeviceId': requestDeviceId,
       'status': 'ok',
       'lat': pos.latitude,
       'lng': pos.longitude,
@@ -229,6 +232,7 @@ if (cachedLat != null &&
 .doc(requestId)
       .set({
       'locatorId': myLocatorId,
+	  'requestDeviceId': requestDeviceId,
       'status': 'error',
       'error': e.toString(),
       'ts': FieldValue.serverTimestamp(),
@@ -263,6 +267,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final myLocatorId = await IdentityManager.getOrCreateDeviceId();
   final requestDeviceId =
     (data['requestDeviceId'] ?? '').toString().trim();
+	print("requestDeviceId:$requestDeviceId");
   if (type != 'rl' ||
       requestId == null ||
       requestId.isEmpty ||
@@ -341,6 +346,7 @@ if (groupId == null || groupId.isEmpty) {
     if (!gpsOn) {
       await responseRef.set({
         'locatorId': myLocatorId,
+		'requestDeviceId': requestDeviceId,
         'status': 'gps_off',
         'ts': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -351,6 +357,7 @@ if (groupId == null || groupId.isEmpty) {
     if (!perm.isGranted) {
       await responseRef.set({
         'locatorId': myLocatorId,
+		'requestDeviceId': requestDeviceId,
         'status': 'permission_missing',
         'ts': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -381,6 +388,7 @@ if (groupId == null || groupId.isEmpty) {
   } catch (e) {
     await responseRef.set({
       'locatorId': myLocatorId,
+	  'requestDeviceId': requestDeviceId,
       'status': 'error',
       'error': e.toString(),
       'ts': FieldValue.serverTimestamp(),
@@ -396,10 +404,12 @@ Future<bool> _isStillPaired({
       .doc(locatorId)
       .get();
 
-  final pairedRequesterId =
-      locatorDoc.data()?['pairedRequesterId']?.toString() ?? '';
+  final pairedRequesters =
+      locatorDoc.data()?['pairedRequesters'] as Map<String, dynamic>?;
 
-  return pairedRequesterId == requesterId;
+  if (pairedRequesters == null) return false;
+
+  return pairedRequesters.containsKey(requesterId);
 }
 
 

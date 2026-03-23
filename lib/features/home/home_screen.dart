@@ -319,12 +319,64 @@ Future<void> _approvePendingPair() async {
 
     if (pendingRequesterId.isEmpty) return;
     if (groupId.isEmpty) return;
+	
+	final pairedRequestersRaw =
+    (data['pairedRequesters'] as Map<String, dynamic>?) ?? {};
+final pairedRequesters =
+    Map<String, dynamic>.from(pairedRequestersRaw);
+
+final alreadyPaired = pairedRequesters.containsKey(pendingRequesterId);
+
+const locatorRequesterLimit = 2; // şimdilik sabit
+
+if (!alreadyPaired && pairedRequesters.length >= locatorRequesterLimit) {
+  print('APPROVE BLOCKED => locator requester limit reached');
+  return;
+}
+
+final groupSnap = await FirebaseFirestore.instance
+    .collection('groups')
+    .doc(groupId)
+    .get();
+
+final groupData = groupSnap.data() ?? {};
+final maxDevicesCount =
+    (groupData['maxDevicesCount'] as num?)?.toInt() ?? 2;
+
+final devicesSnap = await FirebaseFirestore.instance
+    .collection('groups')
+    .doc(groupId)
+    .collection('devices')
+    .where('active', isEqualTo: true)
+    .get();
+
+final activeDevicesCount = devicesSnap.docs.length;
+
+final locatorAlreadyInGroup = devicesSnap.docs.any((d) => d.id == locatorId);
+
+if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
+  print('APPROVE BLOCKED => group max device limit reached');
+  return;
+}
+
+    if (!alreadyPaired) {
+      pairedRequesters[pendingRequesterId] = {
+        'requesterId': pendingRequesterId,
+        'name': pendingRequesterName,
+        'joinedAt': FieldValue.serverTimestamp(),
+        'active': true,
+      };
+    }
+
+    final pairedRequestersCount = pairedRequesters.length;
 
     await IdentityManager.setLocalGroupId(groupId);
 
     await docRef.set({
-      'pairedRequesterId': pendingRequesterId,
-      'pairedRequesterName': pendingRequesterName,
+      'pairedRequesterId': pendingRequesterId, // eski alan şimdilik dursun
+      'pairedRequesterName': pendingRequesterName, // eski alan şimdilik dursun
+      'pairedRequesters': pairedRequesters,
+      'pairedRequestersCount': pairedRequestersCount,
       'groupId': groupId,
       'pendingPairRequesterId': FieldValue.delete(),
       'pendingPairRequesterName': FieldValue.delete(),
@@ -341,7 +393,7 @@ Future<void> _approvePendingPair() async {
       'deviceId': locatorId,
       'groupId': groupId,
       'role': 'locator',
-      'name': data['name'],
+      'name': (data['name'] ?? 'Locator').toString(),
       'joinedAt': FieldValue.serverTimestamp(),
       'active': true,
       'isMaster': false,
@@ -350,7 +402,6 @@ Future<void> _approvePendingPair() async {
     print('APPROVE PENDING PAIR ERROR => $e');
   }
 }
-
 
   Future<void> _rejectPendingPair() async {
     if (locatorId == null || locatorId!.isEmpty) return;

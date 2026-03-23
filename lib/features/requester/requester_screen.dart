@@ -1061,11 +1061,11 @@ return Row(
 					return const SizedBox();
 				  }
 
-				  final pairedRequesterId =
-					  locatorData['pairedRequesterId']?.toString();
+				  final pairedRequesters =
+					locatorData['pairedRequesters'] as Map<String, dynamic>?;
 
 				  final isStillPaired =
-					  pairedRequesterId != null && pairedRequesterId == requesterId;
+					pairedRequesters != null && pairedRequesters.containsKey(requesterId);
 
 				  if (!isStillPaired) {
 					WidgetsBinding.instance.addPostFrameCallback((_) {
