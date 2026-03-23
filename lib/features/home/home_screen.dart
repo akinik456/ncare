@@ -299,64 +299,58 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
 
-  Future<void> _approvePendingPair() async {
-    if (locatorId == null || locatorId!.isEmpty) return;
+Future<void> _approvePendingPair() async {
+  if (locatorId == null || locatorId!.isEmpty) return;
 
-    try {
-      final docRef = FirebaseFirestore.instance.collection('locators').doc(locatorId);
-      final snap = await docRef.get();
-      final data = snap.data();
-      if (data == null) return;
+  try {
+    final docRef =
+        FirebaseFirestore.instance.collection('locators').doc(locatorId);
 
-      final pendingRequesterId =
-          (data['pendingPairRequesterId'] ?? '').toString().trim();
-      final pendingRequesterName =
-          (data['pendingPairRequesterName'] ?? '').toString().trim();
+    final snap = await docRef.get();
+    final data = snap.data();
+    if (data == null) return;
 
-      if (pendingRequesterId.isEmpty) return;
-	  
-	  final groupId = data['pendingPairGroupId'];
-	  
+    final pendingRequesterId =
+        (data['pendingPairRequesterId'] ?? '').toString().trim();
+    final pendingRequesterName =
+        (data['pendingPairRequesterName'] ?? '').toString().trim();
+    final groupId =
+        (data['pendingPairGroupId'] ?? '').toString().trim();
 
-      await docRef.set({
-        'pairedRequesterId': pendingRequesterId,
-        'pairedRequesterName': pendingRequesterName,
-        'pendingPairRequesterId': FieldValue.delete(),
-        'pendingPairRequesterName': FieldValue.delete(),
-        'pendingPairCreatedAt': FieldValue.delete(),
-      }, SetOptions(merge: true));
-	  
-	  await FirebaseFirestore.instance
-  .collection('groups')
-  .doc(groupId)
-  .collection('devices')
-  .doc(locatorId)
-  .set({
-    'deviceId': locatorId,
-    'groupId': groupId,
-    'role': 'locator',
-    'joinedAt': FieldValue.serverTimestamp(),
-    'active': true,
-});
+    if (pendingRequesterId.isEmpty) return;
+    if (groupId.isEmpty) return;
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pairing approved'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      print('APPROVE PENDING PAIR ERROR => $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to approve pairing'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
+    await IdentityManager.setLocalGroupId(groupId);
+
+    await docRef.set({
+      'pairedRequesterId': pendingRequesterId,
+      'pairedRequesterName': pendingRequesterName,
+      'groupId': groupId,
+      'pendingPairRequesterId': FieldValue.delete(),
+      'pendingPairRequesterName': FieldValue.delete(),
+      'pendingPairCreatedAt': FieldValue.delete(),
+      'pendingPairGroupId': FieldValue.delete(),
+    }, SetOptions(merge: true));
+
+    await FirebaseFirestore.instance
+        .collection('groups')
+        .doc(groupId)
+        .collection('devices')
+        .doc(locatorId)
+        .set({
+      'deviceId': locatorId,
+      'groupId': groupId,
+      'role': 'locator',
+      'name': data['name'],
+      'joinedAt': FieldValue.serverTimestamp(),
+      'active': true,
+      'isMaster': false,
+    }, SetOptions(merge: true));
+  } catch (e) {
+    print('APPROVE PENDING PAIR ERROR => $e');
   }
+}
+
 
   Future<void> _rejectPendingPair() async {
     if (locatorId == null || locatorId!.isEmpty) return;

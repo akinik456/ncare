@@ -5,36 +5,20 @@ admin.initializeApp();
 
 export const onRequestCreated = onDocumentCreated(
   {
-    document: "requesters/{requesterId}/requests/{requestId}",
+    document: "groups/{groupId}/locators/{locatorId}/requests/{requestId}",
     region: "us-central1",
   },
   async (event) => {
-    const requesterId = event.params.requesterId;
+    const groupId = event.params.groupId;
+    const locatorId = event.params.locatorId;
     const requestId = event.params.requestId;
     const data = event.data?.data();
 
-    const locatorId = data?.locatorId?.toString();
-    if (!locatorId) {
-      console.log("NO LOCATOR ID", requesterId, requestId);
-      return;
-    }
+    const requesterId = data?.requesterId?.toString() ?? "";
+    const requestDeviceId = data?.requestDeviceId?.toString() ?? "";
 
-    const locatorDoc = await admin.firestore()
-      .collection("locators")
-      .doc(locatorId)
-      .get();
-
-    const pairedRequesterId =
-      locatorDoc.data()?.pairedRequesterId?.toString() ?? "";
-
-    if (pairedRequesterId != requesterId) {
-      console.log(
-        "REQUEST BLOCKED: NOT PAIRED",
-        requesterId,
-        requestId,
-        locatorId,
-        pairedRequesterId,
-      );
+    if (!locatorId || !requestId || !requesterId) {
+      console.log("INVALID REQUEST DATA", groupId, locatorId, requestId, requesterId);
       return;
     }
 
@@ -47,19 +31,10 @@ export const onRequestCreated = onDocumentCreated(
 
     const requesterName =
       requesterDoc.data()?.name?.toString() || "Requester";
-	  
-	const requestDoc = await admin.firestore()
-	  .collection('requesters')
-	  .doc(requesterId)
-	  .collection('requests')
-	  .doc(requestId)
-	  .get();
 
-    const requestData = requestDoc.data() || {};  
-    const requestDeviceId = requestData.requestDeviceId || "";
-	
     console.log(
       "REQUEST TRIGGERED",
+      groupId,
       requesterId,
       requestId,
       locatorId,
@@ -70,11 +45,12 @@ export const onRequestCreated = onDocumentCreated(
       topic: locatorTopic,
       data: {
         type: "rl",
+        groupId,
         requestId,
         requesterId,
+        requestDeviceId,
         locatorId,
         requesterName,
-		requestDeviceId,
       },
       android: { priority: "high" },
     });
@@ -111,25 +87,21 @@ export const onAlertCreated = onDocumentCreated(
     } else if (type === "geofence_exit") {
       title = "Geofence alert";
       body = `${locatorName} left the selected area`;
-    }else if (type.startsWith("place_arrive")) {
-	  title = "Arrived";
+    } else if (type?.startsWith("place_arrive")) {
+      title = "Arrived";
+      const placeName = data?.placeName?.toString() || "Place";
+      body = `Arrived at ${placeName}`;
+    } else if (type?.startsWith("place_left")) {
+      title = "Left";
+      const placeName = data?.placeName?.toString() || "Place";
+      const distance = data?.distance;
 
-	  const placeName = data?.placeName || "Place";
-	  body = `Arrived at ${placeName}`;
-
-	} else if (type.startsWith("place_left")) {
-	  title = "Left";
-
-	  const placeName = data?.placeName || "Place";
-	  const distance = data?.distance;
-
-	  if (distance != null) {
-		body = `Left ${placeName} (${Math.round(distance)}m)`;
-	  } else {
-		body = `Left ${placeName}`;
-	  }
-	} 
-	else {
+      if (distance != null) {
+        body = `Left ${placeName} (${Math.round(Number(distance))}m)`;
+      } else {
+        body = `Left ${placeName}`;
+      }
+    } else {
       console.log("ALERT IGNORED", requesterId, alertId, type);
       return;
     }
@@ -143,7 +115,7 @@ export const onAlertCreated = onDocumentCreated(
         locatorId,
         locatorName,
         level,
-		placeName: data?.placeName?.toString() ?? "",
+        placeName: data?.placeName?.toString() ?? "",
         distance: data?.distance?.toString() ?? "",
         radiusMeters: data?.radiusMeters?.toString() ?? "",
       },

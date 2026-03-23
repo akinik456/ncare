@@ -46,7 +46,7 @@ class _RequesterScreenState extends State<RequesterScreen> with SingleTickerProv
   double? _myLat;
   double? _myLng;
   Timer? _reqLocationTimer;
-  
+  String? _requesterDeviceId;
 
   @override
   void initState() {
@@ -101,10 +101,13 @@ print('myLat $_myLat , myLng $_myLng');
 }
   Future<void> _initRequesterId() async {
     final id = await IdentityManager.getOrCreateDeviceId();
+	final deviceId=await
+	IdentityManager.getOrCreateDeviceId();
     if (!mounted) return;
 
     setState(() {
       requesterId = id;
+	  _requesterDeviceId=deviceId;
     });
     _listenCallAlerts();
 	_loadGroupId();
@@ -114,7 +117,7 @@ print('myLat $_myLat , myLng $_myLng');
   final gid = prefs.getString('groupId');
 
   setState(() {
-    
+  _groupId=gid;  
   });
 }
 
@@ -206,35 +209,44 @@ String formatDistance(double? distance, double acc) {
    super.dispose();
   }   
 
-  Future<void> _sendRequest() async {
-    if (requesterId == null || requesterId!.isEmpty) return;
-    if (_selectedLocatorId == null || _selectedLocatorId!.isEmpty) return;
+Future<void> _sendRequest() async {
+  if (_groupId == null || _groupId!.isEmpty) return;
+  if (_selectedLocatorId == null || _selectedLocatorId!.isEmpty) return;
+  if (requesterId == null || requesterId!.isEmpty) return;
 
-    final doc = await FirebaseFirestore.instance
-        .collection('requesters')
-        .doc(requesterId)
-        .collection('requests')
-        .add({
-      'type': 'rl',
-      'locatorId': _selectedLocatorId,
-      'ts': FieldValue.serverTimestamp(),
-    });
+  final requestDeviceId = await IdentityManager.getOrCreateDeviceId();
 
-    setState(() {
-      _pendingRequestId = doc.id;
-      _timeout = false;
-    });
+  final doc = await FirebaseFirestore.instance
+      .collection('groups')
+      .doc(_groupId)
+      .collection('locators')
+      .doc(_selectedLocatorId)
+      .collection('requests')
+      .add({
+    'type': 'rl',
+    'requesterId': requesterId,
+    'requestDeviceId': requestDeviceId,
+    'locatorId': _selectedLocatorId,
+    'ts': FieldValue.serverTimestamp(),
+  });
 
-    Future.delayed(const Duration(seconds: 60), () {
-      if (!mounted) return;
+  setState(() {
+    _pendingRequestId = doc.id;
+    _timeout = false;
+  });
 
-      if (_pendingRequestId == doc.id) {
-        setState(() {
-          _timeout = true;
-        });
-      }
-    });
-  }
+  Future.delayed(const Duration(seconds: 60), () {
+    if (!mounted) return;
+
+    if (_pendingRequestId == doc.id) {
+      setState(() {
+        _timeout = true;
+      });
+    }
+  });
+}
+
+
   
 String lastSeenText(Timestamp ts) {
   final time = ts.toDate();
@@ -1068,253 +1080,251 @@ return Row(
 					});
 					return const SizedBox();
 				  }
+					return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+  stream: FirebaseFirestore.instance
+      .collection('groups')
+      .doc(_groupId)
+      .collection('locators')
+      .doc(_selectedLocatorId)
+      .collection('responses')
+      .doc(pendingRequestId ?? visibleRequestId)
+      .snapshots(),
+  builder: (context, snapshot) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return const SizedBox();
+    }
 
-                  return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                    stream: FirebaseFirestore.instance
-                        .collection('requesters')
-                        .doc(requesterId)
-                        .collection('locators')
-                        .doc(_selectedLocatorId)
-                        .collection('responses')
-                        .doc(pendingRequestId ?? visibleRequestId)
-                        .snapshots(),
-                    builder: (context, snapshot) {
-					
-					if (snapshot.connectionState == ConnectionState.waiting) {
-							return const SizedBox();
-						  }
+    if (snapshot.hasError) {
+      return const SizedBox();
+    }
 
-						  if (snapshot.hasError) {
-							return const SizedBox();
-						  }
+    if (!snapshot.hasData || snapshot.data == null) {
+      return const SizedBox();
+    }
 
-						  if (!snapshot.hasData || snapshot.data == null) {
-							return const SizedBox();
-						  }
-							final responseDoc = snapshot.data!;
-						  if (!responseDoc.exists) {
-							return const SizedBox();
-						  }
+    final responseDoc = snapshot.data!;
+    if (!responseDoc.exists) {
+      return const SizedBox();
+    }
 
-						  final data = responseDoc.data();
-						  if (data == null) {
-							return const SizedBox();
-						  }				
-							final status = (data['status'] ?? '').toString();
-						  final lat = (data['lat'] as num?)?.toDouble();
-						  final lng = (data['lng'] as num?)?.toDouble();
-						  final hasFix = (status == 'ok' && lat != null && lng != null);				
-                     
-                        if (hasFix && pendingRequestId != null) {
-                          final currentPending = pendingRequestId!;
-                          WidgetsBinding.instance.addPostFrameCallback((_) async {
-                            if (!mounted) return;                           
+    final data = responseDoc.data();
+    if (data == null) {
+      return const SizedBox();
+    }
 
-                            setState(() {
-                              _lastRequestId = currentPending;
-                              _pendingRequestId = null;
-                              _timeout = false;
-                              _lastAddress = null;
-                              _lastAddressKey = null;
-                            });
-                          });
-                        }
-                      
+    final responseDeviceId =
+        (data['requestDeviceId'] ?? '').toString().trim();
 
-                      if (visibleRequestId == null && pendingRequestId != null) {
-                        if (data == null) {
-                          return const SizedBox();
-                        }
-                      }
+    if (_requesterDeviceId != null &&
+        responseDeviceId.isNotEmpty &&
+        responseDeviceId != _requesterDeviceId) {
+      return const SizedBox();
+    }
 
-                      if (visibleRequestId == null && pendingRequestId == null) {
-                        return const SizedBox();
-                      }
+    final status = (data['status'] ?? '').toString();
+    final lat = (data['lat'] as num?)?.toDouble();
+    final lng = (data['lng'] as num?)?.toDouble();
+    final hasFix = (status == 'ok' && lat != null && lng != null);
 
-                      final displayDocId = _lastRequestId ?? visibleRequestId;
-                      if (displayDocId == null) {
-                        return const SizedBox();
-                      }
+    if (hasFix && pendingRequestId != null) {
+      final currentPending = pendingRequestId!;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
 
-                      return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                        stream: FirebaseFirestore.instance
-                            .collection('requesters')
-                            .doc(requesterId)
-                            .collection('locators')
-                            .doc(_selectedLocatorId)
-                            .collection('responses')
-                            .doc(displayDocId)
-                            .snapshots(),
-                        builder: (context, visibleSnapshot) {
-                          final visibleData = visibleSnapshot.data?.data();
+        setState(() {
+          _lastRequestId = currentPending;
+          _pendingRequestId = null;
+          _timeout = false;
+          _lastAddress = null;
+          _lastAddressKey = null;
+        });
+      });
+    }
 
-                          if (visibleData == null) {
-                            return const SizedBox();
-                          }
+    if (visibleRequestId == null && pendingRequestId != null) {
+      return const SizedBox();
+    }
 
-                          final status = (visibleData['status'] ?? '').toString();
-                          final lat = (visibleData['lat'] as num?)?.toDouble();
-                          final lng = (visibleData['lng'] as num?)?.toDouble();
-                          final acc = (visibleData['acc'] as num?)?.toDouble();
-                          final ts = visibleData['ts'] as Timestamp?;
-                          final battery =
-                              (visibleData['battery'] as num?)?.toInt();
+    if (visibleRequestId == null && pendingRequestId == null) {
+      return const SizedBox();
+    }
 
-                          final hasFix =
-                              (status == 'ok' && lat != null && lng != null);
-                          final online =
-                              ts != null &&
-                              DateTime.now().difference(ts.toDate()).inSeconds <= 60;
+    final displayDocId = _lastRequestId ?? visibleRequestId;
+    if (displayDocId == null) {
+      return const SizedBox();
+    }
 
-                          if (!hasFix) {
-                            return _StatusCard(
-                              icon: Icons.sync_problem_rounded,
-                              iconBg: const Color(0xFFFEF2F2),
-                              iconColor: const Color(0xFFDC2626),
-                              title: 'Response received',
-                              subtitle:
-                                  'Status: $status\nWaiting for valid location...',
-                            );
-                          }
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('groups')
+          .doc(_groupId)
+          .collection('locators')
+          .doc(_selectedLocatorId)
+          .collection('responses')
+          .doc(displayDocId)
+          .snapshots(),
+      builder: (context, visibleSnapshot) {
+        final visibleData = visibleSnapshot.data?.data();
 
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            _resolveAddress(lat!, lng!);
-                          });
+        if (visibleData == null) {
+          return const SizedBox();
+        }
 
-                          return Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(color: const Color(0xFFE2E8F0)),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Color(0x120F172A),
-                                  blurRadius: 18,
-                                  offset: Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 36,
-                                      height: 36,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFDCFCE7),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: const Icon(
-                                        Icons.location_on_rounded,
-                                        color: Color(0xFF16A34A),
-                                        size: 20,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      'Location result',
-                                      style: theme.textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.w800,
-                                        color: const Color(0xFF0F172A),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                if (_lastAddress != null) ...[
-                                  const SizedBox(height: 12),
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(14),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFF8FAFC),
-                                      borderRadius: BorderRadius.circular(18),
-                                      border: Border.all(
-                                        color: const Color(0xFFE2E8F0),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Padding(
-                                          padding: EdgeInsets.only(top: 2),
-                                          child: Icon(
-                                            Icons.place_rounded,
-                                            color: Color(0xFF1D4ED8),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Text(
-                                            _lastAddress!,
-                                            style: theme.textTheme.bodyMedium
-                                                ?.copyWith(
-                                              color: const Color(0xFF0F172A),
-                                              height: 1.4,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                                const SizedBox(height: 12),
-                                Wrap(
-                                  spacing: 10,
-                                  runSpacing: 8,
-                                  children: [
-                                    _MiniInfo(
-                                      icon: Icons.gps_fixed_rounded,
-                                      text: acc != null
-                                          ? 'Accuracy ${acc.toStringAsFixed(0)} m'
-                                          : 'Accuracy -',
-                                    ),
-                                    if (battery != null)
-                                      _MiniInfo(
-                                        icon: Icons.battery_full,
-                                        text: 'Battery $battery%',
-                                      ),
-                                    _MiniInfo(
-                                      icon: Icons.circle,
-                                      text: online ? 'Online' : lastSeenText(ts!),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 14),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: OutlinedButton.icon(
-                                    onPressed: () => _openInMaps(lat, lng),
-                                    icon: const Icon(Icons.map_rounded),
-                                    label: const Text('Open in Maps'),
-                                    style: OutlinedButton.styleFrom(
-                                      foregroundColor: const Color(0xFF1D4ED8),
-                                      side: const BorderSide(
-                                        color: Color(0xFFBFDBFE),
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 14,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(18),
-                                      ),
-                                      textStyle: const TextStyle(
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 15,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  );
+        final visibleResponseDeviceId =
+            (visibleData['requestDeviceId'] ?? '').toString().trim();
+
+        if (_requesterDeviceId != null &&
+            visibleResponseDeviceId.isNotEmpty &&
+            visibleResponseDeviceId != _requesterDeviceId) {
+          return const SizedBox();
+        }
+
+        final status = (visibleData['status'] ?? '').toString();
+        final lat = (visibleData['lat'] as num?)?.toDouble();
+        final lng = (visibleData['lng'] as num?)?.toDouble();
+        final acc = (visibleData['acc'] as num?)?.toDouble();
+        final ts = visibleData['ts'] as Timestamp?;
+        final battery = (visibleData['battery'] as num?)?.toInt();
+
+        final hasFix = (status == 'ok' && lat != null && lng != null);
+        final online =
+            ts != null &&
+            DateTime.now().difference(ts.toDate()).inSeconds <= 60;
+
+        if (!hasFix) {
+          return _StatusCard(
+            icon: Icons.sync_problem_rounded,
+            iconBg: const Color(0xFFFEF2F2),
+            iconColor: const Color(0xFFDC2626),
+            title: 'Response received',
+            subtitle: 'Status: $status\nWaiting for valid location...',
+          );
+        }
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _resolveAddress(lat!, lng!);
+        });
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x120F172A),
+                blurRadius: 18,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.location_on_rounded,
+                      color: Color(0xFF16A34A),
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Location result',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              if (_lastAddress != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(top: 2),
+                        child: Icon(
+                          Icons.place_rounded,
+                          color: Color(0xFF1D4ED8),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _lastAddress!,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: const Color(0xFF0F172A),
+                            height: 1.4,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: [
+                  _MiniInfo(
+                    icon: Icons.gps_fixed_rounded,
+                    text: acc != null
+                        ? 'Accuracy ${acc.toStringAsFixed(0)} m'
+                        : 'Accuracy -',
+                  ),
+                  if (battery != null)
+                    _MiniInfo(
+                      icon: Icons.battery_full,
+                      text: 'Battery $battery%',
+                    ),
+                  _MiniInfo(
+                    icon: Icons.circle,
+                    text: online ? 'Online' : lastSeenText(ts!),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _openInMaps(lat, lng),
+                  icon: const Icon(Icons.map_rounded),
+                  label: const Text('Open in Maps'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  },
+);
+
+
+				  
                 },
               ),
           ],

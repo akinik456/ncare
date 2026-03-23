@@ -104,11 +104,16 @@ if (role == 'locator') {
 
   final data = message.data;
   if (data['type'] != 'rl') return;
+  
+  print("rl received");
 
   final requestId = data['requestId']?.toString();
   final requesterId = data['requesterId']?.toString();
   final targetLocatorId = data['locatorId']?.toString();
-
+  final requestDeviceId =
+    (data['requestDeviceId'] ?? '').toString().trim();
+  
+  
   final battery = Battery();
   final level = await battery.batteryLevel;
 
@@ -125,7 +130,13 @@ if (role == 'locator') {
     print("FG SKIP => target=$targetLocatorId mine=$myLocatorId");
     return;
   }
- 
+  
+  final groupId = await IdentityManager.getLocalGroupId();
+if (groupId == null || groupId.isEmpty) {
+  print("FG RL BLOCKED => no groupId");
+  return;
+}
+print("groupId:$groupId");
   final stillPaired = await _isStillPaired(
   locatorId: myLocatorId!,
   requesterId: requesterId,
@@ -146,6 +157,8 @@ final locatorDoc = await FirebaseFirestore.instance
     .collection('locators')
     .doc(myLocatorId)
     .get();
+	
+print("myLocatorId:$myLocatorId");
 
 final cachedLat = (locatorDoc.data()?['lat'] as num?)?.toDouble();
 final cachedLng = (locatorDoc.data()?['lng'] as num?)?.toDouble();
@@ -161,12 +174,12 @@ if (cachedLat != null &&
     cachedAcc != null &&
     age < 30) {
   await FirebaseFirestore.instance
-      .collection('requesters')
-      .doc(requesterId)
-	  .collection('locators')
-      .doc(myLocatorId)
-      .collection('responses')
-      .doc(requestId)
+      .collection('groups')
+.doc(groupId)
+.collection('locators')
+.doc(myLocatorId)
+.collection('responses')
+.doc(requestId)
       .set({
     'locatorId': myLocatorId,
     'status': 'ok',
@@ -187,12 +200,12 @@ if (cachedLat != null &&
 	
     
 	await FirebaseFirestore.instance
-      .collection('requesters')
-      .doc(requesterId)
-	  .collection('locators')
-      .doc(myLocatorId)
-      .collection('responses')
-      .doc(requestId)
+      .collection('groups')
+.doc(groupId)
+.collection('locators')
+.doc(myLocatorId)
+.collection('responses')
+.doc(requestId)
       .set({
       'locatorId': myLocatorId,
       'status': 'ok',
@@ -208,12 +221,12 @@ if (cachedLat != null &&
     print("FG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
   } catch (e) {
     await FirebaseFirestore.instance
-      .collection('requesters')
-      .doc(requesterId)
-	  .collection('locators')
-      .doc(myLocatorId)
-      .collection('responses')
-      .doc(requestId)
+      .collection('groups')
+.doc(groupId)
+.collection('locators')
+.doc(myLocatorId)
+.collection('responses')
+.doc(requestId)
       .set({
       'locatorId': myLocatorId,
       'status': 'error',
@@ -248,7 +261,8 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final requesterId = data['requesterId']?.toString();
   final targetLocatorId = data['locatorId']?.toString();
   final myLocatorId = await IdentityManager.getOrCreateDeviceId();
-
+  final requestDeviceId =
+    (data['requestDeviceId'] ?? '').toString().trim();
   if (type != 'rl' ||
       requestId == null ||
       requestId.isEmpty ||
@@ -273,15 +287,21 @@ if (!stillPaired) {
   return;
 }
 
+final groupId = await IdentityManager.getLocalGroupId();
+if (groupId == null || groupId.isEmpty) {
+  print("FG RL BLOCKED => no groupId");
+  return;
+}
+
   await NotificationService.showFromRemoteMessage(message);
 
   final responseRef = FirebaseFirestore.instance
-      .collection('requesters')
-      .doc(requesterId)
-      .collection('locators')
-      .doc(myLocatorId)
-      .collection('responses')
-      .doc(requestId);
+      .collection('groups')
+.doc(groupId)
+.collection('locators')
+.doc(myLocatorId)
+.collection('responses')
+.doc(requestId);
 
   try {
     final locatorDoc = await FirebaseFirestore.instance
@@ -306,6 +326,7 @@ if (!stillPaired) {
         age < 30) {
       await responseRef.set({
         'locatorId': myLocatorId,
+		'requestDeviceId': requestDeviceId,
         'status': 'ok',
         'lat': cachedLat,
         'lng': cachedLng,
@@ -346,6 +367,7 @@ if (!stillPaired) {
     
     await responseRef.set({
       'locatorId': myLocatorId,
+	  'requestDeviceId': requestDeviceId,
       'status': 'ok',
       'lat': pos.latitude,
       'lng': pos.longitude,
