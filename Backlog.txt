@@ -48,3 +48,7 @@ gösterilmeli ya da silinmeli
 11 locator rl notification toggle
 
 12 role yenilenebilsin?
+
+13 max. device count
+
+14 call me bireysel / All 

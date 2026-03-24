@@ -1,10 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'device_state_manager.dart';
 
-
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'device_state_manager.dart';
-
 class AlertEngine {
   static String _docId(String type, String locatorId) {
     return '${type}_$locatorId';

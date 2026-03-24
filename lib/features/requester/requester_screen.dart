@@ -109,7 +109,7 @@ print('myLat $_myLat , myLng $_myLng');
       requesterId = id;
 	  _requesterDeviceId=deviceId;
     });
-    _listenCallAlerts();
+    
 	_loadGroupId();
   }
   Future<void> _loadGroupId() async {
@@ -119,6 +119,7 @@ print('myLat $_myLat , myLng $_myLng');
   setState(() {
   _groupId=gid;  
   });
+  _listenCallAlerts();
 }
 
 String shortCode(String id) {
@@ -267,29 +268,19 @@ String lastSeenText(Timestamp ts) {
 }    
 
 void _listenCallAlerts() {
-  if (requesterId == null || requesterId!.isEmpty) return;
-
+  if (_groupId == null || _groupId!.isEmpty) return;
+  print("callme Listener Started");
   FirebaseFirestore.instance
-      .collection('requesters')
-      .doc(requesterId)
-      .collection('alerts')
-      //.where('type', isEqualTo: 'call_me')
+      .collectionGroup('alerts')
+      .where('type', isEqualTo: 'call_me')
+      .where('groupId', isEqualTo: _groupId)
       .orderBy('ts', descending: true)
-      .limit(1)
       .snapshots()
       .listen((snapshot) async {
-    //if (snapshot.docs.isEmpty) return;
+	 print(snapshot.docs.first.data());
+    if (snapshot.docs.isEmpty) return;
 
-    //final doc = snapshot.docs.first;
-	
-	final docs = snapshot.docs
-      .where((d) => (d.data()['type'] ?? '').toString() == 'call_me')
-      .toList();
-
-  if (docs.isEmpty) return;
-
-  final doc = docs.first;
-	
+    final doc = snapshot.docs.first;
     if (_lastAlertId == doc.id) return;
 
     final data = doc.data();
@@ -299,8 +290,6 @@ void _listenCallAlerts() {
 
     if (locatorId.isNotEmpty) {
       final locatorDoc = await FirebaseFirestore.instance
-          .collection('requesters')
-          .doc(requesterId)
           .collection('locators')
           .doc(locatorId)
           .get();
@@ -313,17 +302,15 @@ void _listenCallAlerts() {
 
     setState(() {
       _lastAlertId = doc.id;
-	  _activeCallAlertId=doc.id;
+      _activeCallAlertId = doc.id;
       _callRequestFrom = displayName;
-	  _callRequestLocatorId = locatorId;
-	  
+      _callRequestLocatorId = locatorId;
     });
-  },onError:(e){
-  print("$e");
-  }
-  
-  );
+  }, onError: (e) {
+    print("CALL_ME LISTENER ERROR => $e");
+  });
 }
+
 
 
 
@@ -601,9 +588,11 @@ onPressed: () async {
   }
 
   final snap = await FirebaseFirestore.instance
-      .collection('requesters')
-      .doc(requesterId)
-      .collection('alerts')
+    .collection('groups')
+    .doc(_groupId)
+    .collection('locators')
+    .doc(locatorId)
+    .collection('alerts')
       .where('type', isEqualTo: 'call_me')
       .get();
   

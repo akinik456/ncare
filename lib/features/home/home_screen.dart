@@ -130,51 +130,57 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _sendCallMeAlert() async {
-    final settings = await LocatorSettingsReader.load();
-    if (settings == null) return;
-    if (!settings.callEnabled) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Call request is disabled for this locator'),
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
+Future<void> _sendCallMeAlert() async {
+print("callme called");
+  final settings = await LocatorSettingsReader.load();
+  if (settings == null) return;
 
-    final locatorId = await IdentityManager.getOrCreateDeviceId();
-
-    final locatorDoc = await FirebaseFirestore.instance
-        .collection('locators')
-        .doc(locatorId)
-        .get();
-
-    final requesterId = settings.pairedRequesterId;
-    locatorDoc.data()?['pairedRequesterId'];
-
-    if (requesterId == null || requesterId.isEmpty) return;
-
-    await FirebaseFirestore.instance
-        .collection('requesters')
-        .doc(requesterId)
-        .collection('alerts')
-        .add({
-      'type': 'call_me',
-      'locatorId': locatorId,
-      'locatorName': locatorName,
-      'ts': FieldValue.serverTimestamp(),
-    });
-
+  if (!settings.callEnabled) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Call request sent'),
+        content: Text('Call request is disabled for this locator'),
         duration: Duration(seconds: 2),
       ),
     );
+    return;
   }
+  
+  print("settings.callEnabled:$settings.callEnabled");
+
+  final locatorId = await IdentityManager.getOrCreateDeviceId();
+   print("locatorId:$locatorId");
+  final locatorDoc = await FirebaseFirestore.instance
+      .collection('locators')
+      .doc(locatorId)
+      .get();
+  final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
+  final groupId = (locatorDoc.data()?['groupId'] ?? '').toString().trim();
+  if (groupId.isEmpty) return;
+print("groupId:$groupId");
+  await FirebaseFirestore.instance
+    .collection('groups')
+    .doc(groupId)
+    .collection('locators')
+    .doc(locatorId)
+    .collection('alerts')
+    .add({
+  'type': 'call_me',
+  'groupId': groupId,
+  'locatorId': locatorId,
+  'locatorName': locatorName,
+  'ts': FieldValue.serverTimestamp(),
+});
+
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Call request sent'),
+      duration: Duration(seconds: 2),
+    ),
+  );
+}
+
 
   Future<void> _startBatteryMonitor() async {
     _batteryTimer?.cancel();
@@ -929,6 +935,7 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
                               const SizedBox(height: 12),
                               FilledButton.icon(
                                 onPressed: paired ? _sendCallMeAlert : null,
+								
                                 icon: const Icon(Icons.call),
                                 label: Text(
                                   paired
