@@ -21,6 +21,7 @@ Speed
 PLC
 Robot
 Protect
+call asistant
 
 
 **************************
@@ -117,6 +118,10 @@ Bildirim ve background davranışı için:
 
 flutter build apk --release
 daha doğru test verir.
+
+flutter clean
+flutter pub get
+flutter build apk --debug --target-platform android-arm
 
 ***********************************
 

@@ -22,7 +22,8 @@ class LocatorSettings {
 class LocatorSettingsReader {
   static Future<LocatorSettings?> load() async {
   final locatorId = await IdentityManager.getOrCreateDeviceId();
-
+  final groupId = await IdentityManager.getLocalGroupId();
+		//if (groupId == null || groupId.isEmpty) return;
   final locatorDoc = await FirebaseFirestore.instance
       .collection('locators')
       .doc(locatorId)
@@ -36,8 +37,8 @@ class LocatorSettingsReader {
   }
 
   final doc = await FirebaseFirestore.instance
-      .collection('requesters')
-      .doc(pairedRequesterId)
+      .collection('groups')
+      .doc(groupId)
       .collection('locators')
       .doc(locatorId)
       .get();

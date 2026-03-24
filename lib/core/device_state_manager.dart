@@ -91,7 +91,8 @@ class DeviceStateManager {
       final gpsSent = prefs.getBool('gpsOffAlertSent') ?? false;
 
       final locatorId = await IdentityManager.getOrCreateDeviceId();
-
+	  final groupId = await IdentityManager.getLocalGroupId();
+		if (groupId == null || groupId.isEmpty) return;
       final locatorDoc = await FirebaseFirestore.instance
           .collection('locators')
           .doc(locatorId)
@@ -105,8 +106,8 @@ class DeviceStateManager {
       if (requesterId.isEmpty) return;
 
       final settingsDoc = await FirebaseFirestore.instance
-          .collection('requesters')
-          .doc(requesterId)
+          .collection('groups')
+          .doc(groupId)
           .collection('locators')
           .doc(locatorId)
           .get();
@@ -116,7 +117,7 @@ class DeviceStateManager {
 
       if (!gpsEnabled && gpsOffAlarmEnabled && !gpsSent) {
           await AlertEngine.send(
-          requesterId: requesterId,
+          groupId: groupId,
           locatorId: locatorId,
           locatorName: locatorName,
           alertType: 'gps_off',
@@ -157,9 +158,11 @@ class DeviceStateManager {
     required String locatorId,
     required geo.Position pos,
   }) async {
+  final groupId = await IdentityManager.getLocalGroupId();
+		if (groupId == null || groupId.isEmpty) return;
     final gfDoc = await FirebaseFirestore.instance
-        .collection('requesters')
-        .doc(requesterId)
+        .collection('groups')
+        .doc(groupId)
         .collection('locators')
         .doc(locatorId)
         .get();
@@ -172,7 +175,7 @@ class DeviceStateManager {
     final cLng = (gf?['geofenceCenterLng'] as num?)?.toDouble();
 
     if (!enabled || radius == null || cLat == null || cLng == null) return;
-
+	
     final dist = geo.Geolocator.distanceBetween(
       pos.latitude,
       pos.longitude,
@@ -194,22 +197,13 @@ class DeviceStateManager {
           .get();
       final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
 
-      await AlertEngine.send(
-        requesterId: requesterId,
-        locatorId: locatorId,
-        locatorName: locatorName,
-        alertType: 'geofence_exit',
-        extra: {
-          'distance': dist,
-        },
-      );
 
       print('GF EXIT ALERT => $dist');
     }
 
     if (_gfInside == false && inside == true) {
       await AlertEngine.clear(
-        requesterId: requesterId,
+        groupId: groupId,
         locatorId: locatorId,
         alertType: 'geofence_exit',
       );
@@ -225,6 +219,8 @@ class DeviceStateManager {
     required String locatorId,
     required geo.Position pos,
   }) async {
+  final groupId = await IdentityManager.getLocalGroupId();
+		if (groupId == null || groupId.isEmpty) return;
     final locatorDoc = await FirebaseFirestore.instance
         .collection('locators')
         .doc(locatorId)
@@ -233,8 +229,8 @@ class DeviceStateManager {
     final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
 
     final placesSnap = await FirebaseFirestore.instance
-        .collection('requesters')
-        .doc(requesterId)
+        .collection('groups')
+        .doc(groupId)
         .collection('locators')
         .doc(locatorId)
         .collection('places')
@@ -260,6 +256,8 @@ class DeviceStateManager {
         lat,
         lng,
       );
+	  final groupId = await IdentityManager.getLocalGroupId();
+if (groupId == null || groupId.isEmpty) return;
 
       final newState = dist <= radiusMeters ? 'inside' : 'outside';
 
@@ -285,7 +283,7 @@ class DeviceStateManager {
 final currentAlertType = 'place_${transitionType}_${placeDoc.id}';
 
 await AlertEngine.send(
-  requesterId: requesterId,
+  groupId: groupId,
   locatorId: locatorId,
   locatorName: locatorName,
   alertType: currentAlertType,

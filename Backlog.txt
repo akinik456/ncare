@@ -51,4 +51,6 @@ gösterilmeli ya da silinmeli
 
 13 max. device count
 
-14 call me bireysel / All 
+14 call me bireysel / All
+
+15 s2 android 9 gps on/off görmüyor

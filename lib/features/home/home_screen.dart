@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../../core/alert_engine.dart';
 import '../../core/device_state_manager.dart';
 import '../../core/identity_manager.dart';
@@ -59,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _initLocatorId() async {
     final id = await IdentityManager.getOrCreateDeviceId();
+	await FirebaseMessaging.instance.subscribeToTopic("locator_$id");
     final generatedCode = _generatePairCode(id);
 
     if (!mounted) return;
@@ -200,7 +201,9 @@ print("groupId:$groupId");
             .doc(locatorId)
             .get();
 
-        final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
+        final groupId = await IdentityManager.getLocalGroupId();
+		if (groupId == null || groupId.isEmpty) return;
+		final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
 
         final requesterId =
             (locatorDoc.data()?['pairedRequesterId'] ?? '').toString().trim();
@@ -208,8 +211,8 @@ print("groupId:$groupId");
         if (requesterId.isEmpty) return;
 
         final settingsDoc = await FirebaseFirestore.instance
-            .collection('requesters')
-            .doc(requesterId)
+            .collection('groups')
+            .doc(groupId)
             .collection('locators')
             .doc(locatorId)
             .get();
@@ -223,12 +226,12 @@ print("groupId:$groupId");
         if (level <= threshold && batteryAlarmEnabled && !batterysent) {
           
           await AlertEngine.send(
-            requesterId: requesterId,
-            locatorId: locatorId,
-            locatorName: locatorName,
-            alertType: 'battery_low',
-			extra: {
-				'battery': level,
+             groupId: groupId,
+			  locatorId: locatorId,
+			  locatorName: locatorName,
+			  alertType: 'battery_low',
+			  extra: {
+				'level': level,
 			},
           );
 
@@ -402,8 +405,28 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
       'name': (data['name'] ?? 'Locator').toString(),
       'joinedAt': FieldValue.serverTimestamp(),
       'active': true,
-      'isMaster': false,
     }, SetOptions(merge: true));
+    await FirebaseFirestore.instance
+        .collection('groups')
+        .doc(groupId)
+        .collection('locators')
+        .doc(locatorId)
+        .set({
+      'locatorId': locatorId,
+      'name': (data['name'] ?? 'Locator').toString(),
+      'joinedAt': FieldValue.serverTimestamp(),
+      'active': true,
+	   // ---- DEFAULT SETTINGS ----
+  'callEnabled': true,
+  'gpsOffAlarmEnabled': true,
+  'batteryAlarmEnabled': true,
+  'batteryAlertThreshold': 20,
+  'placeAlarmEnabled': false,
+  'geofenceAlarmEnabled': false,
+  'geofenceRadius': 250,
+    }, SetOptions(merge: true));	
+	
+	
   } catch (e) {
     print('APPROVE PENDING PAIR ERROR => $e');
   }

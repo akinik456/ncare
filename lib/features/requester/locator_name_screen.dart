@@ -16,16 +16,19 @@ class _LocatorNameScreenState extends State<LocatorNameScreen> {
   final controller = TextEditingController();
 
 Future<void> _save() async {
+
   try {
     final requesterId = await IdentityManager.getOrCreateDeviceId();
     final locatorId = widget.locatorId.toString();
+    final groupId = await IdentityManager.getLocalGroupId();
+	//if (groupId == null || groupId.isEmpty) return; 
 
     print("REQUESTER ID => $requesterId");
     print("LOCATOR ID => $locatorId");
 
     await FirebaseFirestore.instance
-        .collection('requesters')
-        .doc(requesterId)
+        .collection('groups')
+        .doc(groupId)
         .collection('locators')
         .doc(locatorId)
         .set({
@@ -37,8 +40,8 @@ Future<void> _save() async {
     print("REQUESTER SIDE LOCATOR SAVED");
 
     final requesterDoc = await FirebaseFirestore.instance
-		.collection('requesters')
-		.doc(requesterId)
+		.collection('groups')
+		.doc(groupId)
 		.get();
 
 	final requesterName =

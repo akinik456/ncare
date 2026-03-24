@@ -103,6 +103,8 @@ print('myLat $_myLat , myLng $_myLng');
     final id = await IdentityManager.getOrCreateDeviceId();
 	final deviceId=await
 	IdentityManager.getOrCreateDeviceId();
+	 
+    await FirebaseMessaging.instance.subscribeToTopic(id);
     if (!mounted) return;
 
     setState(() {

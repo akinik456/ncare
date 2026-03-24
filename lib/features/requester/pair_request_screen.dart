@@ -32,7 +32,9 @@ class _PairRequestScreenState extends State<PairRequestScreen> {
       final requesterId = await IdentityManager.getOrCreateDeviceId();
 
       final requesterDoc = await FirebaseFirestore.instance
-          .collection('requesters')
+          .collection('groups')
+		  .doc(groupId)
+		  .collection('devices')
           .doc(requesterId)
           .get();
 

@@ -50,10 +50,12 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     });
 
     try {
+	final groupId = await IdentityManager.getLocalGroupId();
+		//if (groupId == null || groupId.isEmpty) return;
       final placesSnap = await FirebaseFirestore.instance
-          .collection('requesters')
+          .collection('groups')
           .doc(await IdentityManager.getOrCreateDeviceId())
-          .collection('locators')
+          .collection('groupId')
           .doc(widget.locatorId)
           .collection('places')
           .get();
@@ -130,9 +132,11 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
       _isFresh;
 
   Future<int> _getPlaceCount(String requesterId) async {
+  final groupId = await IdentityManager.getLocalGroupId();
+		//if (groupId == null || groupId.isEmpty) return;
     final snap = await FirebaseFirestore.instance
-        .collection('requesters')
-        .doc(requesterId)
+        .collection('groups')
+        .doc(groupId)
         .collection('locators')
         .doc(widget.locatorId)
         .collection('places')
@@ -146,6 +150,8 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
     setState(() => _saving = true);
     try {
       final requesterId = await IdentityManager.getOrCreateDeviceId();
+	  final groupId = await IdentityManager.getLocalGroupId();
+		if (groupId == null || groupId.isEmpty) return;
       final placeCount = await _getPlaceCount(requesterId);
       if (placeCount >= 3) {
         if (!mounted) return;
@@ -160,8 +166,8 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
           : _nameController.text.trim();
 
       await FirebaseFirestore.instance
-          .collection('requesters')
-          .doc(requesterId)
+          .collection('groups')
+          .doc(groupId)
           .collection('locators')
           .doc(widget.locatorId)
           .collection('places')

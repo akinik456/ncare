@@ -59,10 +59,13 @@ class _PairScreenState extends State<PairScreen> {
 		  
 		  final locatorId = await 		  
 		  IdentityManager.getOrCreateDeviceId();
+		  final groupId = await IdentityManager.getLocalGroupId();
+		if (groupId == null || groupId.isEmpty) return;
+		  
 		  		  
 		  await FirebaseFirestore.instance
-			.collection('requesters')
-			.doc(requesterId)
+			.collection('groups')
+			.doc(groupId)
 			.collection('locators')
 			.doc(locatorId)
 			.set({

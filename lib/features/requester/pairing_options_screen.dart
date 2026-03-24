@@ -56,10 +56,12 @@ class _PairingOptionsScreenState extends State<PairingOptionsScreen> {
     });
   }
 Future<void> _loadGeofenceCenter() async {
+final groupId = await IdentityManager.getLocalGroupId();
+		if (groupId == null || groupId.isEmpty) return;
   final requesterId = await IdentityManager.getOrCreateDeviceId();
   final doc = await FirebaseFirestore.instance
-      .collection('requesters')
-      .doc(requesterId)
+      .collection('groups')
+      .doc(groupId)
       .collection('locators')
       .doc(widget.locatorId)
       .get();
@@ -75,10 +77,11 @@ Future<void> _loadGeofenceCenter() async {
 
 Future<void> _loadExistingSettings() async {
   final requesterId = await IdentityManager.getOrCreateDeviceId();
-
+  final groupId = await IdentityManager.getLocalGroupId();
+	if (groupId == null || groupId.isEmpty) return;
   final doc = await FirebaseFirestore.instance
-      .collection('requesters')
-      .doc(requesterId)
+      .collection('groups')
+      .doc(groupId)
       .collection('locators')
       .doc(widget.locatorId)
       .get();
@@ -101,7 +104,7 @@ Future<void> _setCurrentLocationAsGeofenceCenter() async {
 
   try {
     final requesterId = await IdentityManager.getOrCreateDeviceId();
-
+final groupId = await IdentityManager.getLocalGroupId();
     var permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
@@ -123,8 +126,8 @@ Future<void> _setCurrentLocationAsGeofenceCenter() async {
 		if(pos == null) return;
     
     await FirebaseFirestore.instance
-	    .collection('requesters')
-        .doc(requesterId)
+	    .collection('groups')
+        .doc(groupId)
         .collection('locators')
         .doc(widget.locatorId)
         .set({
@@ -153,9 +156,10 @@ setState(() {
 
 Future<int> _getPlaceCount() async {
   final requesterId = await IdentityManager.getOrCreateDeviceId();
+  final groupId = await IdentityManager.getLocalGroupId();
   final snap = await FirebaseFirestore.instance
-      .collection('requesters')
-      .doc(requesterId)
+      .collection('groups')
+      .doc(groupId)
       .collection('locators')
       .doc(widget.locatorId)
       .collection('places')
@@ -193,7 +197,8 @@ Future<void> _confirmPairing() async {
 
   try {
     final requesterId = await IdentityManager.getOrCreateDeviceId();
-
+	final groupId = await IdentityManager.getLocalGroupId();
+		if (groupId == null || groupId.isEmpty) return;
     final requesterDoc = await FirebaseFirestore.instance
         .collection('requesters')
         .doc(requesterId)
@@ -211,8 +216,8 @@ Future<void> _confirmPairing() async {
         (locatorDoc.data()?['name'] ?? 'Locator').toString().trim();
 
     await FirebaseFirestore.instance
-        .collection('requesters')
-        .doc(requesterId)
+        .collection('groups')
+        .doc(groupId)
         .collection('locators')
         .doc(widget.locatorId)
         .set({
@@ -323,9 +328,10 @@ Future<void> _confirmPairing() async {
 
   Future<CollectionReference<Map<String, dynamic>>> _placesRef() async {
     final requesterId = await IdentityManager.getOrCreateDeviceId();
+	final groupId = await IdentityManager.getLocalGroupId();
     return FirebaseFirestore.instance
-        .collection('requesters')
-        .doc(requesterId)
+        .collection('groups')
+        .doc(groupId)
         .collection('locators')
         .doc(widget.locatorId)
         .collection('places');
@@ -579,11 +585,12 @@ Future<void> _removeLocator() async {
 
   try {
     final requesterId = await IdentityManager.getOrCreateDeviceId();
+	final groupId = await IdentityManager.getLocalGroupId();
     final firestore = FirebaseFirestore.instance;
     final locatorRef = firestore.collection('locators').doc(widget.locatorId);
     final requesterLocatorRef = firestore
-        .collection('requesters')
-        .doc(requesterId)
+        .collection('groups')
+        .doc(groupId)
         .collection('locators')
         .doc(widget.locatorId);
 

@@ -17,20 +17,28 @@ export const onRequestCreated = onDocumentCreated(
     const requesterId = data?.requesterId?.toString() ?? "";
     const requestDeviceId = data?.requestDeviceId?.toString() ?? "";
 
-    if (!locatorId || !requestId || !requesterId) {
-      console.log("INVALID REQUEST DATA", groupId, locatorId, requestId, requesterId);
+    if (!groupId || !locatorId || !requestId || !requesterId) {
+      console.log(
+        "INVALID REQUEST DATA",
+        groupId,
+        locatorId,
+        requestId,
+        requesterId,
+      );
       return;
     }
 
     const locatorTopic = `locator_${locatorId}`;
 
-    const requesterDoc = await admin.firestore()
-      .collection("requesters")
+    const requesterDeviceDoc = await admin.firestore()
+      .collection("groups")
+      .doc(groupId)
+      .collection("devices")
       .doc(requesterId)
       .get();
 
     const requesterName =
-      requesterDoc.data()?.name?.toString() || "Requester";
+      requesterDeviceDoc.data()?.name?.toString() || "Requester";
 
     console.log(
       "REQUEST TRIGGERED",
@@ -59,18 +67,20 @@ export const onRequestCreated = onDocumentCreated(
 
 export const onAlertCreated = onDocumentCreated(
   {
-    document: "requesters/{requesterId}/alerts/{alertId}",
+    document: "groups/{groupId}/locators/{locatorId}/alerts/{alertId}",
     region: "us-central1",
   },
   async (event) => {
-    const requesterId = event.params.requesterId;
+    const groupId = event.params.groupId;
+    const locatorId = event.params.locatorId;
     const alertId = event.params.alertId;
     const data = event.data?.data();
 
-    const type = data?.type?.toString();
-    const locatorId = data?.locatorId?.toString() ?? "";
+    const type = data?.type?.toString() ?? "";
     const locatorName = data?.locatorName?.toString() ?? "Locator";
     const level = data?.level?.toString() ?? data?.battery?.toString() ?? "";
+    const targetRequesterDeviceId =
+      data?.requesterDeviceId?.toString() ?? "";
 
     let title = "";
     let body = "";
@@ -84,49 +94,76 @@ export const onAlertCreated = onDocumentCreated(
     } else if (type === "battery_low") {
       title = "Battery alert";
       body = `${locatorName} battery is low${level ? ` (${level}%)` : ""}`;
-    } else if (type === "geofence_exit") {
-      title = "Geofence alert";
-      body = `${locatorName} left the selected area`;
-    } else if (type?.startsWith("place_arrive")) {
+    } else if (type.startsWith("place_arrive")) {
       title = "Arrived";
       const placeName = data?.placeName?.toString() || "Place";
       body = `Arrived at ${placeName}`;
-    } else if (type?.startsWith("place_left")) {
+    } else if (type.startsWith("place_left")) {
       title = "Left";
       const placeName = data?.placeName?.toString() || "Place";
       const distance = data?.distance;
-
       if (distance != null) {
         body = `Left ${placeName} (${Math.round(Number(distance))}m)`;
       } else {
         body = `Left ${placeName}`;
       }
     } else {
-      console.log("ALERT IGNORED", requesterId, alertId, type);
+      console.log("ALERT IGNORED", groupId, locatorId, alertId, type);
       return;
     }
 
-    await admin.messaging().send({
-      topic: requesterId,
-      data: {
-        type: type ?? "",
-        alertId,
-        requesterId,
+    const devicesSnap = await admin.firestore()
+      .collection("groups")
+      .doc(groupId)
+      .collection("devices")
+      .where("role", "==", "requester")
+      .where("active", "==", true)
+      .get();
+
+    let targetDeviceIds = devicesSnap.docs.map((d) => d.id);
+
+    if (type === "call_me" && targetRequesterDeviceId.isNotEmpty) {
+      targetDeviceIds = targetDeviceIds.filter(
+        (id: string) => id === targetRequesterDeviceId,
+      );
+    }
+
+    if (targetDeviceIds.length === 0) {
+      console.log(
+        "NO TARGET REQUESTER DEVICES",
+        groupId,
         locatorId,
-        locatorName,
-        level,
-        placeName: data?.placeName?.toString() ?? "",
-        distance: data?.distance?.toString() ?? "",
-        radiusMeters: data?.radiusMeters?.toString() ?? "",
-      },
-      notification: {
-        title,
-        body,
-      },
-      android: {
-        priority: "high",
-        collapseKey: type ?? "alert",
-      },
-    });
+        alertId,
+        type,
+        targetRequesterDeviceId,
+      );
+      return;
+    }
+
+    for (const requesterDeviceId of targetDeviceIds) {
+      await admin.messaging().send({
+        topic: requesterDeviceId,
+        data: {
+          type,
+          alertId,
+          groupId,
+          locatorId,
+          locatorName,
+          level,
+          requesterDeviceId,
+          placeName: data?.placeName?.toString() ?? "",
+          distance: data?.distance?.toString() ?? "",
+          radiusMeters: data?.radiusMeters?.toString() ?? "",
+        },
+        notification: {
+          title,
+          body,
+        },
+        android: {
+          priority: "high",
+          collapseKey: type,
+        },
+      });
+    }
   },
 );
