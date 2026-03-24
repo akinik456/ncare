@@ -717,18 +717,30 @@ onPressed: () async {
                       stream: (_groupId == null || _groupId!.isEmpty)
     ? null
     : FirebaseFirestore.instance
-        .collection('groups')
-        .doc(_groupId)
-        .collection('devices')
+        .collection('locators')
         .where('role', isEqualTo: 'locator')
         .where('active', isEqualTo: true)
         .snapshots(),
 builder: (context, snapshot) {
-  final docs = snapshot.data?.docs ?? [];
+  final allDocs = snapshot.data?.docs ?? [];
+
+  final docs = allDocs.where((doc) {
+    final data = doc.data();
+    final pairedRequesters =
+        data['pairedRequesters'] as Map<String, dynamic>?;
+
+    if (pairedRequesters == null || requesterId == null) {
+      return false;
+    }
+
+    return pairedRequesters.containsKey(requesterId);
+  }).toList();
 
   if (docs.isEmpty) {
     return Text(
-      _groupId == null ? 'Create or join a group first' : 'No locator',
+      _groupId == null
+          ? 'Create or join a group first'
+          : 'No paired locator',
       style: theme.textTheme.titleMedium?.copyWith(
         color: Colors.white,
         fontWeight: FontWeight.w700,
@@ -759,195 +771,168 @@ builder: (context, snapshot) {
 
       final selected = locatorId == _selectedLocatorId;
 
+      return GestureDetector(
+        onTap: () {
+          setState(() {
+            _selectedLocatorId = locatorId;
+          });
+        },
+        onLongPress: () async {
+          final changed = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PairingOptionsScreen(
+                locatorId: locatorId,
+                locatorName: name,
+              ),
+            ),
+          );
 
-return GestureDetector(
-  onTap: () {
-    setState(() {
-      _selectedLocatorId = locatorId;
-    });
-  },
-  onLongPress: () async {
-    final changed = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PairingOptionsScreen(
-          locatorId: locatorId,
-          locatorName: name,
+          if (changed == true && mounted) {
+            setState(() {});
+          }
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 7,
+              ),
+              decoration: BoxDecoration(
+                color: selected
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                name,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: selected
+                      ? const Color(0xFF1D4ED8)
+                      : Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            StreamBuilder<DocumentSnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('locators')
+                  .doc(locatorId)
+                  .snapshots(),
+              builder: (context, snap) {
+                if (!snap.hasData) {
+                  return const SizedBox();
+                }
+
+                final data = snap.data!.data() as Map<String, dynamic>?;
+                final ts = data?['lastSeen'] as Timestamp?;
+                final lastSeen = ts?.toDate();
+                final battery = data?['battery'] ?? 0;
+                final gpsOn = data?['gpsEnabled'] ?? true;
+
+                final online = lastSeen != null &&
+                    DateTime.now().difference(lastSeen).inSeconds < 120;
+
+                final lat = (data?['lat'] as num?)?.toDouble();
+                final lng = (data?['lng'] as num?)?.toDouble();
+                final acc = (data?['acc'] as num?)?.toDouble() ?? 0;
+
+                double? distance;
+
+                if (_myLat != null &&
+                    _myLng != null &&
+                    lat != null &&
+                    lng != null) {
+                  distance = Geolocator.distanceBetween(
+                    _myLat!,
+                    _myLng!,
+                    lat,
+                    lng,
+                  );
+                }
+
+                return Row(
+                  children: [
+                    online
+                        ? AnimatedBuilder(
+                            animation: _pulse,
+                            builder: (context, child) {
+                              return Transform.scale(
+                                scale: _pulse.value,
+                                child: child,
+                              );
+                            },
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Colors.green,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          )
+                        : Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.white70,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                    const SizedBox(width: 6),
+                    Text(
+                      online ? "ONLINE" : formatLastSeen(lastSeen),
+                      style: TextStyle(
+                        color: online ? Colors.green : Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      "🔋$battery%",
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      gpsOn ? "📍GPS" : "⚠️GPS",
+                      style: TextStyle(
+                        color: gpsOn ? Colors.white70 : Colors.orange,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (distance != null) ...[
+                      const SizedBox(width: 12),
+                      Text(
+                        formatDistance(distance, acc),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                );
+              },
+            ),
+          ],
         ),
-      ),
-    );
-
-    if (changed == true && mounted) {
-      setState(() {});
-    }
-  },
-
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 7,
-        ),
-        decoration: BoxDecoration(
-          color: selected
-              ? Colors.white
-              : Colors.white.withValues(alpha: 0.18),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          name,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: selected
-                ? const Color(0xFF1D4ED8)
-                : Colors.white,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-      const SizedBox(height: 6),
-      StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('locators')
-            .doc(locatorId)
-            .snapshots(),
-        builder: (context, snap) {
-
-  if (!snap.hasData) {
-    return const SizedBox();
-  }
-
-  final data = snap.data!.data() as Map<String, dynamic>?;
-
-  final ts = data?['lastSeen'] as Timestamp?;
-  final lastSeen = ts?.toDate();
-
-  final battery = data?['battery'] ?? 0;
-  final gpsOn = data?['gpsEnabled'] ?? true;
-
-  final online = lastSeen != null &&
-      DateTime.now().difference(lastSeen).inSeconds < 120;
-	  
-final lat = (data?['lat'] as num?)?.toDouble();
-final lng = (data?['lng'] as num?)?.toDouble();	  
-final acc = (data?['acc'] as num?)?.toDouble() ?? 0;	
-
-double? distance;
-
-if (_myLat != null && _myLng != null && lat != null && lng != null) {
-  distance = Geolocator.distanceBetween(
-    _myLat!,
-    _myLng!,
-    lat!,
-    lng!,
+      );
+    }).toList(),
   );
 }
 
-String distanceLabel;
-
-if (distance == null) {
-  distanceLabel = "-";
-} else if (distance <= acc + 30) {
-  distanceLabel = "NEARBY";
-} else {
-  distanceLabel = "${distance.round()} m ±${acc.round()}";
-}
-
-print('lat=$lat lng=$lng');
-print('distance=$distance');
-return Row(
-  children: [
-    online
-        ? AnimatedBuilder(
-            animation: _pulse,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _pulse.value,
-                child: child,
-              );
-            },
-            child: Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                color: Colors.green,
-                shape: BoxShape.circle,
-              ),
-            ),
-          )
-        : Container(
-            width: 8,
-            height: 8,
-            decoration: const BoxDecoration(
-              color: Colors.white70,
-              shape: BoxShape.circle,
-            ),
-          ),
-
-    const SizedBox(width: 6),
-
-    Text(
-      online ? "ONLINE" : formatLastSeen(lastSeen),
-      style: TextStyle(
-        color: online ? Colors.green : Colors.white70,
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-      ),
-    ),
-
-    const SizedBox(width: 12),
-
-    Text(
-      "🔋$battery%",
-      style: const TextStyle(
-        color: Colors.white70,
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-      ),
-    ),
-
-    const SizedBox(width: 12),
-
-    Text(
-      gpsOn ? "📍GPS" : "⚠️GPS",
-      style: TextStyle(
-        color: gpsOn ? Colors.white70 : Colors.orange,
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-      ),
-    ),
-
-    if (distance != null) ...[
-      const SizedBox(width: 12),
-      Text(
-        formatDistance(distance,acc),
-        style: const TextStyle(
-          color: Colors.white70,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    ],
-  ],
-);
-  
-  
-  
-}
-
-		
-      ),
-    ],
-  ),
-);
-
-
-							  
-                            
-                          }).toList(),
-                        );
-                      },
+					  
+					  
                     ),
                   ),
                 ],
