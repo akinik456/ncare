@@ -1,18 +1,6 @@
 1 req,loc isim değiştirme
-
-2 Multi requester
-Örnek:
-child locator
-   ↑
-mother requester
-father requester
-Gerekecek:
-
-pairs/
-   requesterId
-   locatorId
-   
-3 Konum geçmişi (tartışılacak)
+  
+2 Konum geçmişi (tartışılacak)
 Şu an:
 responses/requestId
 Kalıcı.
@@ -21,36 +9,28 @@ geçmiş tutulacak mı
 kaç gün tutulacak
 privacy konusu
 
-4 Locator bg / fg / restart testleri
-Test senaryoları:
-app kapalı
-ekran kilitli
-restart
-internet gidip gelmesi
-uçak modu
-
-5 Marka & isim
+3 Marka & isim
 NCare geçici.
 Alternatifler konuşulacak.
 
-6 App icon
+4 App icon
 Play Store için gerekli.
 
-7 UI Polish
+5 UI Polish
 
-8 her locator ün kendi son adresi olmalı , loc değişince ya kendi son adresi
+6 her locator ün kendi son adresi olmalı , loc değişince ya kendi son adresi
 gösterilmeli ya da silinmeli
 
-9 start da subscribe için takılabiliyor , sık oluyor. 
+7 start da subscribe için takılabiliyor , sık oluyor. 
 
-10 batteryAlarmEnabled , batteryAlertThreshold Firestore da isimleri kontrol et ya english ya da türkçe
+8 batteryAlarmEnabled , batteryAlertThreshold Firestore da isimleri kontrol et ya english ya da türkçe
 
-11 locator rl notification toggle
+9 locator rl notification toggle
 
-12 role yenilenebilsin?
+10 role yenilenebilsin?
 
-13 max. device count
+11 max. device count
 
-14 call me bireysel / All
+12 call me bireysel / All
 
-15 s2 android 9 gps on/off görmüyor
+13 s2 android 9 gps on/off görmüyor

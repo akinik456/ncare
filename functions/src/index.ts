@@ -81,6 +81,7 @@ export const onAlertCreated = onDocumentCreated(
     const level = data?.level?.toString() ?? data?.battery?.toString() ?? "";
     const targetRequesterDeviceId =
       data?.requesterDeviceId?.toString() ?? "";
+    const targetMode = data?.targetMode?.toString() ?? "";
 
     let title = "";
     let body = "";
@@ -122,10 +123,24 @@ export const onAlertCreated = onDocumentCreated(
 
     let targetDeviceIds = devicesSnap.docs.map((d) => d.id);
 
-    if (type === "call_me" && targetRequesterDeviceId.isNotEmpty) {
-      targetDeviceIds = targetDeviceIds.filter(
-        (id: string) => id === targetRequesterDeviceId,
-      );
+    if (type === "call_me") {
+      if (targetMode === "single" && targetRequesterDeviceId.length > 0) {
+        targetDeviceIds = targetDeviceIds.filter(
+          (id: string) => id === targetRequesterDeviceId,
+        );
+      } else if (targetMode === "all") {
+        // herkese gider
+      } else {
+        console.log(
+          "CALL_ME IGNORED => invalid target mode",
+          groupId,
+          locatorId,
+          alertId,
+          targetMode,
+          targetRequesterDeviceId,
+        );
+        return;
+      }
     }
 
     if (targetDeviceIds.length === 0) {
@@ -151,6 +166,7 @@ export const onAlertCreated = onDocumentCreated(
           locatorName,
           level,
           requesterDeviceId,
+          targetMode,
           placeName: data?.placeName?.toString() ?? "",
           distance: data?.distance?.toString() ?? "",
           radiusMeters: data?.radiusMeters?.toString() ?? "",

@@ -182,6 +182,83 @@ print("groupId:$groupId");
   );
 }
 
+Future<void> _sendCallMeSingle(
+  String requesterId,
+  String requesterName,
+) async {
+  final locatorId = await IdentityManager.getOrCreateDeviceId();
+
+  final locatorDoc = await FirebaseFirestore.instance
+      .collection('locators')
+      .doc(locatorId)
+      .get();
+
+  final groupId =
+      (locatorDoc.data()?['groupId'] ?? '').toString().trim();
+  if (groupId.isEmpty) return;
+
+  await FirebaseFirestore.instance
+      .collection('groups')
+      .doc(groupId)
+      .collection('locators')
+      .doc(locatorId)
+      .collection('alerts')
+      .add({
+    'type': 'call_me',
+    'groupId': groupId,
+    'locatorId': locatorId,
+    'locatorName': locatorName,
+    'targetMode': 'single',
+    'requesterDeviceId': requesterId,
+    'requesterName': requesterName,
+    'ts': FieldValue.serverTimestamp(),
+  });
+
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text('Call request sent to $requesterName'),
+      duration: const Duration(seconds: 2),
+    ),
+  );
+}
+
+Future<void> _sendCallMeAll() async {
+  final locatorId = await IdentityManager.getOrCreateDeviceId();
+
+  final locatorDoc = await FirebaseFirestore.instance
+      .collection('locators')
+      .doc(locatorId)
+      .get();
+
+  final groupId =
+      (locatorDoc.data()?['groupId'] ?? '').toString().trim();
+  if (groupId.isEmpty) return;
+
+  await FirebaseFirestore.instance
+      .collection('groups')
+      .doc(groupId)
+      .collection('locators')
+      .doc(locatorId)
+      .collection('alerts')
+      .add({
+    'type': 'call_me',
+    'groupId': groupId,
+    'locatorId': locatorId,
+    'locatorName': locatorName,
+    'targetMode': 'all',
+    'ts': FieldValue.serverTimestamp(),
+  });
+
+  if (!mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Call request sent to everybody'),
+      duration: Duration(seconds: 2),
+    ),
+  );
+}
+
 
   Future<void> _startBatteryMonitor() async {
     _batteryTimer?.cancel();
@@ -572,79 +649,6 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
     );
   }
 
-  Widget _buildPairCodeCard(ThemeData theme, String code) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE2E8F0),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(
-                  Icons.password_rounded,
-                  color: Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Remote Pairing Code',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F172A),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Requester can pair with this 6-character code.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: const Color(0xFF475569),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 18),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: SelectableText(
-              code,
-              textAlign: TextAlign.center,
-              style: theme.textTheme.headlineMedium?.copyWith(
-                color: const Color(0xFF0F172A),
-                fontWeight: FontWeight.w900,
-                letterSpacing: 8,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     if (locatorId == null) {
@@ -886,13 +890,42 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
                                     ),
                                   ),
                                 ),
+					  const SizedBox(height: 10),
+						Text(
+						  'Remote pairing code',
+						  style: theme.textTheme.bodySmall?.copyWith(
+							color: Colors.white.withOpacity(0.85),
+							fontWeight: FontWeight.w600,
+						  ),
+						),
+						const SizedBox(height: 6),
+						Container(
+						  padding: const EdgeInsets.symmetric(
+							horizontal: 12,
+							vertical: 10,
+						  ),
+						  decoration: BoxDecoration(
+							color: Colors.white.withOpacity(0.15),
+							borderRadius: BorderRadius.circular(12),
+						  ),
+						  child: SelectableText(
+							currentPairCode,
+							style: const TextStyle(
+							  color: Colors.white,
+							  fontSize: 18,
+							  fontWeight: FontWeight.w900,
+							  letterSpacing: 4,
+							),
+						  ),
+						),								
                               ],
                             ),
                           ],
                         ),
                       ),
+
+					  
                       const SizedBox(height: 14),
-                      _buildPairCodeCard(theme, currentPairCode),
                       const SizedBox(height: 14),
                       StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
                         stream: FirebaseFirestore.instance
@@ -956,20 +989,60 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
                                 ),
                               ),
                               const SizedBox(height: 12),
-                              FilledButton.icon(
-                                onPressed: paired ? _sendCallMeAlert : null,
-								
-                                icon: const Icon(Icons.call),
-                                label: Text(
-                                  paired
-                                      ? 'Ask $requesterName to call'
-                                      : 'Ask requester to call',
-                                ),
-                              ),
+                              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+  stream: FirebaseFirestore.instance
+      .collection('locators')
+      .doc(locatorId)
+      .snapshots(),
+  builder: (context, snapshot) {
+    final data = snapshot.data?.data();
+    final paired = data?['pairedRequesters']
+        as Map<String, dynamic>?;
+
+    if (paired == null) return const SizedBox();
+
+    final activeRequesters = paired.entries
+        .where((e) => e.value['active'] == true)
+        .toList();
+
+    if (activeRequesters.isEmpty) {
+      return const SizedBox();
+    }
+
+    return Column(
+      children: [
+        ...activeRequesters.map((e) {
+          final requesterId = e.key;
+          final name =
+              (e.value['name'] ?? 'Requester').toString();
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: FilledButton.icon(
+              onPressed: () =>
+                  _sendCallMeSingle(requesterId, name),
+              icon: const Icon(Icons.call),
+              label: Text('Call $name'),
+            ),
+          );
+        }),
+
+        if (activeRequesters.length > 1)
+          FilledButton.icon(
+            onPressed: _sendCallMeAll,
+            icon: const Icon(Icons.campaign),
+            label: const Text('Call Everybody'),
+          ),
+      ],
+    );
+  },
+),
+							  
                             ],
                           );
                         },
                       ),
+					  
                       const SizedBox(height: 14),
                       Container(
                         padding: const EdgeInsets.all(16),

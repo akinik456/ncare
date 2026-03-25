@@ -289,6 +289,8 @@ String lastSeenText(Timestamp ts) {
 void _listenCallAlerts() {
   if (_groupId == null || _groupId!.isEmpty) return;
 
+  print("callme Listener Started");
+
   _callAlertSub?.cancel();
 
   _callAlertSub = FirebaseFirestore.instance
@@ -298,37 +300,59 @@ void _listenCallAlerts() {
       .orderBy('ts', descending: true)
       .snapshots()
       .listen((snapshot) async {
-        if (snapshot.docs.isEmpty) return;
+    if (snapshot.docs.isEmpty) return;
 
-        final doc = snapshot.docs.first;
-        if (_lastAlertId == doc.id) return;
+    final visibleDocs = snapshot.docs.where((doc) {
+      final data = doc.data();
 
-        final data = doc.data();
-        final locatorId = (data['locatorId'] ?? '').toString();
+      final targetMode = (data['targetMode'] ?? 'all').toString();
+      final targetRequesterDeviceId =
+          (data['requesterDeviceId'] ?? '').toString().trim();
 
-        String displayName = 'Locator';
+      if (targetMode == 'all') {
+        return true;
+      }
 
-        if (locatorId.isNotEmpty) {
-          final locatorDoc = await FirebaseFirestore.instance
-              .collection('locators')
-              .doc(locatorId)
-              .get();
+      if (targetMode == 'single') {
+        return _requesterDeviceId != null &&
+            targetRequesterDeviceId == _requesterDeviceId;
+      }
 
-          displayName =
-              (locatorDoc.data()?['name'] ?? 'Locator').toString().trim();
-        }
+      return false;
+    }).toList();
 
-        if (!mounted) return;
+    if (visibleDocs.isEmpty) return;
 
-        setState(() {
-          _lastAlertId = doc.id;
-          _activeCallAlertId = doc.id;
-          _callRequestFrom = displayName;
-          _callRequestLocatorId = locatorId;
-        });
-      }, onError: (e) {
-        print("CALL_ME LISTENER ERROR => $e");
-      });
+    final doc = visibleDocs.first;
+
+    if (_lastAlertId == doc.id) return;
+
+    final data = doc.data();
+    final locatorId = (data['locatorId'] ?? '').toString();
+
+    String displayName = 'Locator';
+
+    if (locatorId.isNotEmpty) {
+      final locatorDoc = await FirebaseFirestore.instance
+          .collection('locators')
+          .doc(locatorId)
+          .get();
+
+      displayName =
+          (locatorDoc.data()?['name'] ?? 'Locator').toString().trim();
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _lastAlertId = doc.id;
+      _activeCallAlertId = doc.id;
+      _callRequestFrom = displayName;
+      _callRequestLocatorId = locatorId;
+    });
+  }, onError: (e) {
+    print("CALL_ME LISTENER ERROR => $e");
+  });
 }
 
 
