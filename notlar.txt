@@ -232,3 +232,38 @@ Hepsi için:
 Önce happy path
 sonra break etmeye çalış
 
+*******************En pratik kalıcı çözüm
+Her seferinde elle --target-platform android-arm yazmamak için:
+1) Hep split-per-abi build al
+Bash
+flutter build apk --debug --split-per-abi
+Sonra eski cihaz için hep bunu kur:
+Plain text
+app-armeabi-v7a-debug.apk
+Bu en temiz yöntem.
+Daha kalıcı
+Kendine küçük bir .bat dosyası yap.
+build_arm7_debug.bat
+Batch file
+flutter clean
+flutter pub get
+flutter build apk --debug --split-per-abi
+pause
+Sonra hep buna çift tıklarsın.
+Eski cihaz için doğru apk her seferinde çıkar.
+Neden tam kalıcı değil?
+Çünkü Flutter CLI’da:
+“hep armv7 build al” diye proje içine sabit bir ayar yok
+build komutuyla belirleniyor
+Yani en kalıcı çözüm: 👉 küçük batch/script veya 👉 hep split-per-abi
+Benim önerim
+Senin kullanımına göre en iyisi:
+Batch file
+flutter build apk --debug --split-per-abi
+çünkü:
+armv7 apk ayrı çıkar
+arm64 de ayrı çıkar
+karışma olmaz
+Sonuç
+Tam otomatik proje ayarı yok
+ama bat dosyası + split-per-abi ile pratikte kalıcı çözüm olur brom.

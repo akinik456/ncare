@@ -585,19 +585,36 @@ Future<void> _removeLocator() async {
 
   try {
     final requesterId = await IdentityManager.getOrCreateDeviceId();
-	final groupId = await IdentityManager.getLocalGroupId();
     final firestore = FirebaseFirestore.instance;
     final locatorRef = firestore.collection('locators').doc(widget.locatorId);
-    final requesterLocatorRef = firestore
-        .collection('groups')
-        .doc(groupId)
-        .collection('locators')
-        .doc(widget.locatorId);
 
     final locatorSnap = await locatorRef.get();
     final locatorData = locatorSnap.data() ?? <String, dynamic>{};
 
-    final updates = <String, dynamic>{};
+    final pairedRequestersRaw =
+        (locatorData['pairedRequesters'] as Map<String, dynamic>?) ?? {};
+    final pairedRequesters =
+        Map<String, dynamic>.from(pairedRequestersRaw);
+
+    if (pairedRequesters.containsKey(requesterId)) {
+      final requesterEntry =
+          Map<String, dynamic>.from(pairedRequesters[requesterId] as Map);
+
+      requesterEntry['active'] = false;
+      requesterEntry['removedAt'] = FieldValue.serverTimestamp();
+
+      pairedRequesters[requesterId] = requesterEntry;
+    }
+
+    final activeCount = pairedRequesters.values.where((entry) {
+      final map = Map<String, dynamic>.from(entry as Map);
+      return map['active'] == true;
+    }).length;
+
+    final updates = <String, dynamic>{
+      'pairedRequesters': pairedRequesters,
+      'pairedRequestersCount': activeCount,
+    };
 
     if ((locatorData['pairedRequesterId'] ?? '').toString() == requesterId) {
       updates['pairedRequesterId'] = FieldValue.delete();
@@ -610,22 +627,7 @@ Future<void> _removeLocator() async {
       updates['pendingPairCreatedAt'] = FieldValue.delete();
     }
 
-    final batch = firestore.batch();
-
-    batch.set(
-      requesterLocatorRef,
-      {
-        'active': false,
-        'removedAt': FieldValue.serverTimestamp(),
-      },
-      SetOptions(merge: true),
-    );
-
-    if (updates.isNotEmpty) {
-      batch.set(locatorRef, updates, SetOptions(merge: true));
-    }
-
-    await batch.commit();
+    await locatorRef.set(updates, SetOptions(merge: true));
 
     if (!mounted) return;
     Navigator.pop(context, true);
@@ -635,6 +637,7 @@ Future<void> _removeLocator() async {
     }
   }
 }
+
 
   @override
   Widget build(BuildContext context) {

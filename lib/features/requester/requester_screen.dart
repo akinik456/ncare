@@ -47,6 +47,7 @@ class _RequesterScreenState extends State<RequesterScreen> with SingleTickerProv
   double? _myLng;
   Timer? _reqLocationTimer;
   String? _requesterDeviceId;
+  StreamSubscription? _callAlertSub;
 
   @override
   void initState() {
@@ -210,6 +211,7 @@ String formatDistance(double? distance, double acc) {
   _pulseController.dispose();
   _reqLocationTimer?.cancel();
    super.dispose();
+   _callAlertSub?.cancel();
   }   
 
 Future<void> _sendRequest() async {
@@ -271,46 +273,47 @@ String lastSeenText(Timestamp ts) {
 
 void _listenCallAlerts() {
   if (_groupId == null || _groupId!.isEmpty) return;
-  print("callme Listener Started");
-  FirebaseFirestore.instance
+
+  _callAlertSub?.cancel();
+
+  _callAlertSub = FirebaseFirestore.instance
       .collectionGroup('alerts')
       .where('type', isEqualTo: 'call_me')
       .where('groupId', isEqualTo: _groupId)
       .orderBy('ts', descending: true)
       .snapshots()
       .listen((snapshot) async {
-	 print(snapshot.docs.first.data());
-    if (snapshot.docs.isEmpty) return;
+        if (snapshot.docs.isEmpty) return;
 
-    final doc = snapshot.docs.first;
-    if (_lastAlertId == doc.id) return;
+        final doc = snapshot.docs.first;
+        if (_lastAlertId == doc.id) return;
 
-    final data = doc.data();
-    final locatorId = (data['locatorId'] ?? '').toString();
+        final data = doc.data();
+        final locatorId = (data['locatorId'] ?? '').toString();
 
-    String displayName = 'Locator';
+        String displayName = 'Locator';
 
-    if (locatorId.isNotEmpty) {
-      final locatorDoc = await FirebaseFirestore.instance
-          .collection('locators')
-          .doc(locatorId)
-          .get();
+        if (locatorId.isNotEmpty) {
+          final locatorDoc = await FirebaseFirestore.instance
+              .collection('locators')
+              .doc(locatorId)
+              .get();
 
-      displayName =
-          (locatorDoc.data()?['name'] ?? 'Locator').toString().trim();
-    }
+          displayName =
+              (locatorDoc.data()?['name'] ?? 'Locator').toString().trim();
+        }
 
-    if (!mounted) return;
+        if (!mounted) return;
 
-    setState(() {
-      _lastAlertId = doc.id;
-      _activeCallAlertId = doc.id;
-      _callRequestFrom = displayName;
-      _callRequestLocatorId = locatorId;
-    });
-  }, onError: (e) {
-    print("CALL_ME LISTENER ERROR => $e");
-  });
+        setState(() {
+          _lastAlertId = doc.id;
+          _activeCallAlertId = doc.id;
+          _callRequestFrom = displayName;
+          _callRequestLocatorId = locatorId;
+        });
+      }, onError: (e) {
+        print("CALL_ME LISTENER ERROR => $e");
+      });
 }
 
 
@@ -430,6 +433,7 @@ Future<void> _joinGroup() async {
   setState(() {
     _groupId = result;
   });
+  _listenCallAlerts();
 }
 
 
@@ -714,50 +718,53 @@ onPressed: () async {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                      stream: (_groupId == null || _groupId!.isEmpty)
-    ? null
-    : FirebaseFirestore.instance
-        .collection('locators')
-        .where('role', isEqualTo: 'locator')
-        .where('active', isEqualTo: true)
-        .snapshots(),
-builder: (context, snapshot) {
-  final allDocs = snapshot.data?.docs ?? [];
+  stream: (_groupId == null || _groupId!.isEmpty)
+      ? null
+      : FirebaseFirestore.instance
+          .collection('locators')
+          .where('groupId', isEqualTo: _groupId)
+          .where('role', isEqualTo: 'locator')
+          .where('active', isEqualTo: true)
+          .snapshots(),
+  builder: (context, snapshot) {
+    final allDocs = snapshot.data?.docs ?? [];
 
-  final docs = allDocs.where((doc) {
-    final data = doc.data();
-    final pairedRequesters =
-        data['pairedRequesters'] as Map<String, dynamic>?;
+    final docs = allDocs.where((doc) {
+      final data = doc.data();
+      final pairedRequesters =
+          data['pairedRequesters'] as Map<String, dynamic>?;
 
-    if (pairedRequesters == null || requesterId == null) {
-      return false;
+      if (pairedRequesters == null || requesterId == null) {
+        return false;
+      }
+
+      return pairedRequesters.containsKey(requesterId);
+    }).toList();
+
+    if (docs.isEmpty) {
+      return Text(
+        _groupId == null
+            ? 'Create or join a group first'
+            : 'No paired locator',
+        style: theme.textTheme.titleMedium?.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+        ),
+      );
     }
 
-    return pairedRequesters.containsKey(requesterId);
-  }).toList();
+    final hasSelected =
+        docs.any((doc) => doc.id == _selectedLocatorId);
 
-  if (docs.isEmpty) {
-    return Text(
-      _groupId == null
-          ? 'Create or join a group first'
-          : 'No paired locator',
-      style: theme.textTheme.titleMedium?.copyWith(
-        color: Colors.white,
-        fontWeight: FontWeight.w700,
-      ),
-    );
-  }
-
-  final hasSelected = docs.any((doc) => doc.id == _selectedLocatorId);
-
-  if (!hasSelected) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      setState(() {
-        _selectedLocatorId = docs.first.id;
+    if (!hasSelected) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _selectedLocatorId = docs.first.id;
+        });
       });
-    });
-  }
+    }
+
 
   return Wrap(
     spacing: 8,
