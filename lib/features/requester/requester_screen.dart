@@ -218,6 +218,21 @@ Future<void> _sendRequest() async {
   if (_groupId == null || _groupId!.isEmpty) return;
   if (_selectedLocatorId == null || _selectedLocatorId!.isEmpty) return;
   if (requesterId == null || requesterId!.isEmpty) return;
+  
+  final locatorDoc = await FirebaseFirestore.instance
+    .collection('locators')
+    .doc(_selectedLocatorId)
+    .get();
+
+final paired = locatorDoc.data()?['pairedRequesters']
+    as Map<String, dynamic>?;
+
+final entry = paired?[requesterId];
+
+if (entry == null || entry['active'] != true) {
+  print("REQ BLOCKED => not paired");
+  return;
+}
 
   final requestDeviceId = await IdentityManager.getOrCreateDeviceId();
 
@@ -738,20 +753,32 @@ onPressed: () async {
         return false;
       }
 
-      return pairedRequesters.containsKey(requesterId);
+      final entry = pairedRequesters[requesterId];
+	  if(entry == null ) return false;
+	  
+	  return entry['active'] == true ;
     }).toList();
 
     if (docs.isEmpty) {
-      return Text(
-        _groupId == null
-            ? 'Create or join a group first'
-            : 'No paired locator',
-        style: theme.textTheme.titleMedium?.copyWith(
-          color: Colors.white,
-          fontWeight: FontWeight.w700,
-        ),
-      );
-    }
+	  WidgetsBinding.instance.addPostFrameCallback((_) {
+		if (!mounted) return;
+		if (_selectedLocatorId != null) {
+		  setState(() {
+			_selectedLocatorId = null;
+		  });
+		}
+	  });
+
+	  return Text(
+		_groupId == null
+			? 'Create or join a group first'
+			: 'No paired locator',
+		style: theme.textTheme.titleMedium?.copyWith(
+		  color: Colors.white,
+		  fontWeight: FontWeight.w700,
+		),
+	  );
+	}
 
     final hasSelected =
         docs.any((doc) => doc.id == _selectedLocatorId);

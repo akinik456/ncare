@@ -350,7 +350,7 @@ final groupSnap = await FirebaseFirestore.instance
 
 final groupData = groupSnap.data() ?? {};
 final maxDevicesCount =
-    (groupData['maxDevicesCount'] as num?)?.toInt() ?? 2;
+    (groupData['maxDevicesCount'] as num?)?.toInt() ?? 5;
 
 final devicesSnap = await FirebaseFirestore.instance
     .collection('groups')

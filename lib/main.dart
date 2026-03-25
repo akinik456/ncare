@@ -404,14 +404,13 @@ Future<bool> _isStillPaired({
       .doc(locatorId)
       .get();
 
-  final pairedRequesters =
+  final paired =
       locatorDoc.data()?['pairedRequesters'] as Map<String, dynamic>?;
 
-  if (pairedRequesters == null) return false;
+  final entry = paired?[requesterId];
 
-  return pairedRequesters.containsKey(requesterId);
+  return entry != null && entry['active'] == true;
 }
-
 
 class NCareApp extends StatelessWidget {
   final bool setupDone;

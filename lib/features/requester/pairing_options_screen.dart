@@ -628,7 +628,7 @@ Future<void> _removeLocator() async {
     }
 
     await locatorRef.set(updates, SetOptions(merge: true));
-
+	
     if (!mounted) return;
     Navigator.pop(context, true);
   } finally {
