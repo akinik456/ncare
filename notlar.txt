@@ -130,31 +130,29 @@ flutter build apk --debug --target-platform android-arm
 
 NCare project continuation.
 
-We have:
-- deterministic alerts (gps, battery, place)
-- request/response system (stable)
-- pairing system with approval
-- multi locator working
-- shared requester (multi-device) working
-
-Critical decisions:
-- NO DELETE policy (24h retention)
-- alerts are event-based (no clear/delete)
-- same requesterId can be used on multiple devices
-- request/response will be device-separated (next step)
-
-Goal:
-- stabilize system
-- complete multi-device separation
-- prepare for production
+Current state:
+- core architecture stable
+- many-to-many locator/requester working
+- pairing filtering implemented
+- individual call_me working (FG + BG)
+- alerts migrated to groups/{groupId}/locators
+- notification timestamp added (local time)
+- UI polish phase
 
 Rules:
-- step by step only
-- no code unless requested
-- no architecture change unless necessary
-- short and precise answers
+- no new features
+- only bug fixes and polish
+- step-by-step changes
+- no architecture rewrite
+- keep core stable
 
-We continue from here.
+Next focus:
+- small UI fixes
+- remove locator behavior polish
+- call_me dismissal persistence
+- pairing edge cases
+- performance / background stability
+
 
 *************************
 Sohbet Kuralları;
@@ -169,11 +167,9 @@ O yüzden yazacağım kurallara yüzde yüz uymalıyız ama KESİNLİKLE . 99 bi
 -Geliştirme aşaması adım adım .Bir adım için onay alınmadan bir sonrakine geçilmeyecek.ASLA!
 -Gereksiz tekrarlardan kaçınılacak.
 -Ben ver demeden kod vermeyeceksin
--Dev_Context dosyası atıyorum
 -Android app geliştiriyoruz.Terminalden flutter kullanıyorum Android Studio yok
  Ayrıca ben android bilmiyorum , embedded yazılımcıyım  ben.
--Projeye tam olarak hakim olmalısın,bunun için hangi dosyalara ihtiyacın varsa listele 
- hepsini zip olarak atarım.
+-Projeye zip olarak atıyorum.
 
 
 **************************************

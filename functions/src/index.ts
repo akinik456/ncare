@@ -17,7 +17,7 @@ export const onRequestCreated = onDocumentCreated(
     const data = event.data?.data();
 
     const requesterId = data?.requesterId?.toString() ?? "";
-    const requestDeviceId = data?.requestDeviceId?.toString() ?? "";
+    const requesterDeviceId = data?.requesterDeviceId?.toString() ?? "";
 
     if (!groupId || !locatorId || !requestId || !requesterId) {
       console.log(
@@ -58,7 +58,7 @@ export const onRequestCreated = onDocumentCreated(
         groupId,
         requestId,
         requesterId,
-        requestDeviceId,
+        requesterDeviceId,
         locatorId,
         requesterName,
       },

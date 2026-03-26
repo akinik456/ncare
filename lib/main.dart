@@ -110,9 +110,9 @@ if (role == 'locator') {
   final requestId = data['requestId']?.toString();
   final requesterId = data['requesterId']?.toString();
   final targetLocatorId = data['locatorId']?.toString();
-  final requestDeviceId =
-    (data['requestDeviceId'] ?? '').toString().trim();
-	print("requestDeviceId:$requestDeviceId");
+  final requesterDeviceId =
+    (data['requesterDeviceId'] ?? '').toString().trim();
+	print("requesterDeviceId:$requesterDeviceId");
   
   
   final battery = Battery();
@@ -183,7 +183,7 @@ if (cachedLat != null &&
 .doc(requestId)
       .set({
     'locatorId': myLocatorId,
-	'requestDeviceId': requestDeviceId,
+	'requesterDeviceId': requesterDeviceId,
     'status': 'ok',
     'lat': cachedLat,
     'lng': cachedLng,
@@ -210,7 +210,7 @@ if (cachedLat != null &&
 .doc(requestId)
       .set({
       'locatorId': myLocatorId,
-	  'requestDeviceId': requestDeviceId,
+	  'requesterDeviceId': requesterDeviceId,
       'status': 'ok',
       'lat': pos.latitude,
       'lng': pos.longitude,
@@ -232,7 +232,7 @@ if (cachedLat != null &&
 .doc(requestId)
       .set({
       'locatorId': myLocatorId,
-	  'requestDeviceId': requestDeviceId,
+	  'requesterDeviceId': requesterDeviceId,
       'status': 'error',
       'error': e.toString(),
       'ts': FieldValue.serverTimestamp(),
@@ -265,9 +265,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final requesterId = data['requesterId']?.toString();
   final targetLocatorId = data['locatorId']?.toString();
   final myLocatorId = await IdentityManager.getOrCreateDeviceId();
-  final requestDeviceId =
-    (data['requestDeviceId'] ?? '').toString().trim();
-	print("requestDeviceId:$requestDeviceId");
+  final requesterDeviceId =
+    (data['requesterDeviceId'] ?? '').toString().trim();
+	print("requesterDeviceId:$requesterDeviceId");
   if (type != 'rl' ||
       requestId == null ||
       requestId.isEmpty ||
@@ -331,7 +331,7 @@ if (groupId == null || groupId.isEmpty) {
         age < 30) {
       await responseRef.set({
         'locatorId': myLocatorId,
-		'requestDeviceId': requestDeviceId,
+		'requesterDeviceId': requesterDeviceId,
         'status': 'ok',
         'lat': cachedLat,
         'lng': cachedLng,
@@ -346,7 +346,7 @@ if (groupId == null || groupId.isEmpty) {
     if (!gpsOn) {
       await responseRef.set({
         'locatorId': myLocatorId,
-		'requestDeviceId': requestDeviceId,
+		'requesterDeviceId': requesterDeviceId,
         'status': 'gps_off',
         'ts': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -357,7 +357,7 @@ if (groupId == null || groupId.isEmpty) {
     if (!perm.isGranted) {
       await responseRef.set({
         'locatorId': myLocatorId,
-		'requestDeviceId': requestDeviceId,
+		'requesterDeviceId': requesterDeviceId,
         'status': 'permission_missing',
         'ts': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -374,7 +374,7 @@ if (groupId == null || groupId.isEmpty) {
     
     await responseRef.set({
       'locatorId': myLocatorId,
-	  'requestDeviceId': requestDeviceId,
+	  'requesterDeviceId': requesterDeviceId,
       'status': 'ok',
       'lat': pos.latitude,
       'lng': pos.longitude,
@@ -388,7 +388,7 @@ if (groupId == null || groupId.isEmpty) {
   } catch (e) {
     await responseRef.set({
       'locatorId': myLocatorId,
-	  'requestDeviceId': requestDeviceId,
+	  'requesterDeviceId': requesterDeviceId,
       'status': 'error',
       'error': e.toString(),
       'ts': FieldValue.serverTimestamp(),

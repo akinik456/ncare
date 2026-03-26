@@ -1,36 +1,23 @@
 1 req,loc isim değiştirme
-  
-2 Konum geçmişi (tartışılacak)
-Şu an:
-responses/requestId
-Kalıcı.
-Ama konuşmamız gereken:
-geçmiş tutulacak mı
-kaç gün tutulacak
-privacy konusu
 
-3 Marka & isim
+2 Marka & isim
 NCare geçici.
 Alternatifler konuşulacak.
 
-4 App icon
+ App icon
 Play Store için gerekli.
 
-5 UI Polish
+4 UI Polish
 
-6 her locator ün kendi son adresi olmalı , loc değişince ya kendi son adresi
+5 her locator ün kendi son adresi olmalı , loc değişince ya kendi son adresi
 gösterilmeli ya da silinmeli
 
-7 start da subscribe için takılabiliyor , sık oluyor. 
+6 start da subscribe için takılabiliyor , sık oluyor. 
 
-8 batteryAlarmEnabled , batteryAlertThreshold Firestore da isimleri kontrol et ya english ya da türkçe
+7 batteryAlarmEnabled , batteryAlertThreshold Firestore da isimleri kontrol et ya english ya da türkçe
 
-9 locator rl notification toggle
+8 max. device count
 
-10 role yenilenebilsin?
+9 s2 android 9 gps on/off görmüyor
 
-11 max. device count
-
-12 call me bireysel / All
-
-13 s2 android 9 gps on/off görmüyor
+10 req loc silme

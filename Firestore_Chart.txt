@@ -1,13 +1,12 @@
-locators/{locatorId}/paired_requesters/{requesterId}
+
 
 COLLECTION , document
 
-LOCATORS(locators)
+
 locatorId  -> (acc,battery,gpsEnabled,lastSeen,lat,lng,name: "...",PairCode,pairedRequesterId,pairedRequesterName: "...",pendingPairCreatedAt,pendingPairRequesterId,pendingPairRequesterName,)                
 	
-REQUESTERS(requesters)
-requesterId
-	ALERTS(alerts)
+
+
 	alertId -> geofence_exit_locatorId (distance,locatorId,requestId,ts,type: "geofence_exit")
 			-> gps_off_locatorId (locatorId,locatorName: "..",ts:,type: "gps_off")
 			-> battery_low_locatorId (locatorId,locatorName: "..",ts:,type: "battery_low")

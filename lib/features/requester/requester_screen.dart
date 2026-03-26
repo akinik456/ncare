@@ -239,57 +239,125 @@ String formatDistance(double? distance, double acc) {
   }   
 
 Future<void> _sendRequest() async {
-  if (_groupId == null || _groupId!.isEmpty) return;
-  if (_selectedLocatorId == null || _selectedLocatorId!.isEmpty) return;
-  if (requesterId == null || requesterId!.isEmpty) return;
-  
-  final locatorDoc = await FirebaseFirestore.instance
-    .collection('locators')
-    .doc(_selectedLocatorId)
-    .get();
+  try {
+    if (_groupId == null || _groupId!.isEmpty) return;
+    if (_selectedLocatorId == null || _selectedLocatorId!.isEmpty) return;
+    if (requesterId == null || requesterId!.isEmpty) return;
 
-final paired = locatorDoc.data()?['pairedRequesters']
-    as Map<String, dynamic>?;
+    final locatorDoc = await FirebaseFirestore.instance
+        .collection('locators')
+        .doc(_selectedLocatorId)
+        .get();
 
-final entry = paired?[requesterId];
+    final paired = locatorDoc.data()?['pairedRequesters'] as Map<String, dynamic>?;
+    final entry = paired?[requesterId];
 
-if (entry == null || entry['active'] != true) {
-  print("REQ BLOCKED => not paired");
-  return;
-}
-
-  final requestDeviceId = await IdentityManager.getOrCreateDeviceId();
-
-  final doc = await FirebaseFirestore.instance
-      .collection('groups')
-      .doc(_groupId)
-      .collection('locators')
-      .doc(_selectedLocatorId)
-      .collection('requests')
-      .add({
-    'type': 'rl',
-    'requesterId': requesterId,
-    'requestDeviceId': requestDeviceId,
-    'locatorId': _selectedLocatorId,
-    'ts': FieldValue.serverTimestamp(),
-  });
-
-  setState(() {
-    _pendingRequestId = doc.id;
-    _timeout = false;
-  });
-
-  Future.delayed(const Duration(seconds: 60), () {
-    if (!mounted) return;
-
-    if (_pendingRequestId == doc.id) {
-      setState(() {
-        _timeout = true;
-      });
+    if (entry == null || entry['active'] != true) {
+      print('REQ BLOCKED => not paired');
+      return;
     }
-  });
-}
 
+    final requesterDeviceId = await IdentityManager.getOrCreateDeviceId();
+
+    final locatorRef = FirebaseFirestore.instance
+        .collection('groups')
+        .doc(_groupId)
+        .collection('locators')
+        .doc(_selectedLocatorId);
+
+    final requestsRef = locatorRef.collection('requests');
+    final responsesRef = locatorRef.collection('responses');
+
+    // -------------------------------
+    // trim ONLY my own requests
+    // keep max 9 before adding new one
+    // no orderBy in query -> sort in Dart
+    // -------------------------------
+    final myRequestsSnap = await requestsRef
+        .where('requesterDeviceId', isEqualTo: requesterDeviceId)
+        .get();
+
+    final myRequestDocs = myRequestsSnap.docs.toList()
+      ..sort((a, b) {
+        final aTs = a.data()['ts'];
+        final bTs = b.data()['ts'];
+
+        final aMs = aTs is Timestamp ? aTs.millisecondsSinceEpoch : 0;
+        final bMs = bTs is Timestamp ? bTs.millisecondsSinceEpoch : 0;
+
+        return aMs.compareTo(bMs);
+      });
+
+    if (myRequestDocs.length >= 10) {
+      final deleteCount = myRequestDocs.length - 9;
+      final batch = FirebaseFirestore.instance.batch();
+
+      for (final doc in myRequestDocs.take(deleteCount)) {
+        batch.delete(doc.reference);
+      }
+
+      await batch.commit();
+    }
+
+    // -------------------------------
+    // trim ONLY my own responses
+    // keep max 9 before adding new one
+    // response field: requesterDeviceId
+    // no orderBy in query -> sort in Dart
+    // -------------------------------
+    final myResponsesSnap = await responsesRef
+        .where('requesterDeviceId', isEqualTo: requesterDeviceId)
+        .get();
+
+    final myResponseDocs = myResponsesSnap.docs.toList()
+      ..sort((a, b) {
+        final aTs = a.data()['ts'];
+        final bTs = b.data()['ts'];
+
+        final aMs = aTs is Timestamp ? aTs.millisecondsSinceEpoch : 0;
+        final bMs = bTs is Timestamp ? bTs.millisecondsSinceEpoch : 0;
+
+        return aMs.compareTo(bMs);
+      });
+
+    if (myResponseDocs.length >= 10) {
+      final deleteCount = myResponseDocs.length - 9;
+      final batch = FirebaseFirestore.instance.batch();
+
+      for (final doc in myResponseDocs.take(deleteCount)) {
+        batch.delete(doc.reference);
+      }
+
+      await batch.commit();
+    }
+
+    final doc = await requestsRef.add({
+      'type': 'rl',
+      'requesterId': requesterId,
+      'requesterDeviceId': requesterDeviceId,
+      'locatorId': _selectedLocatorId,
+      'ts': FieldValue.serverTimestamp(),
+    });
+
+    setState(() {
+      _pendingRequestId = doc.id;
+      _timeout = false;
+    });
+
+    Future.delayed(const Duration(seconds: 60), () {
+      if (!mounted) return;
+
+      if (_pendingRequestId == doc.id) {
+        setState(() {
+          _timeout = true;
+        });
+      }
+    });
+  } catch (e, st) {
+    print('SEND REQUEST ERROR => $e');
+    print(st);
+  }
+}
 
   
 String lastSeenText(Timestamp ts) {
@@ -1206,7 +1274,7 @@ if (_groupId == null || _groupId!.isEmpty) ...[
     }
 
     final responseDeviceId =
-        (data['requestDeviceId'] ?? '').toString().trim();
+        (data['requesterDeviceId'] ?? '').toString().trim();
 
     if (_requesterDeviceId != null &&
         responseDeviceId.isNotEmpty &&
@@ -1264,7 +1332,7 @@ if (_groupId == null || _groupId!.isEmpty) ...[
         }
 
         final visibleResponseDeviceId =
-            (visibleData['requestDeviceId'] ?? '').toString().trim();
+            (visibleData['requesterDeviceId'] ?? '').toString().trim();
 
         if (_requesterDeviceId != null &&
             visibleResponseDeviceId.isNotEmpty &&
