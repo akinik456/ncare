@@ -97,24 +97,21 @@ if (role == 'locator') {
   final requesterId = await IdentityManager.getOrCreateDeviceId();
 }  
 
-  FirebaseMessaging.onMessage.listen((message) async {
+FirebaseMessaging.onMessage.listen((message) async {
   await NotificationGateway.handle(message);
-
   if (role != 'locator') return;
 
   final data = message.data;
   if (data['type'] != 'rl') return;
-  
+
   print("rl received");
 
   final requestId = data['requestId']?.toString();
   final requesterId = data['requesterId']?.toString();
   final targetLocatorId = data['locatorId']?.toString();
   final requesterDeviceId =
-    (data['requesterDeviceId'] ?? '').toString().trim();
-	print("requesterDeviceId:$requesterDeviceId");
-  
-  
+      (data['requesterDeviceId'] ?? '').toString().trim();
+
   final battery = Battery();
   final level = await battery.batteryLevel;
 
@@ -131,22 +128,22 @@ if (role == 'locator') {
     print("FG SKIP => target=$targetLocatorId mine=$myLocatorId");
     return;
   }
-  
-  final groupId = await IdentityManager.getLocalGroupId();
-if (groupId == null || groupId.isEmpty) {
-  print("FG RL BLOCKED => no groupId");
-  return;
-}
-print("groupId:$groupId");
-  final stillPaired = await _isStillPaired(
-  locatorId: myLocatorId!,
-  requesterId: requesterId,
-);
 
-if (!stillPaired) {
-  print("FG RL BLOCKED => requester not paired");
-  return;
-}
+  final groupId = await IdentityManager.getLocalGroupId();
+  if (groupId == null || groupId.isEmpty) {
+    print("FG RL BLOCKED => no groupId");
+    return;
+  }
+
+  final stillPaired = await _isStillPaired(
+    locatorId: myLocatorId!,
+    requesterId: requesterId,
+  );
+
+  if (!stillPaired) {
+    print("FG RL BLOCKED => requester not paired");
+    return;
+  }
 
   final prefs = await SharedPreferences.getInstance();
   final enabled = prefs.getBool('locator_request_alerts') ?? true;
@@ -154,63 +151,69 @@ if (!stillPaired) {
   if (enabled) {
     LocatorUiState.instance.onRequestReceived(requestId);
   }
-final locatorDoc = await FirebaseFirestore.instance
-    .collection('locators')
-    .doc(myLocatorId)
-    .get();
-	
-print("myLocatorId:$myLocatorId");
 
-final cachedLat = (locatorDoc.data()?['lat'] as num?)?.toDouble();
-final cachedLng = (locatorDoc.data()?['lng'] as num?)?.toDouble();
-final cachedAcc = (locatorDoc.data()?['acc'] as num?)?.toDouble();
+  final locatorDoc = await FirebaseFirestore.instance
+      .collection('locators')
+      .doc(myLocatorId)
+      .get();
 
-final ts = locatorDoc.data()?['ts'] as Timestamp?;
-final age = ts != null
-    ? DateTime.now().difference(ts.toDate()).inSeconds
-    : 9999;
+  print("myLocatorId:$myLocatorId");
+
+  final cachedLat = (locatorDoc.data()?['lat'] as num?)?.toDouble();
+  final cachedLng = (locatorDoc.data()?['lng'] as num?)?.toDouble();
+  final cachedAcc = (locatorDoc.data()?['acc'] as num?)?.toDouble();
+  final lastSeen = locatorDoc.data()?['lastSeen'];
+
+  final age = lastSeen != null
+      ? DateTime.now().difference(lastSeen.toDate()).inSeconds
+      : 9999;
+
   try {
-if (cachedLat != null &&
-    cachedLng != null &&
-    cachedAcc != null &&
-    age < 30) {
-  await FirebaseFirestore.instance
-      .collection('groups')
-.doc(groupId)
-.collection('locators')
-.doc(myLocatorId)
-.collection('responses')
-.doc(requestId)
-      .set({
-    'locatorId': myLocatorId,
-	'requesterDeviceId': requesterDeviceId,
-    'status': 'ok',
-    'lat': cachedLat,
-    'lng': cachedLng,
-    'acc': cachedAcc,
-    'battery': level,
-    'ts': FieldValue.serverTimestamp(),
-    'via': 'cached',
-  }, SetOptions(merge: true));
-}  
-  
+    if (cachedLat != null &&
+        cachedLng != null &&
+        cachedAcc != null &&
+        age < 30) {
+      await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(groupId)
+          .collection('locators')
+          .doc(myLocatorId)
+          .collection('responses')
+          .doc(requestId)
+          .set({
+        'locatorId': myLocatorId,
+        'requesterDeviceId': requesterDeviceId,
+        'status': 'ok',
+        'lat': cachedLat,
+        'lng': cachedLng,
+        'acc': cachedAcc,
+        'battery': level,
+        'ts': FieldValue.serverTimestamp(),
+        'via': 'cached',
+      }, SetOptions(merge: true));
+
+      LocatorUiState.instance.onSentOk();
+      print("FG CACHED SENT => $requestId $cachedLat,$cachedLng age=$age");
+      return;
+    }
+
     final pos = await LocationService.getCurrentLocationSafe(
-  accuracy: LocationAccuracy.high,
-  timeLimit: const Duration(seconds: 20),
-);
-		if(pos == null) return;
-	
-    
-	await FirebaseFirestore.instance
-      .collection('groups')
-.doc(groupId)
-.collection('locators')
-.doc(myLocatorId)
-.collection('responses')
-.doc(requestId)
-      .set({
+      accuracy: LocationAccuracy.high,
+      timeLimit: const Duration(seconds: 20),
+    );
+
+    if (pos == null) return;
+
+    await FirebaseFirestore.instance
+        .collection('groups')
+        .doc(groupId)
+        .collection('locators')
+        .doc(myLocatorId)
+        .collection('responses')
+        .doc(requestId)
+        .set({
       'locatorId': myLocatorId,
-	  'requesterDeviceId': requesterDeviceId,
+      'requesterDeviceId': requesterDeviceId,
       'status': 'ok',
       'lat': pos.latitude,
       'lng': pos.longitude,
@@ -224,15 +227,15 @@ if (cachedLat != null &&
     print("FG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
   } catch (e) {
     await FirebaseFirestore.instance
-      .collection('groups')
-.doc(groupId)
-.collection('locators')
-.doc(myLocatorId)
-.collection('responses')
-.doc(requestId)
-      .set({
+        .collection('groups')
+        .doc(groupId)
+        .collection('locators')
+        .doc(myLocatorId)
+        .collection('responses')
+        .doc(requestId)
+        .set({
       'locatorId': myLocatorId,
-	  'requesterDeviceId': requesterDeviceId,
+      'requesterDeviceId': requesterDeviceId,
       'status': 'error',
       'error': e.toString(),
       'ts': FieldValue.serverTimestamp(),
@@ -317,11 +320,12 @@ if (groupId == null || groupId.isEmpty) {
     final cachedLat = (locatorDoc.data()?['lat'] as num?)?.toDouble();
     final cachedLng = (locatorDoc.data()?['lng'] as num?)?.toDouble();
     final cachedAcc = (locatorDoc.data()?['acc'] as num?)?.toDouble();
-    final ts = locatorDoc.data()?['ts'] as Timestamp?;
-    final age = ts != null
-        ? DateTime.now().difference(ts.toDate()).inSeconds
-        : 9999;
+	
+	final lastSeen = locatorDoc.data()?['lastSeen'];
 
+  final age = lastSeen != null
+      ? DateTime.now().difference(lastSeen.toDate()).inSeconds
+      : 9999;
     final battery = Battery();
     final level = await battery.batteryLevel;
 
@@ -340,6 +344,10 @@ if (groupId == null || groupId.isEmpty) {
         'ts': FieldValue.serverTimestamp(),
         'via': 'cached_bg',
       }, SetOptions(merge: true));
+      LocatorUiState.instance.onSentOk();
+      print("BG CACHED SENT => $requestId $cachedLat,$cachedLng age=$age");
+      return;
+	  
     }
 
     final gpsOn = await Geolocator.isLocationServiceEnabled();
