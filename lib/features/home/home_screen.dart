@@ -192,6 +192,7 @@ Future<void> _sendCallMeSingle(
       .collection('locators')
       .doc(locatorId)
       .get();
+  final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
 
   final groupId =
       (locatorDoc.data()?['groupId'] ?? '').toString().trim();
@@ -230,6 +231,7 @@ Future<void> _sendCallMeAll() async {
       .collection('locators')
       .doc(locatorId)
       .get();
+  final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
 
   final groupId =
       (locatorDoc.data()?['groupId'] ?? '').toString().trim();
@@ -405,8 +407,8 @@ Future<void> _approvePendingPair() async {
 
     if (pendingRequesterId.isEmpty) return;
     if (groupId.isEmpty) return;
-	
-	final pairedRequestersRaw =
+
+final pairedRequestersRaw =
     (data['pairedRequesters'] as Map<String, dynamic>?) ?? {};
 final pairedRequesters =
     Map<String, dynamic>.from(pairedRequestersRaw);
@@ -493,7 +495,7 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
       'name': (data['name'] ?? 'Locator').toString(),
       'joinedAt': FieldValue.serverTimestamp(),
       'active': true,
-	   // ---- DEFAULT SETTINGS ----
+  // ---- DEFAULT SETTINGS ----
   'callEnabled': true,
   'gpsOffAlarmEnabled': true,
   'batteryAlarmEnabled': true,
@@ -501,13 +503,14 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
   'placeAlarmEnabled': false,
   'geofenceAlarmEnabled': false,
   'geofenceRadius': 250,
-    }, SetOptions(merge: true));	
-	
-	
+    }, SetOptions(merge: true));
+
+
   } catch (e) {
     print('APPROVE PENDING PAIR ERROR => $e');
   }
 }
+
 
   Future<void> _rejectPendingPair() async {
     if (locatorId == null || locatorId!.isEmpty) return;
@@ -938,6 +941,18 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
                               (data?['pairedRequesterName'] ?? '').toString().trim();
 
                           final paired = requesterName.isNotEmpty;
+						  
+						  final pairedRequesters =
+    data?['pairedRequesters'] as Map<String, dynamic>?;
+
+final pairedNames = pairedRequesters == null
+    ? <String>[]
+    : pairedRequesters.values
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .where((e) => e['active'] == true)
+        .map((e) => (e['name'] ?? 'Requester').toString())
+        .toList();
+						  
                           final hasPendingPair =
                               (data?['pendingPairRequesterId'] ?? '')
                                   .toString()
@@ -972,19 +987,19 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
-                                      child: Text(
-                                        paired
-                                            ? 'Paired with $requesterName'
-                                            : 'Not paired yet',
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodyMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w700,
-                                              color: const Color(0xFF0F172A),
-                                            ),
-                                      ),
-                                    ),
+  child: Text(
+    pairedNames.isNotEmpty
+        ? 'Paired with ${pairedNames.join(', ')}'
+        : 'Not paired yet',
+    style: Theme.of(context)
+        .textTheme
+        .bodyMedium
+        ?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: const Color(0xFF0F172A),
+        ),
+  ),
+),
                                   ],
                                 ),
                               ),
@@ -1022,7 +1037,7 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
               onPressed: () =>
                   _sendCallMeSingle(requesterId, name),
               icon: const Icon(Icons.call),
-              label: Text('Call $name'),
+              label: Text('Ask $name to call me'),
             ),
           );
         }),
@@ -1031,7 +1046,7 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
           FilledButton.icon(
             onPressed: _sendCallMeAll,
             icon: const Icon(Icons.campaign),
-            label: const Text('Call Everybody'),
+            label: const Text('Ask everyone to call me'),
           ),
       ],
     );

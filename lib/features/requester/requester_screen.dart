@@ -450,7 +450,16 @@ Future<void> _joinGroup() async {
 
   if (result == null || result.isEmpty) return;
 
-  final deviceId = await IdentityManager.getOrCreateDeviceId();
+  final requesterId = await IdentityManager.getOrCreateDeviceId();
+  
+  final requesterDoc = await FirebaseFirestore.instance
+		.collection('requesters')
+		.doc(requesterId)
+		.get();
+
+	final requesterName =
+		(requesterDoc.data()?['name'] ?? '').toString();
+		
   final now = FieldValue.serverTimestamp();
 
   await IdentityManager.setLocalGroupId(result);
@@ -459,11 +468,12 @@ Future<void> _joinGroup() async {
       .collection('groups')
       .doc(result)
       .collection('devices')
-      .doc(deviceId)
+      .doc(requesterId)
       .set({
-    'deviceId': deviceId,
+    'deviceId': requesterId,
     'groupId': result,
     'role': 'requester',
+	'name': requesterName,
     'joinedAt': now,
     'active': true,
     'isMaster': false,
@@ -517,7 +527,7 @@ Future<void> _joinGroup() async {
                 );
               },
               icon: const Icon(Icons.person_add_alt_1_rounded),
-              label: const Text('Add'),
+              label: const Text('Add locator'),
               style: FilledButton.styleFrom(
                 foregroundColor: const Color(0xFF0F172A),
                 backgroundColor: Colors.white,
@@ -620,7 +630,9 @@ Container(
         ),
         TextButton(
 onPressed: () async {
+  final alertId = _activeCallAlertId;
   final locatorId = _callRequestLocatorId;
+  final groupId = _groupId;
 
   setState(() {
     _callRequestFrom = null;
@@ -628,19 +640,22 @@ onPressed: () async {
     _activeCallAlertId = null;
   });
 
-  if (requesterId == null || requesterId!.isEmpty || locatorId == null) {
-    return;
-  }
+   if (groupId == null || groupId.isEmpty) return;
+  if (locatorId == null || locatorId.isEmpty) return;
+  if (alertId == null || alertId.isEmpty) return;
 
-  final snap = await FirebaseFirestore.instance
-    .collection('groups')
-    .doc(_groupId)
-    .collection('locators')
-    .doc(locatorId)
-    .collection('alerts')
-      .where('type', isEqualTo: 'call_me')
-      .get();
-  
+  try {
+  await FirebaseFirestore.instance
+      .collection('groups')
+      .doc(groupId)
+      .collection('locators')
+      .doc(locatorId)
+      .collection('alerts')
+      .doc(alertId)
+      .delete();
+} catch (e) {
+  print('CALL_ME DISMISS DELETE ERROR => $e');
+}
 },
 
           child: const Text('DISMISS'),
@@ -648,7 +663,7 @@ onPressed: () async {
       ],
     ),
   ),
-//if (_groupId == null) ...[
+if (_groupId == null || _groupId!.isEmpty) ...[
   const SizedBox(height: 8),
   SizedBox(
     width: double.infinity,
@@ -658,7 +673,7 @@ onPressed: () async {
       label: const Text("Join group"),
     ),
   ),
-//],		  
+],		  
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
