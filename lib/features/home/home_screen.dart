@@ -132,7 +132,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
 Future<void> _sendCallMeAlert() async {
-print("callme called");
+  print("callme called");
+
   final settings = await LocatorSettingsReader.load();
   if (settings == null) return;
 
@@ -146,32 +147,39 @@ print("callme called");
     );
     return;
   }
-  
-  print("settings.callEnabled:$settings.callEnabled");
+
+  print("settings.callEnabled:${settings.callEnabled}");
 
   final locatorId = await IdentityManager.getOrCreateDeviceId();
-   print("locatorId:$locatorId");
+  print("locatorId:$locatorId");
+
   final locatorDoc = await FirebaseFirestore.instance
       .collection('locators')
       .doc(locatorId)
       .get();
+
   final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
-  final groupId = (locatorDoc.data()?['groupId'] ?? '').toString().trim();
+  final groupId =
+      (locatorDoc.data()?['groupId'] ?? '').toString().trim();
+
   if (groupId.isEmpty) return;
-print("groupId:$groupId");
+
+  print("groupId:$groupId");
+
   await FirebaseFirestore.instance
-    .collection('groups')
-    .doc(groupId)
-    .collection('locators')
-    .doc(locatorId)
-    .collection('alerts')
-    .add({
-  'type': 'call_me',
-  'groupId': groupId,
-  'locatorId': locatorId,
-  'locatorName': locatorName,
-  'ts': FieldValue.serverTimestamp(),
-});
+      .collection('groups')
+      .doc(groupId)
+      .collection('locators')
+      .doc(locatorId)
+      .collection('alerts')
+      .add({
+    'type': 'call_me',
+    'groupId': groupId,
+    'locatorId': locatorId,
+    'locatorName': locatorName,
+    'targetMode': 'all',
+    'ts': FieldValue.serverTimestamp(),
+  });
 
   if (!mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(

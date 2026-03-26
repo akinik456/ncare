@@ -35,6 +35,7 @@ class _RequesterScreenState extends State<RequesterScreen> with SingleTickerProv
   String? _selectedLocatorId;
   bool _timeout = false;
   String? _callRequestFrom;
+  String? _callRequestTs;
   String? _lastAlertId;
   String? _activeCallAlertId;
   String? _callRequestLocatorId;
@@ -152,7 +153,30 @@ Future<void> _initBatteryDefaults() async {
   }
 }
 
+String formatAlertTs(Timestamp? ts) {
+  if (ts == null) return '';
 
+  final dt = ts.toDate();
+  final now = DateTime.now();
+
+  final sameDay =
+      dt.year == now.year &&
+      dt.month == now.month &&
+      dt.day == now.day;
+
+  if (sameDay) {
+    final h = dt.hour.toString().padLeft(2, '0');
+    final m = dt.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  final d = dt.day.toString().padLeft(2, '0');
+  final mo = dt.month.toString().padLeft(2, '0');
+  final h = dt.hour.toString().padLeft(2, '0');
+  final m = dt.minute.toString().padLeft(2, '0');
+
+  return '$d.$mo $h:$m';
+}
 
 Future<void> saveRequestAlerts(bool value) async {
   final prefs = await SharedPreferences.getInstance();
@@ -329,7 +353,8 @@ void _listenCallAlerts() {
 
     final data = doc.data();
     final locatorId = (data['locatorId'] ?? '').toString();
-
+	final ts = data['ts'] as Timestamp?;
+	final formattedTs = formatAlertTs(ts);
     String displayName = 'Locator';
 
     if (locatorId.isNotEmpty) {
@@ -349,6 +374,7 @@ void _listenCallAlerts() {
       _activeCallAlertId = doc.id;
       _callRequestFrom = displayName;
       _callRequestLocatorId = locatorId;
+	   _callRequestTs = formattedTs;
     });
   }, onError: (e) {
     print("CALL_ME LISTENER ERROR => $e");
@@ -620,14 +646,31 @@ Container(
         const Icon(Icons.call, color: Color(0xFFDC2626)),
         const SizedBox(width: 10),
         Expanded(
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        '$_callRequestFrom wants you to call',
+        style: const TextStyle(
+          fontWeight: FontWeight.w700,
+          color: Color(0xFF7F1D1D),
+        ),
+      ),
+      if (_callRequestTs != null && _callRequestTs!.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
           child: Text(
-            '$_callRequestFrom wants you to call',
+            _callRequestTs!,
             style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF7F1D1D),
+              fontSize: 12,
+              color: Color(0xFF991B1B),
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
+    ],
+  ),
+),
         TextButton(
 onPressed: () async {
   final alertId = _activeCallAlertId;
@@ -638,6 +681,7 @@ onPressed: () async {
     _callRequestFrom = null;
     _callRequestLocatorId = null;
     _activeCallAlertId = null;
+	_callRequestTs = null;
   });
 
    if (groupId == null || groupId.isEmpty) return;

@@ -94,76 +94,105 @@ static Future<void> show({
   
   
 
-  static Future<void> showFromRemoteMessage(RemoteMessage message) async {
-  
-    await ensureInitialized();
+static Future<void> showFromRemoteMessage(RemoteMessage message) async {
+  await ensureInitialized();
 
-    final data = message.data;
+  final data = message.data;
 
-    final type = (data['type'] ?? '').toString();
-    final locatorName = (data['locatorName'] ?? 'Locator').toString();
-    final placeName = (data['placeName'] ?? 'Place').toString();
+  final tsStr = data['ts'];
+  DateTime? dt;
 
-
-
-    String title =
-        message.notification?.title?.trim().isNotEmpty == true
-            ? message.notification!.title!
-            : 'NCare Alert';
-
-    String body =
-        message.notification?.body?.trim().isNotEmpty == true
-            ? message.notification!.body!
-            : 'You have a new alert';
-			
-    if (type == 'rl') {
-      final requesterName = (data['requesterName'] ?? 
-	'Requester').toString();
-      title = 'Location request';
-     body = '$requesterName requested your location';
-    }
-	
-	final prefs = await SharedPreferences.getInstance();
-    if(type == 'rl'){
-	final enabled = prefs.getBool('locator_request_alerts') ?? true;
-	
-       if (!enabled) return;
-	}			
-			
-
-    if (type == 'call_me') {
-      title = 'Call request';
-      body = '$locatorName wants you to call';
-    } else if (type == 'battery_low') {
-      title = 'Battery alert';
-      body = '$locatorName battery is low';
-    } else if (type == 'gps_off') {
-      title = 'GPS alert';
-      body = '$locatorName GPS is OFF';
-    } else if (type.startsWith('place_arrive')) {
-      title = 'Arrived';
-      body = '$locatorName arrived at $placeName';
-    } else if (type.startsWith('place_left')) {
-      title = 'Left';
-      body = '$locatorName left $placeName';
-    }
-
-    await _fln.show(
-      _notificationId(type, locatorName),
-      title,
-      body,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'ncare_alerts',
-          'NCare Alerts',
-          channelDescription: 'Important alerts from NCare',
-          importance: Importance.high,
-          priority: Priority.high,
-          ticker: 'NCare alert',
-        ),
-      ),
-    );
+  if (tsStr != null && tsStr.isNotEmpty) {
+    dt = DateTime.fromMillisecondsSinceEpoch(int.parse(tsStr));
   }
+
+  String formatAlertTsFromDate(DateTime date) {
+    final now = DateTime.now();
+
+    final sameDay =
+        date.year == now.year &&
+        date.month == now.month &&
+        date.day == now.day;
+
+    final hh = date.hour.toString().padLeft(2, '0');
+    final mm = date.minute.toString().padLeft(2, '0');
+
+    if (sameDay) {
+      return '$hh:$mm';
+    }
+
+    final dd = date.day.toString().padLeft(2, '0');
+    final mo = date.month.toString().padLeft(2, '0');
+
+    return '$dd.$mo $hh:$mm';
+  }
+
+  final formattedTs = dt != null ? formatAlertTsFromDate(dt) : '';
+
+  final type = (data['type'] ?? '').toString();
+  final locatorName = (data['locatorName'] ?? 'Locator').toString();
+  final placeName = (data['placeName'] ?? 'Place').toString();
+
+  String title =
+      message.notification?.title?.trim().isNotEmpty == true
+          ? message.notification!.title!
+          : 'NCare Alert';
+
+  String body =
+      message.notification?.body?.trim().isNotEmpty == true
+          ? message.notification!.body!
+          : 'You have a new alert';
+
+  if (type == 'rl') {
+    final requesterName = (data['requesterName'] ?? 'Requester').toString();
+    title = 'Location request';
+    body = '$requesterName requested your location';
+  }
+
+  final prefs = await SharedPreferences.getInstance();
+
+  if (type == 'rl') {
+    final enabled = prefs.getBool('locator_request_alerts') ?? true;
+    if (!enabled) return;
+  }
+
+  if (type == 'call_me') {
+    title = 'Call request';
+    body = '$locatorName wants you to call';
+  } else if (type == 'battery_low') {
+    title = 'Battery alert';
+    body = '$locatorName battery is low';
+  } else if (type == 'gps_off') {
+    title = 'GPS alert';
+    body = '$locatorName GPS is OFF';
+  } else if (type.startsWith('place_arrive')) {
+    title = 'Arrived';
+    body = '$locatorName arrived at $placeName';
+  } else if (type.startsWith('place_left')) {
+    title = 'Left';
+    body = '$locatorName left $placeName';
+  }
+
+  if (formattedTs.isNotEmpty) {
+    body = '$body • $formattedTs';
+  }
+
+  await _fln.show(
+    _notificationId(type, locatorName),
+    title,
+    body,
+    const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'ncare_alerts',
+        'NCare Alerts',
+        channelDescription: 'Important alerts from NCare',
+        importance: Importance.high,
+        priority: Priority.high,
+        ticker: 'NCare alert',
+      ),
+    ),
+  );
+}
 
   static int _notificationId(String type, String locatorName) {
     return Object.hash(type, locatorName) & 0x7fffffff;

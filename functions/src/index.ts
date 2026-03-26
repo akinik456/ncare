@@ -3,6 +3,8 @@ import * as admin from "firebase-admin";
 
 admin.initializeApp();
 
+
+
 export const onRequestCreated = onDocumentCreated(
   {
     document: "groups/{groupId}/locators/{locatorId}/requests/{requestId}",
@@ -90,6 +92,7 @@ export const onAlertCreated = onDocumentCreated(
       title = "Call request";
       body = `${locatorName} wants you to call`;
     } else if (type === "gps_off") {
+		
       title = "GPS disabled";
       body = `${locatorName} turned GPS off`;
     } else if (type === "battery_low") {
@@ -170,6 +173,7 @@ export const onAlertCreated = onDocumentCreated(
           placeName: data?.placeName?.toString() ?? "",
           distance: data?.distance?.toString() ?? "",
           radiusMeters: data?.radiusMeters?.toString() ?? "",
+		  ts: data?.ts?.toMillis()?.toString() ?? "",
         },
         notification: {
           title,
