@@ -85,9 +85,11 @@ class _PairRequestScreenState extends State<PairRequestScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: const Color(0xFF020617),
       appBar: AppBar(
-        title: const Text('Pair request'),
+        backgroundColor: const Color(0xFF020617),
+        surfaceTintColor: Colors.transparent,
+        title: const Text('NCare', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
       ),
       body: SafeArea(
         child: Padding(
@@ -98,9 +100,9 @@ class _PairRequestScreenState extends State<PairRequestScreen> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: const Color(0xFF020617),
                   borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: const Color(0xFF38BDF8).withOpacity(.28)),
                   boxShadow: const [
                     BoxShadow(
                       color: Color(0x120F172A),
@@ -117,7 +119,7 @@ class _PairRequestScreenState extends State<PairRequestScreen> {
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF0F172A),
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -125,7 +127,7 @@ class _PairRequestScreenState extends State<PairRequestScreen> {
                       'Pairing will finish only after the locator approves this request.',
                       style: TextStyle(
                         fontSize: 15,
-                        color: Color(0xFF64748B),
+                        color: Color(0xFF94A3B8),
                         height: 1.4,
                       ),
                     ),

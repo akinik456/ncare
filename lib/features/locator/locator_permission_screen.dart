@@ -86,16 +86,16 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
+      backgroundColor: const Color(0xFF020617),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFF8FBFF),
-              Color(0xFFF4F7FB),
-              Color(0xFFF1F5F9),
+              Color(0xFF020617),
+              Color(0xFF020617),
+              Color(0xFF0F172A),
             ],
           ),
         ),
@@ -144,7 +144,7 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> {
                             ),
                             child: const Icon(
                               Icons.location_on_rounded,
-                              color: Colors.white,
+                              color: const Color(0xFF020617),
                               size: 34,
                             ),
                           ),
@@ -179,7 +179,7 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> {
                         borderRadius: BorderRadius.circular(30),
                         color: Colors.white,
                         border: Border.all(
-                          color: const Color(0xFFE2E8F0),
+                          color: const Color(0xFF334155),
                           width: 1.1,
                         ),
                         boxShadow: const [
@@ -198,7 +198,7 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> {
                             style: TextStyle(
                               fontSize: 23,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xFF0F172A),
+                              color: Colors.white,
                               letterSpacing: -0.4,
                             ),
                           ),
@@ -208,7 +208,7 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF64748B),
+                              color: Color(0xFF94A3B8),
                             ),
                           ),
                           const SizedBox(height: 18),

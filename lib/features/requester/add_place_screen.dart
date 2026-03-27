@@ -227,16 +227,16 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: const Color(0xFF020617),
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: const Color(0xFFF1F5F9),
+        backgroundColor: const Color(0xFF020617),
         surfaceTintColor: Colors.transparent,
         title: const Text(
-          'Add place',
+          'NCare',
           style: TextStyle(
             fontWeight: FontWeight.w800,
-            color: Color(0xFF0F172A),
+            color: Colors.white,
           ),
         ),
       ),
@@ -249,9 +249,9 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: const Color(0xFF020617),
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: const Color(0xFF6366F1).withOpacity(.28)),
                       boxShadow: const [
                         BoxShadow(
                           color: Color(0x120F172A),
@@ -268,14 +268,14 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F172A),
+                            color: Colors.white,
                           ),
                         ),
                         const SizedBox(height: 6),
                         const Text(
                           'Save a place from the locator current location.',
                           style: TextStyle(
-                            color: Color(0xFF64748B),
+                            color: Color(0xFF94A3B8),
                             height: 1.35,
                           ),
                         ),
@@ -284,8 +284,23 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                           controller: _nameController,
                           decoration: const InputDecoration(
                             labelText: 'Place name',
-                            border: OutlineInputBorder(),
+                            labelStyle: TextStyle(color: Color(0xFF94A3B8)),
+                            filled: true,
+                            fillColor: Color(0xFF0F172A),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(18)),
+                              borderSide: BorderSide(color: Color(0xFF334155)),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(18)),
+                              borderSide: BorderSide(color: Color(0xFF334155)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(Radius.circular(18)),
+                              borderSide: BorderSide(color: Color(0xFF6366F1)),
+                            ),
                           ),
+                          style: TextStyle(color: Colors.white),
                         ),
                         const SizedBox(height: 18),
                         if (_error != null) ...[

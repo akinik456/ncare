@@ -1,23 +1,23 @@
-1 req,loc isim değiştirme
-
-2 Marka & isim
+1 Marka & isim
 NCare geçici.
 Alternatifler konuşulacak.
 
  App icon
 Play Store için gerekli.
 
-4 UI Polish
+2 UI Polish
 
-5 her locator ün kendi son adresi olmalı , loc değişince ya kendi son adresi
+3 her locator ün kendi son adresi olmalı , loc değişince ya kendi son adresi
 gösterilmeli ya da silinmeli
 
 6 start da subscribe için takılabiliyor , sık oluyor. 
 
-7 batteryAlarmEnabled , batteryAlertThreshold Firestore da isimleri kontrol et ya english ya da türkçe
+5 batteryAlarmEnabled , batteryAlertThreshold Firestore da isimleri kontrol et ya english ya da türkçe
 
-8 max. device count
+6 max. device count
 
-9 s2 android 9 gps on/off görmüyor
+7 s2 android 9 gps on/off görmüyor
 
-10 req loc silme
+8 req loc silme
+
+9 status da lastseen çok eski ise batery ve konum anlamsız

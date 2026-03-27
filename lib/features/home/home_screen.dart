@@ -47,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
       (_) => _updatePresence(),
     );
     _initLocatorId();
+	_loadLocatorName();
     _startBatteryMonitor();
   }
 
@@ -677,27 +678,46 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
       'locatorName': locatorName ?? 'Locator',
     });
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF1F5F9),
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        title: const Text(
-          'Locator',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF0F172A),
+return Scaffold(
+  backgroundColor: const Color(0xFFF1F5F9),
+  appBar: AppBar(
+    backgroundColor: const Color(0xFFF1F5F9),
+    surfaceTintColor: Colors.transparent,
+    elevation: 0,
+    centerTitle: true,
+    title: const Text(
+      'LYNRA Care',
+      style: TextStyle(
+        fontWeight: FontWeight.w800,
+        color: Color(0xFF0F172A),
+      ),
+    ),
+  ),
+  body: SafeArea(
+    child: Column(
+      children: [
+        const SizedBox(height: 6),
+
+        Center(
+          child: Text(
+            locatorName ?? 'Device',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF334155),
+            ),
           ),
         ),
-      ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: StreamBuilder<bool>(
+
+        const SizedBox(height: 6),
+
+        Expanded(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: StreamBuilder<bool>(
                 initialData: DeviceStateManager.instance.isReady,
                 stream: DeviceStateManager.instance.readyStream,
                 builder: (context, snapshot) {
@@ -783,14 +803,34 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
                                       height: 1.45,
                                     ),
                                   ),
-                                  const SizedBox(height: 12),
+                                  
+								  const SizedBox(height: 8),
+                                                    
+													const Text(
+                                                      'Remote Pairing Code',
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontWeight: FontWeight.w700,
+                                                      ),
+                                                    ),
+													SelectableText(
+                                                      currentPairCode,
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 22,
+                                                        fontWeight: FontWeight.w900,
+                                                        letterSpacing: 8,
+                                                      ),
+                                                    ),
+													const SizedBox(height: 12),
                                   SelectableText(
                                     locatorId!,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
+                                    style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontWeight: FontWeight.w700,
+                                                      ),
+                                  ),	
+								  
                                 ],
                               ),
                             ),
@@ -848,27 +888,7 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
                                                     color: const Color(0xFFE2E8F0),
                                                   ),
                                                 ),
-                                                child: Column(
-                                                  children: [
-                                                    const Text(
-                                                      'Remote Pairing Code',
-                                                      style: TextStyle(
-                                                        color: Color(0xFF475569),
-                                                        fontWeight: FontWeight.w700,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(height: 8),
-                                                    SelectableText(
-                                                      currentPairCode,
-                                                      style: const TextStyle(
-                                                        color: Color(0xFF0F172A),
-                                                        fontSize: 28,
-                                                        fontWeight: FontWeight.w900,
-                                                        letterSpacing: 8,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
+                                               
                                               ),
                                             ],
                                           ),
@@ -901,34 +921,7 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
                                     ),
                                   ),
                                 ),
-					  const SizedBox(height: 10),
-						Text(
-						  'Remote pairing code',
-						  style: theme.textTheme.bodySmall?.copyWith(
-							color: Colors.white.withOpacity(0.85),
-							fontWeight: FontWeight.w600,
-						  ),
-						),
-						const SizedBox(height: 6),
-						Container(
-						  padding: const EdgeInsets.symmetric(
-							horizontal: 12,
-							vertical: 10,
-						  ),
-						  decoration: BoxDecoration(
-							color: Colors.white.withOpacity(0.15),
-							borderRadius: BorderRadius.circular(12),
-						  ),
-						  child: SelectableText(
-							currentPairCode,
-							style: const TextStyle(
-							  color: Colors.white,
-							  fontSize: 18,
-							  fontWeight: FontWeight.w900,
-							  letterSpacing: 4,
-							),
-						  ),
-						),								
+					  			
                               ],
                             ),
                           ],
@@ -1106,6 +1099,9 @@ final pairedNames = pairedRequesters == null
           ),
         ),
       ),
+	  ],
+	  ),
+	  ),
     );
   }
 }

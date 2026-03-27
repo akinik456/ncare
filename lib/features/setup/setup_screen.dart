@@ -60,9 +60,9 @@ void initState(){
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: const Color(0xFF020617),
       appBar: AppBar(
-        backgroundColor: const Color(0xFFF1F5F9),
+        backgroundColor: const Color(0xFF020617),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         titleSpacing: 20,
@@ -70,7 +70,7 @@ void initState(){
           'NCare',
           style: TextStyle(
             fontWeight: FontWeight.w800,
-            color: Color(0xFF0F172A),
+            color: Colors.white,
           ),
         ),
       ),
@@ -134,7 +134,7 @@ void initState(){
                                     ready
                                         ? Icons.verified_rounded
                                         : Icons.warning_amber_rounded,
-                                    color: Colors.white,
+                                    color: const Color(0xFF020617),
                                     size: 24,
                                   ),
                                 ),
@@ -176,7 +176,7 @@ void initState(){
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          border: Border.all(color: const Color(0xFF334155)),
                           boxShadow: const [
                             BoxShadow(
                               color: Color(0x120F172A),
@@ -192,7 +192,7 @@ void initState(){
                               'Device check',
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w800,
-                                color: const Color(0xFF0F172A),
+                                color: Colors.white,
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -255,16 +255,47 @@ void initState(){
                           ],
                         ),
                       ),
-					  SwitchListTile(
+					  
+					  SwitchListTile.adaptive(
   value: requestAlertsEnabled,
-  title: const Text("Request alerts"),
-  subtitle: const Text("Notify when locator receives a location request"),
+  
+		 title: Text(
+        "Request alerts",
+        style: const TextStyle(
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+  
+		subtitle: Text(
+        "Notify when locator receives a location request",
+        style: const TextStyle(
+          color: Colors.white,
+          height: 1.35,
+        ),
+      ),
   onChanged: saveRequestAlerts,
 ),
 SwitchListTile(
   value: deviceWarningsEnabled,
-  title: const Text("Device warnings"),
-  subtitle: const Text("Notify when GPS or permissions are off"),
+  //title: const Text("Device warnings"),
+  //subtitle: const Text("Notify when GPS or permissions are off"),
+  
+  title: Text(
+        "Device warnings",
+        style: const TextStyle(
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+	  
+	  subtitle: Text(
+        "Notify when GPS or permissions are off",
+        style: const TextStyle(
+          color: Colors.white,
+          height: 1.35,
+        ),
+      ),
   onChanged: saveDeviceWarnings,
 ),
                     ],

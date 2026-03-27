@@ -1067,44 +1067,53 @@ if (_groupId == null || _groupId!.isEmpty) ...[
                               shape: BoxShape.circle,
                             ),
                           ),
-                    const SizedBox(width: 6),
-                    Text(
-                      online ? "ONLINE" : formatLastSeen(lastSeen),
-                      style: TextStyle(
-                        color: online ? Colors.green : Colors.white70,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      "🔋$battery%",
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      gpsOn ? "📍GPS" : "⚠️GPS",
-                      style: TextStyle(
-                        color: gpsOn ? Colors.white70 : Colors.orange,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (distance != null) ...[
-                      const SizedBox(width: 12),
-                      Text(
-                        formatDistance(distance, acc),
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+						  
+						  
+const SizedBox(width: 6),
+Text(
+  online ? "ONLINE" : formatLastSeen(lastSeen),
+  style: TextStyle(
+    color: online ? Colors.green : Colors.white70,
+    fontSize: 12,
+    fontWeight: FontWeight.w600,
+  ),
+),
+
+if (online) ...[
+  const SizedBox(width: 12),
+  Text(
+    "🔋$battery%",
+    style: const TextStyle(
+      color: Colors.white70,
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+    ),
+  ),
+
+  const SizedBox(width: 12),
+  Text(
+    gpsOn ? "📍GPS" : "⚠️GPS",
+    style: TextStyle(
+      color: gpsOn ? Colors.white70 : Colors.orange,
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+    ),
+  ),
+
+  if (distance != null) ...[
+    const SizedBox(width: 12),
+    Text(
+      formatDistance(distance, acc),
+      style: const TextStyle(
+        color: Colors.white70,
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  ],
+]
+					
+					
                   ],
                 );
               },

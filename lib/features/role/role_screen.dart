@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import '../../core/role_manager.dart';
 import '../setup/name_screen.dart';
@@ -36,140 +35,88 @@ class RoleScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFFF4F7FB);
-    const navy = Color(0xFF0F172A);
-    const muted = Color(0xFF64748B);
-    const primary = Color(0xFF2563EB);
+    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: bg,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFF8FBFF),
-              Color(0xFFF4F7FB),
-              Color(0xFFF1F5F9),
+              Color(0xFF1E293B),
+  Color(0xFF1E293B),
+  Color(0xFF334155),
             ],
           ),
         ),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 560),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(32),
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Color(0xFF1D4ED8),
-                            Color(0xFF2563EB),
-                            Color(0xFF3B82F6),
-                          ],
-                        ),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x332563EB),
-                            blurRadius: 28,
-                            offset: Offset(0, 14),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(22),
-                              color: Colors.white.withOpacity(0.16),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.16),
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.shield_rounded,
-                              color: Colors.white,
-                              size: 34,
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          const Text(
-                            'NCare',
-                            style: TextStyle(
-                              fontSize: 34,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: -0.9,
-                              height: 1.0,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            'Select how this device should work in your safety setup.',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFFE0ECFF),
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
+
+                    const SizedBox(height: 10),
+
+                    Text(
+                      "NCare",
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontSize: 38,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: -1,
                       ),
                     ),
 
-                    const SizedBox(height: 22),
+                    const SizedBox(height: 10),
 
-                    _CreateGroupCard(
+                    Text(
+                      "Choose device role",
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w700,
+                        color: const Color(0xFF94A3B8),
+                      ),
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    /// CREATE GROUP (TOP)
+                    _MainCard(
+                      title: "Create New Group",
+                      subtitle: "Start a fresh NCare group on this device",
+                      icon: Icons.group_add_rounded,
+                      color: const Color(0xFF6366F1),
                       onTap: () => _startNewGroup(context),
                     ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 18),
 
-                    const Padding(
-                      padding: EdgeInsets.only(left: 2, bottom: 8),
-                      child: Text(
-                        'Use existing role',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: muted,
-                        ),
-                      ),
-                    ),
-
-                    _RoleCard(
-                      title: 'Locator',
-                      subtitle: 'This phone shares location when a request arrives.',
+                    _MainCard(
+                      title: "Locator",
+                      subtitle: "Share location when request arrives",
                       icon: Icons.phone_android_rounded,
-                      accent: const Color(0xFF16A34A),
-                      badgeText: 'Share',
+                      color: const Color(0xFF22C55E),
                       onTap: () => _select(context, "locator"),
                     ),
 
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 18),
 
-                    _RoleCard(
-                      title: 'Requester',
-                      subtitle: 'This phone asks a paired locator for current location.',
+                    _MainCard(
+                      title: "Requester",
+                      subtitle: "Ask paired locator for location",
                       icon: Icons.travel_explore_rounded,
-                      accent: const Color(0xFF0891B2),
-                      badgeText: 'Request',
+                      color: const Color(0xFF38BDF8),
                       onTap: () => _select(context, "requester"),
                     ),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                   ],
                 ),
               ),
@@ -181,126 +128,18 @@ class RoleScreen extends StatelessWidget {
   }
 }
 
-class _CreateGroupCard extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _CreateGroupCard({
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    const primary = Color(0xFF2563EB);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(30),
-        onTap: onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(30),
-            color: Colors.white,
-            border: Border.all(
-              color: const Color(0xFFD7E6FF),
-              width: 1.2,
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x120F172A),
-                blurRadius: 24,
-                offset: Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(18),
-            child: Row(
-              children: [
-                Container(
-                  width: 62,
-                  height: 62,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFFEFF6FF),
-                        Color(0xFFDBEAFE),
-                      ],
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.group_add_rounded,
-                    color: primary,
-                    size: 32,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Create New Group',
-                        style: TextStyle(
-                          fontSize: 23,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF0F172A),
-                          letterSpacing: -0.4,
-                        ),
-                      ),
-                      SizedBox(height: 6),
-                      Text(
-                        'Start fresh on this device and continue as requester.',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF64748B),
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFEFF6FF),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.arrow_forward_rounded,
-                    color: primary,
-                    size: 22,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RoleCard extends StatelessWidget {
+class _MainCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
-  final Color accent;
-  final String badgeText;
+  final Color color;
   final VoidCallback onTap;
 
-  const _RoleCard({
+  const _MainCard({
     required this.title,
     required this.subtitle,
     required this.icon,
-    required this.accent,
-    required this.badgeText,
+    required this.color,
     required this.onTap,
   });
 
@@ -309,98 +148,61 @@ class _RoleCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(28),
         onTap: onTap,
+        borderRadius: BorderRadius.circular(28),
         child: Ink(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(28),
-            color: Colors.white,
-            border: Border.all(
-              color: const Color(0xFFE2E8F0),
-              width: 1.1,
-            ),
-            boxShadow: const [
+            color: const Color(0xFF334155),
+            border: Border.all(color: color.withOpacity(.35)),
+            boxShadow: [
               BoxShadow(
-                color: Color(0x100F172A),
-                blurRadius: 20,
-                offset: Offset(0, 8),
-              ),
+                color: color.withOpacity(.25),
+                blurRadius: 25,
+                offset: const Offset(0, 10),
+              )
             ],
           ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
             child: Row(
               children: [
                 Container(
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(22),
-                    color: accent.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                    color: color.withOpacity(.15),
                   ),
-                  child: Icon(
-                    icon,
-                    color: accent,
-                    size: 32,
-                  ),
+                  child: Icon(icon, color: color, size: 30),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 18),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              title,
-                              style: const TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF0F172A),
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: accent.withOpacity(0.10),
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Text(
-                              badgeText,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                color: accent,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
-                      const SizedBox(height: 7),
+                      const SizedBox(height: 6),
                       Text(
                         subtitle,
                         style: const TextStyle(
+                          color: Color(0xFF94A3B8),
                           fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF64748B),
-                          height: 1.35,
+                          height: 1.3,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 18,
-                  color: accent,
-                ),
+                Icon(Icons.arrow_forward_ios_rounded,
+                    size: 18, color: color),
               ],
             ),
           ),

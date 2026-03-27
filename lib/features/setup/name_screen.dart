@@ -152,16 +152,16 @@ class _NameScreenState extends State<NameScreen> {
     final hintText = isRequester ? 'Enter requester name' : 'Enter locator name';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FB),
+      backgroundColor: const Color(0xFF020617),
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFF8FBFF),
-              Color(0xFFF4F7FB),
-              Color(0xFFF1F5F9),
+              Color(0xFF020617),
+              Color(0xFF020617),
+              Color(0xFF0F172A),
             ],
           ),
         ),
@@ -254,9 +254,9 @@ class _NameScreenState extends State<NameScreen> {
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(30),
-                        color: Colors.white,
+                        color: const Color(0xFF020617),
                         border: Border.all(
-                          color: const Color(0xFFE2E8F0),
+                          color: const Color(0xFF334155),
                           width: 1.1,
                         ),
                         boxShadow: const [
@@ -275,17 +275,8 @@ class _NameScreenState extends State<NameScreen> {
                             style: const TextStyle(
                               fontSize: 23,
                               fontWeight: FontWeight.w900,
-                              color: Color(0xFF0F172A),
-                              letterSpacing: -0.4,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'You can change this later if needed.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
                               color: Color(0xFF64748B),
+                              letterSpacing: -0.4,
                             ),
                           ),
                           const SizedBox(height: 18),

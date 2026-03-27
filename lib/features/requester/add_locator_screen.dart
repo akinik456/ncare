@@ -130,21 +130,42 @@ class _AddLocatorScreenState extends State<AddLocatorScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 12),
-          const Text(
-            'Add locator',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF0F172A),
+          Container(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(32),
+              color: const Color(0xFF020617),
+              border: Border.all(color: const Color(0xFF38BDF8).withOpacity(.35)),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF38BDF8).withOpacity(.18),
+                  blurRadius: 24,
+                  offset: const Offset(0, 12),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Choose how you want to start pairing.',
-            style: TextStyle(
-              fontSize: 15,
-              color: Color(0xFF64748B),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Add locator',
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: -0.8,
+                  ),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  'Choose how you want to start pairing.',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Color(0xFF94A3B8),
+                    height: 1.35,
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 24),
@@ -161,9 +182,9 @@ class _AddLocatorScreenState extends State<AddLocatorScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              color: const Color(0xFF020617),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: const Color(0xFF38BDF8).withOpacity(.25)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -173,7 +194,7 @@ class _AddLocatorScreenState extends State<AddLocatorScreen> {
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF0F172A),
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -184,7 +205,20 @@ class _AddLocatorScreenState extends State<AddLocatorScreen> {
                   decoration: const InputDecoration(
                     hintText: 'ABC123',
                     counterText: '',
-                    border: OutlineInputBorder(),
+                    filled: true,
+                    fillColor: Color(0xFF0F172A),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(18)),
+                      borderSide: BorderSide(color: Color(0xFF334155)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(18)),
+                      borderSide: BorderSide(color: Color(0xFF334155)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(18)),
+                      borderSide: BorderSide(color: Color(0xFF38BDF8)),
+                    ),
                   ),
                   onChanged: (value) {
                     final upper = value.toUpperCase();
@@ -253,10 +287,13 @@ class _AddLocatorScreenState extends State<AddLocatorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF020617),
       appBar: _scannerMode
           ? null
           : AppBar(
-              title: const Text('Add locator'),
+              backgroundColor: const Color(0xFF020617),
+              surfaceTintColor: Colors.transparent,
+              title: const Text('NCare', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
             ),
       body: _scannerMode ? _buildScanner() : _buildMethodPicker(),
     );

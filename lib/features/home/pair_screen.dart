@@ -27,8 +27,11 @@ class _PairScreenState extends State<PairScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFF020617),
       appBar: AppBar(
-        title: const Text("Pair Locator"),
+        backgroundColor: const Color(0xFF020617),
+        surfaceTintColor: Colors.transparent,
+        title: const Text("NCare", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
       ),
       body: MobileScanner(
         controller: controller,
