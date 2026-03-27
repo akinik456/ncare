@@ -8,8 +8,9 @@ role_screen_light_premium
 
 **************************
 Care
+family
+fleet
 group
-vts
 PassW
 BLE
 Stalk

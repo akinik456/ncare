@@ -20,11 +20,7 @@ class NcareMessagingService : FirebaseMessagingService() {
 
         val intent = Intent(this, NcareForegroundService::class.java)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
+        
     } else {
         Log.d("NCARE_FCM", "NOT STARTING FG (type != rl)")
     }

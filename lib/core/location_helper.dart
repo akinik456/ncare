@@ -17,13 +17,13 @@ class LocationService {
       return null;
     }
 
-   try {
-    return await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-      
-    );
-  } catch (_) {
-    return null;
+    try {
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: accuracy,
+        timeLimit: timeLimit,
+      );
+    } catch (_) {
+      return null;
+    }
   }
-}
 }

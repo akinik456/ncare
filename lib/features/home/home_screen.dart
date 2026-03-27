@@ -13,6 +13,7 @@ import '../../core/device_state_manager.dart';
 import '../../core/identity_manager.dart';
 import '../../core/location_helper.dart';
 import '../../core/locator_settings_reader.dart';
+import '../../core/device_state_manager.dart';
 import '../setup/setup_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -61,6 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _initLocatorId() async {
     final id = await IdentityManager.getOrCreateDeviceId();
 	await FirebaseMessaging.instance.subscribeToTopic("locator_$id");
+	print('_initLocatorId  FCM OK => $id');
     final generatedCode = _generatePairCode(id);
 
     if (!mounted) return;
@@ -718,217 +720,233 @@ return Scaffold(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 520),
-                child: StreamBuilder<bool>(
-                initialData: DeviceStateManager.instance.isReady,
-                stream: DeviceStateManager.instance.readyStream,
-                builder: (context, snapshot) {
-                  final ready = snapshot.data ?? false;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(18),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(28),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: ready
-                                ? const [
-                                    Color(0xFF0F766E),
-                                    Color(0xFF0D9488),
-                                    Color(0xFF14B8A6),
-                                  ]
-                                : const [
-                                    Color(0xFFB45309),
-                                    Color(0xFFD97706),
-                                    Color(0xFFF59E0B),
-                                  ],
+child: StreamBuilder<bool>(
+  initialData: DeviceStateManager.instance.isReady,
+  stream: DeviceStateManager.instance.readyStream,
+  builder: (context, snapshot) {
+    
+    final ready = snapshot.data ?? false;
+	
+	final gpsEnabled = DeviceStateManager.instance.gpsEnabled;
+final hasLocationPermission =
+    DeviceStateManager.instance.hasLocationPermission;
+final hasBackgroundLocationPermission =
+    DeviceStateManager.instance.hasBackgroundLocationPermission;
+
+    final statusTitle = ready
+        ? 'Locator Device Ready'
+        : !hasBackgroundLocationPermission
+            ? 'Background Location Required'
+            : !gpsEnabled
+                ? 'Location Service Off'
+                : 'Location Permission Required';
+
+    final statusMessage = ready
+        ? 'This device is ready to receive location requests.'
+        : !hasBackgroundLocationPermission
+            ? 'Set location access to "Allow all the time" in system settings.'
+            : !gpsEnabled
+                ? 'Turn on location services to keep this locator ready.'
+                : 'Grant location permission to continue.';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: ready
+                  ? const [
+                      Color(0xFF0F766E),
+                      Color(0xFF0D9488),
+                      Color(0xFF14B8A6),
+                    ]
+                  : const [
+                      Color(0xFFB45309),
+                      Color(0xFFD97706),
+                      Color(0xFFF59E0B),
+                    ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: ready
+                    ? const Color(0x220F766E)
+                    : const Color(0x22B45309),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 46,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(14),
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: ready
-                                  ? const Color(0x220F766E)
-                                  : const Color(0x22B45309),
-                              blurRadius: 28,
-                              offset: const Offset(0, 12),
-                            ),
-                          ],
+                          child: Icon(
+                            ready
+                                ? Icons.verified_rounded
+                                : Icons.warning_amber_rounded,
+                            color: Colors.white,
+                            size: 24,
+                          ),
                         ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(
-                                        width: 46,
-                                        height: 46,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.16),
-                                          borderRadius: BorderRadius.circular(14),
-                                        ),
-                                        child: Icon(
-                                          ready
-                                              ? Icons.verified_rounded
-                                              : Icons.warning_amber_rounded,
-                                          color: Colors.white,
-                                          size: 24,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          ready
-                                              ? 'Locator Device Ready'
-                                              : 'Locator Needs Attention',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.w800,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    ready
-                                        ? 'This device is ready to receive location requests.'
-                                        : 'GPS or permissions missing.',
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: Colors.white.withValues(alpha: 0.94),
-                                      height: 1.45,
-                                    ),
-                                  ),
-                                  
-								  const SizedBox(height: 8),
-                                                    
-													const Text(
-                                                      'Remote Pairing Code',
-                                                      style: TextStyle(
-                                                        color: Colors.white,
-                                                        fontWeight: FontWeight.w700,
-                                                      ),
-                                                    ),
-													SelectableText(
-                                                      currentPairCode,
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 22,
-                                                        fontWeight: FontWeight.w900,
-                                                        letterSpacing: 8,
-                                                      ),
-                                                    ),
-													const SizedBox(height: 12),
-                                  SelectableText(
-                                    locatorId!,
-                                    style: TextStyle(
-                                                        color: Colors.white,
-                                                        fontWeight: FontWeight.w700,
-                                                      ),
-                                  ),	
-								  
-                                ],
-                              ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            statusTitle,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
                             ),
-                            const SizedBox(width: 14),
-                            Column(
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      statusMessage,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.94),
+                        height: 1.45,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    const Text(
+                      'Remote Pairing Code',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SelectableText(
+                      currentPairCode,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 8,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SelectableText(
+                      locatorId!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 14),
+              Column(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => Dialog(
+                          backgroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(28),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                GestureDetector(
-                                  onTap: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (_) => Dialog(
-                                        backgroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(28),
-                                        ),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(20),
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Text(
-                                                'Locator QR',
-                                                style: TextStyle(
-                                                  fontSize: 20,
-                                                  fontWeight: FontWeight.w800,
-                                                  color: Color(0xFF0F172A),
-                                                ),
-                                              ),
-                                              const SizedBox(height: 16),
-                                              QrImageView(
-                                                data: qrData,
-                                                version: QrVersions.auto,
-                                                size: 260,
-                                              ),
-                                              const SizedBox(height: 12),
-                                              const Text(
-                                                'Scan this code on requester device',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  color: Color(0xFF475569),
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 18),
-                                              Container(
-                                                width: double.infinity,
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 12,
-                                                  vertical: 14,
-                                                ),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFFF8FAFC),
-                                                  borderRadius: BorderRadius.circular(18),
-                                                  border: Border.all(
-                                                    color: const Color(0xFFE2E8F0),
-                                                  ),
-                                                ),
-                                               
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: QrImageView(
-                                      data: qrData,
-                                      version: QrVersions.auto,
-                                      size: 120,
+                                const Text(
+                                  'Locator QR',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF0F172A),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                QrImageView(
+                                  data: qrData,
+                                  version: QrVersions.auto,
+                                  size: 260,
+                                ),
+                                const SizedBox(height: 12),
+                                const Text(
+                                  'Scan this code on requester device',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: Color(0xFF475569),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(height: 18),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(18),
+                                    border: Border.all(
+                                      color: const Color(0xFFE2E8F0),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 8),
-                                SizedBox(
-                                  width: 120,
-                                  child: Text(
-                                    'Tap to enlarge',
-                                    textAlign: TextAlign.center,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: Colors.white.withValues(alpha: 0.95),
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-					  			
                               ],
                             ),
-                          ],
+                          ),
                         ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
                       ),
-
+                      child: QrImageView(
+                        data: qrData,
+                        version: QrVersions.auto,
+                        size: 120,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: 120,
+                    child: Text(
+                      'Tap to enlarge',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.95),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
 					  
                       const SizedBox(height: 14),
                       const SizedBox(height: 14),
@@ -1096,6 +1114,7 @@ final pairedNames = pairedRequesters == null
                   );
                 },
               ),
+			  
             ),
           ),
         ),

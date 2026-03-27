@@ -251,6 +251,7 @@ FirebaseMessaging.onMessage.listen((message) async {
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+print("BG_HANDLER START => data=${message.data}");
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -278,18 +279,19 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       requesterId.isEmpty) {
     return;
   }
-
+print("BG_HANDLER RL RECEIVED");
   if (targetLocatorId == null ||
       targetLocatorId.isEmpty ||
       targetLocatorId != myLocatorId) {
     print("BG SKIP => target=$targetLocatorId mine=$myLocatorId");
     return;
   }
+  
 final stillPaired = await _isStillPaired(
   locatorId: myLocatorId!,
   requesterId: requesterId,
 );
-
+print("BG_HANDLER stillPaired => $stillPaired");
 if (!stillPaired) {
   print("BG RL BLOCKED => requester not paired");
   return;
@@ -300,7 +302,6 @@ if (groupId == null || groupId.isEmpty) {
   print("FG RL BLOCKED => no groupId");
   return;
 }
-
   await NotificationService.showFromRemoteMessage(message);
 
   final responseRef = FirebaseFirestore.instance
@@ -321,14 +322,14 @@ if (groupId == null || groupId.isEmpty) {
     final cachedLng = (locatorDoc.data()?['lng'] as num?)?.toDouble();
     final cachedAcc = (locatorDoc.data()?['acc'] as num?)?.toDouble();
 	
-	final lastSeen = locatorDoc.data()?['lastSeen'];
+  final lastSeen = locatorDoc.data()?['lastSeen'];
 
   final age = lastSeen != null
       ? DateTime.now().difference(lastSeen.toDate()).inSeconds
       : 9999;
     final battery = Battery();
     final level = await battery.batteryLevel;
-
+	
     if (cachedLat != null &&
         cachedLng != null &&
         cachedAcc != null &&
@@ -340,15 +341,16 @@ if (groupId == null || groupId.isEmpty) {
         'lat': cachedLat,
         'lng': cachedLng,
         'acc': cachedAcc,
-        'battery': level,
+        'battery': -1,//level,
         'ts': FieldValue.serverTimestamp(),
         'via': 'cached_bg',
       }, SetOptions(merge: true));
-      LocatorUiState.instance.onSentOk();
+      //LocatorUiState.instance.onSentOk();
       print("BG CACHED SENT => $requestId $cachedLat,$cachedLng age=$age");
       return;
 	  
     }
+
 
     final gpsOn = await Geolocator.isLocationServiceEnabled();
     if (!gpsOn) {
@@ -360,7 +362,6 @@ if (groupId == null || groupId.isEmpty) {
       }, SetOptions(merge: true));
       return;
     }
-
     final perm = await Permission.locationWhenInUse.status;
     if (!perm.isGranted) {
       await responseRef.set({
@@ -372,14 +373,15 @@ if (groupId == null || groupId.isEmpty) {
       return;
     }
 
-
-
   final pos = await LocationService.getCurrentLocationSafe(
   accuracy: LocationAccuracy.high,
   timeLimit: const Duration(seconds: 20),
 );
-		if(pos == null) return;
-    
+		if (pos == null) {
+  print("BG FRESH POS NULL");
+  return;
+}
+ print("BG FRESH BEFORE WRITE");   
     await responseRef.set({
       'locatorId': myLocatorId,
 	  'requesterDeviceId': requesterDeviceId,
@@ -387,13 +389,14 @@ if (groupId == null || groupId.isEmpty) {
       'lat': pos.latitude,
       'lng': pos.longitude,
       'acc': pos.accuracy,
-      'battery': level,
+      'battery': -1,//level,
       'ts': FieldValue.serverTimestamp(),
       'via': 'bg',
     }, SetOptions(merge: true));
 
     print("BG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
   } catch (e) {
+  print("BG_HANDLER ERROR => $e");
     await responseRef.set({
       'locatorId': myLocatorId,
 	  'requesterDeviceId': requesterDeviceId,

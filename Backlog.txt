@@ -21,3 +21,6 @@ gösterilmeli ya da silinmeli
 8 req loc silme
 
 9 status da lastseen çok eski ise batery ve konum anlamsız
+
+http://127.0.0.1:64696/zvDmK48QK94=/devtools/?uri=ws://127.0.0.1:64696/zvDmK48QK94=/ws
+E/FirebaseMessaging(26069): Topic operation failed: SERVICE_NOT_AVAILABLE. Will retry Topic operation.
