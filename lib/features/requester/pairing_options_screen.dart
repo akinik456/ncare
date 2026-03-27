@@ -597,13 +597,7 @@ Future<void> _removeLocator() async {
         Map<String, dynamic>.from(pairedRequestersRaw);
 
     if (pairedRequesters.containsKey(requesterId)) {
-      final requesterEntry =
-          Map<String, dynamic>.from(pairedRequesters[requesterId] as Map);
-
-      requesterEntry['active'] = false;
-      requesterEntry['removedAt'] = FieldValue.serverTimestamp();
-
-      pairedRequesters[requesterId] = requesterEntry;
+    pairedRequesters.remove(requesterId);  
     }
 
     final activeCount = pairedRequesters.values.where((entry) {

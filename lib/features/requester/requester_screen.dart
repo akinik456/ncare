@@ -905,245 +905,204 @@ if (_groupId == null || _groupId!.isEmpty) ...[
       }
 
       final entry = pairedRequesters[requesterId];
-	  if(entry == null ) return false;
-	  
-	  return entry['active'] == true ;
+      if (entry == null) return false;
+
+      return entry['active'] == true;
     }).toList();
+	if (docs.length == 1 && _selectedLocatorId != docs.first.id) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!mounted) return;
+    setState(() {
+      _selectedLocatorId = docs.first.id;
+    });
+  });
+}
 
     if (docs.isEmpty) {
-	  WidgetsBinding.instance.addPostFrameCallback((_) {
-		if (!mounted) return;
-		if (_selectedLocatorId != null) {
-		  setState(() {
-			_selectedLocatorId = null;
-		  });
-		}
-	  });
-
-	  return Text(
-		_groupId == null
-			? 'Create or join a group first'
-			: 'No paired locator',
-		style: theme.textTheme.titleMedium?.copyWith(
-		  color: Colors.white,
-		  fontWeight: FontWeight.w700,
-		),
-	  );
-	}
-
-    final hasSelected =
-        docs.any((doc) => doc.id == _selectedLocatorId);
-
-    if (!hasSelected) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        setState(() {
-          _selectedLocatorId = docs.first.id;
-        });
-      });
+	print("docs is Empty");
+      return Text(
+        _groupId == null
+            ? 'Create or join a group first'
+            : 'No paired locator',
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: Colors.white70,
+          fontWeight: FontWeight.w600,
+        ),
+      );
     }
 
-return Wrap(
-  spacing: 8,
-  runSpacing: 8,
-  children: docs.map((doc) {
-    final deviceData = doc.data();
-    final locatorId = doc.id;
-    final name =
-        (deviceData['name'] ?? deviceData['deviceId'] ?? locatorId)
-            .toString();
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: docs.map((doc) {
+        final deviceData = doc.data();
+        final locatorId = doc.id;
+        final name =
+            (deviceData['name'] ?? deviceData['deviceId'] ?? locatorId)
+                .toString();
 
-    final selected = locatorId == _selectedLocatorId;
+        final selected = locatorId == _selectedLocatorId;
 
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedLocatorId = locatorId;
-        });
-      },
-      onLongPress: () async {
-        final changed = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PairingOptionsScreen(
-              locatorId: locatorId,
-              locatorName: name,
-            ),
-          ),
-        );
-
-        if (changed == true && mounted) {
-          setState(() {});
-        }
-      },
-      child: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('locators')
-            .doc(locatorId)
-            .snapshots(),
-        builder: (context, snap) {
-          if (!snap.hasData) {
-            return Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 7,
-              ),
-              decoration: BoxDecoration(
-                color: selected
-                    ? Colors.white
-                    : Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                name,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: selected
-                      ? const Color(0xFF1D4ED8)
-                      : Colors.white,
-                  fontWeight: FontWeight.w700,
+        return GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedLocatorId = locatorId;
+            });
+          },
+          onLongPress: () async {
+            final changed = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PairingOptionsScreen(
+                  locatorId: locatorId,
+                  locatorName: name,
                 ),
               ),
             );
-          }
 
-          final data = snap.data!.data() as Map<String, dynamic>?;
-          final ts = data?['lastSeen'] as Timestamp?;
-          final lastSeen = ts?.toDate();
-          final battery = data?['battery'] ?? 0;
-          final gpsOn = data?['gpsEnabled'] ?? true;
+            if (changed == true && mounted) {
+              setState(() {});
+            }
+          },
+          child: StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('locators')
+                .doc(locatorId)
+                .snapshots(),
+            builder: (context, snap) {
+              if (!snap.hasData) {
+                return const SizedBox();
+              }
 
-          final online = lastSeen != null &&
-              DateTime.now().difference(lastSeen).inSeconds < 120;
+              final data = snap.data!.data() as Map<String, dynamic>?;
+              final ts = data?['lastSeen'] as Timestamp?;
+              final lastSeen = ts?.toDate();
+              final battery = data?['battery'] ?? 0;
+              final gpsOn = data?['gpsEnabled'] ?? true;
 
-          final lat = (data?['lat'] as num?)?.toDouble();
-          final lng = (data?['lng'] as num?)?.toDouble();
-          final acc = (data?['acc'] as num?)?.toDouble() ?? 0;
+              final online = lastSeen != null &&
+                  DateTime.now().difference(lastSeen).inSeconds < 120;
 
-          double? distance;
+              final lat = (data?['lat'] as num?)?.toDouble();
+              final lng = (data?['lng'] as num?)?.toDouble();
+              final acc = (data?['acc'] as num?)?.toDouble() ?? 0;
 
-          if (_myLat != null &&
-              _myLng != null &&
-              lat != null &&
-              lng != null) {
-            distance = Geolocator.distanceBetween(
-              _myLat!,
-              _myLng!,
-              lat,
-              lng,
-            );
-          }
+              double? distance;
 
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-			
-              SizedBox(
-  width: 140,
-  child: Container(
-    padding: const EdgeInsets.symmetric(
-      horizontal: 12,
-      vertical: 7,
-    ),
-    decoration: BoxDecoration(
-      color: selected
-          ? Colors.white
-          : Colors.white.withValues(alpha: 0.18),
-      borderRadius: BorderRadius.circular(999),
-    ),
-    child: Text(
-      name,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: theme.textTheme.bodyMedium?.copyWith(
-        color: selected
-            ? const Color(0xFF1D4ED8)
-            : Colors.white,
-        fontWeight: FontWeight.w700,
-      ),
-    ),
-  ),
-),
-			  
-              const SizedBox(width: 8),
-              online
-                  ? AnimatedBuilder(
-                      animation: _pulse,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: _pulse.value,
-                          child: child,
-                        );
-                      },
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    )
-                  : Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Colors.white70,
-                        shape: BoxShape.circle,
+              if (_myLat != null &&
+                  _myLng != null &&
+                  lat != null &&
+                  lng != null) {
+                distance = Geolocator.distanceBetween(
+                  _myLat!,
+                  _myLng!,
+                  lat,
+                  lng,
+                );
+              }
+
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: selected
+                            ? const Color(0xFF1D4ED8)
+                            : Colors.white,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-              const SizedBox(width: 6),
-              Text(
-                online ? "ONLINE" : formatLastSeen(lastSeen),
-                style: TextStyle(
-                  color: online ? Colors.green : Colors.white70,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (online) ...[
-                const SizedBox(width: 12),
-                Text(
-                  "🔋$battery%",
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
                   ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  gpsOn ? "📍GPS" : "⚠️GPS",
-                  style: TextStyle(
-                    color: gpsOn ? Colors.white70 : Colors.orange,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (distance != null) ...[
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
+                  online
+                      ? AnimatedBuilder(
+                          animation: _pulse,
+                          builder: (context, child) {
+                            return Transform.scale(
+                              scale: _pulse.value,
+                              child: child,
+                            );
+                          },
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.white70,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                  const SizedBox(width: 6),
                   Text(
-                    formatDistance(distance, acc),
-                    style: const TextStyle(
-                      color: Colors.white70,
+                    online ? "ONLINE" : formatLastSeen(lastSeen),
+                    style: TextStyle(
+                      color: online ? Colors.green : Colors.white70,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                ],
-              ],
-            ],
-          );
-        },
-      ),
-    );
-  }).toList(),
-);
-
-}
-
-					  
-					  
+                  if (online) ...[
+                    const SizedBox(width: 12),
+                    Text(
+                      "🔋$battery%",
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
+                    const SizedBox(width: 12),
+                    Text(
+                      gpsOn ? "📍GPS" : "⚠️GPS",
+                      style: TextStyle(
+                        color: gpsOn ? Colors.white70 : Colors.orange,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (distance != null) ...[
+                      const SizedBox(width: 12),
+                      Text(
+                        formatDistance(distance, acc),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
+              );
+            },
+          ),
+        );
+      }).toList(),
+    );
+  },
+),
                   ),
                 ],
               ),

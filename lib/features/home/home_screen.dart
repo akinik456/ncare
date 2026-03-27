@@ -438,7 +438,7 @@ final groupSnap = await FirebaseFirestore.instance
 
 final groupData = groupSnap.data() ?? {};
 final maxDevicesCount =
-    (groupData['maxDevicesCount'] as num?)?.toInt() ?? 5;
+    (groupData['maxDevicesCount'] as num?)?.toInt() ?? 10;
 
 final devicesSnap = await FirebaseFirestore.instance
     .collection('groups')
@@ -479,6 +479,7 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
       'pendingPairRequesterName': FieldValue.delete(),
       'pendingPairCreatedAt': FieldValue.delete(),
       'pendingPairGroupId': FieldValue.delete(),
+	  'active': true,
     }, SetOptions(merge: true));
 
     await FirebaseFirestore.instance

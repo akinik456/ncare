@@ -263,3 +263,250 @@ karışma olmaz
 Sonuç
 Tam otomatik proje ayarı yok
 ama bat dosyası + split-per-abi ile pratikte kalıcı çözüm olur brom.
+
+
+***************************************************
+
+Ve dediğin konu da yüzde yüz kritik:
+
+app silinene kadar locator tarafı ölmemeli
+en azından request geldiğinde cevap üretebilmeli
+foreground / background / tuş kilidi bozmamalı
+uçak modu aç-kapa sonrası toparlamalı
+restart sonrası geri kalkmalı
+
+Bunu sağlayamazsak gerçekten geri kalan her şey ikinci planda kalır.
+
+Hazırım.
+Bir sonraki adımda sadece bu eksende inceleyeceğim:
+
+boot sonrası ayağa kalkma
+app process ölürse toparlama
+foreground service sürekliliği
+request geldiğinde locator response zinciri
+FCM / local restore / watchdog / receiver tarafı
+uçak modu / network geri gelince toparlama
+
+“başla” de, sadece bu konuya odaklanayım.
+
+evet lütfen başla bende test ediyorum
+59s boyunca düşündüm
+
+Başladım brom. Zip üstünden locator’ın ölmemesi / request’e her koşulda cevap verebilmesi açısından kritik incelemeyi yaptım.
+
+Net sonuç:
+şu an yapı tam rock solid değil.
+Bazı parçalar var, ama özellikle restart / process kill / otomatik geri kalkma tarafı eksik veya zip içinde doğrulanamıyor.
+
+En kritik tespitlerim:
+
+1) En büyük risk: locator canlılığı app process’e bağlı
+DeviceStateManager.instance.start() sadece main() içinde çağrılıyor.
+Bu manager içinde:
+
+2 saniyelik ticker
+60 saniyelik geo ticker
+GPS status stream
+
+var. Bunların hepsi uygulama prosesi yaşadığı sürece çalışır. Process ölürse bunlar biter.
+
+Ayrıca presence update de HomeScreen içinde timer ile yapılıyor:
+
+initState() → _updatePresence()
+sonra 30 saniyede bir tekrar
+
+Bu da demek oluyor ki locator ekranı ve app prosesi tarafı çok kritik.
+App öldürülürse bu düzenli heartbeat durur.
+
+2) Boot sonrası otomatik kalkma garanti görünmüyor
+Manifestte:
+
+NcareMessagingService
+NcareForegroundService
+
+var.
+
+Ama gördüğüm kadarıyla:
+
+BOOT_COMPLETED receiver yok
+manifestte boot receiver tanımı yok
+RECEIVE_BOOT_COMPLETED izni de yok
+
+Bu haliyle telefon restart sonrası otomatik başlama garanti değil.
+
+3) Foreground service tanımlı ama zip içinde yaşam döngüsü görünmüyor
+Manifestte NcareForegroundService kayıtlı.
+Ama zip içinde native Kotlin/Java servis dosyaları yok. O yüzden şunları doğrulayamıyorum:
+
+servis gerçekten start ediliyor mu
+sticky mi
+onTaskRemoved() var mı
+servis restart deniyor mu
+boot sonrası yeniden başlatılıyor mu
+
+Yani:
+servis adı var, ama davranışı bu zip’ten kanıtlanamıyor.
+
+4) Background FCM handler var, bu iyi
+Bu güçlü taraf:
+
+FirebaseMessaging.onBackgroundMessage(...) bağlı
+_firebaseMessagingBackgroundHandler içinde locator request’i işliyor
+pairing kontrolü yapıyor
+response yazıyor
+
+Bu iyi haber.
+Yani data message gerçekten cihaza düşerse, app foreground’da olmasa bile cevap üretme şansı var.
+
+Ama bu tek başına yeterli değil. Çünkü:
+
+üretici/ROM optimizasyonu
+MIUI benzeri agresif öldürmeler
+reboot sonrası subscription / process state
+uçak modu sonrası toparlama
+
+gibi durumlarda sadece background handler’a güvenmek riskli.
+
+5) FCM topic subscription tarafı genel olarak doğru
+FcmManager.ensureSubscriptions():
+
+locator ise locator_<deviceId>
+requester ise kendi device id topic
+
+aboneliğini yapıyor.
+
+Ayrıca app açılışında çağrılıyor, token refresh’te de tekrar çağrılıyor.
+Bu kısım iyi.
+
+Ama yine de kritik nokta şu:
+uygulama hiç açılmazsa / reboot sonrası kendiliğinden kalkmazsa bu mekanizma da çalışmaz.
+
+6) Cache/presence timestamp tarafında tutarsızlık riski var
+FG ve BG request response kodunda cache age hesabı locators/{locatorId} içindeki ts alanından yapılıyor.
+Ama presence update tarafında sen düzenli olarak yazdığın alan:
+
+lastSeen
+battery
+gpsEnabled
+lat/lng/acc
+
+Benim gördüğüm kodda _updatePresence() içinde ts yazılmıyor, lastSeen yazılıyor.
+
+Bu şu riski doğuruyor:
+
+cache age yanlış hesaplanabilir
+cache gereksiz devre dışı kalabilir
+request geldiğinde hızlı cevap beklendiği gibi çalışmayabilir
+
+Bu doğrudan “ölmeme” değil ama cevap verme sürekliliğini etkiler.
+
+7) Uçak modu aç-kapa sonrası özel toparlama mantığı görünmüyor
+Şu an gördüğüm toparlama mekanizmaları:
+
+GPS service status stream
+app start
+token refresh
+
+Ama özellikle:
+
+connectivity/network geri geldi
+airplane mode kapandı
+servis/abonelik/ready state tekrar doğrulansın
+
+şeklinde net bir recovery akışı bu zip’te görünmüyor.
+
+Yani bu testte bozulma görürsen şaşırmam.
+
+Özet kararım:
+
+Foreground / background / lock screen: kısmen umut verici
+Request geldiğinde cevap üretme: mevcut yapıda çoğu durumda olabilir
+App silinene kadar asla durmama: şu an bu seviyede diyemem
+Restart sonrası otomatik geri kalkma: şu haliyle güven vermiyor
+Uçak modu sonrası kendini toparlama: garanti görünmüyor
+Process kill dayanıklılığı: zayıf halka burada
+
+Benim için şu an en kritik açık:
+BOOT_COMPLETED + foreground service yaşam döngüsü + process kill recovery
+
+Bunu rock solid yapmadan locator’a tam güvenmem.
+
+Sen test ederken özellikle bunları vur:
+
+ekran açık
+home tuşu
+recent apps’tan kaydırma
+ekran kilidi uzun süre
+uçak modu aç-kapa
+Wi-Fi/mobil veri kapat-aç
+telefonu restart et
+restart sonrası app’i hiç açmadan request gönder
+
+Sen test sonucunu yaz, ben buna göre bir sonraki adımda sadece en kritik eksik parça hangisi onu söyleyeceğim.
+
+Net konuşuyorum: sorunun ana kaynağı native tarafta görünüyor.
+
+En kritik tespitler:
+
+1) NcareForegroundService şu an çok zayıf
+
+servis sadece notification açıyor
+gerçek iş yapmıyor
+en kötüsü START_NOT_STICKY dönüyor
+
+Bu ne demek:
+
+sistem servisi öldürürse geri başlatmak zorunda değil
+senin “app silinene kadar locator ölmesin” hedefin için bu yanlış
+
+Bence burada en kritik bug bu.
+
+2) NcareMessagingService sadece FG service başlatıyor
+
+type == "rl" ise service start ediyor
+ama request’i burada işlemiyor
+yani asıl iş yine Flutter/Dart tarafına kalıyor
+
+Bu tek başına kötü değil ama şu risk var:
+
+Dart isolate hazır değilse
+app process sorunluysa
+native service sadece notification açmış oluyor
+
+Yani şu an:
+FCM geldi → service başladı
+ama bu, tek başına “kesin response üretir” garantisi vermiyor.
+
+3) MainActivity kritik bir şey yapmıyor
+
+sadece notification channel oluşturuyor
+restart / recovery / boot / watchdog tarafında katkısı yok
+
+Bu normal ama sana güç kazandıran yer burası değil.
+
+4) Hâlâ eksik görünen şeyler
+Şu üçlü olmadan ben “rock solid” diyemem:
+
+BOOT_COMPLETED receiver
+foreground service için daha sağlam lifecycle
+gerekirse process öldükten sonra recovery mantığı
+Şu anki en önemli sonuç
+
+Eğer tek bir yere odaklanacaksak:
+
+👉 NcareForegroundService içindeki START_NOT_STICKY çok kötü bir işaret
+
+Benim gözümde ilk düzeltilecek şey bu.
+
+Kısa değerlendirme
+request alma zinciri: kısmen var
+service başlatma: var
+service dayanıklılığı: zayıf
+reboot sonrası otomatik toparlama: hala eksik
+process kill dayanıklılığı: şu haliyle güven vermiyor
+
+Bence sıradaki adım:
+önce native dayanıklılık checklist’i çıkaralım
+ve en kritik 1. maddeyi düzeltelim.
+
+****************************************

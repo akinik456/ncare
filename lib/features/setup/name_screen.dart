@@ -67,7 +67,7 @@ class _NameScreenState extends State<NameScreen> {
         'trialExpiresAt': Timestamp.fromDate(
           DateTime.now().add(const Duration(days: 7)),
         ),
-        'maxDevicesCount': 5,
+        'maxDevicesCount': 10,
         'groupMasterDeviceId': deviceId,
       });
 
