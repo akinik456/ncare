@@ -16,14 +16,17 @@ class NcareMessagingService : FirebaseMessagingService() {
     Log.d("NCARE_FCM", "type=$type (starting FG if rl)")
 
     if (type == "rl") {
-        Log.d("NCARE_FCM", "STARTING FG NOW")
+    Log.d("NCARE_FCM", "STARTING FG NOW")
+    val intent = Intent(this, NcareForegroundService::class.java)
 
-        val intent = Intent(this, NcareForegroundService::class.java)
-
-        
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        startForegroundService(intent)
     } else {
-        Log.d("NCARE_FCM", "NOT STARTING FG (type != rl)")
+        startService(intent)
     }
+} else {
+    Log.d("NCARE_FCM", "NOT STARTING FG (type != rl)")
+}
 }
 
     override fun onNewToken(token: String) {

@@ -1,5 +1,5 @@
 import 'dart:async';
-
+import 'package:battery_plus/battery_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:permission_handler/permission_handler.dart';
@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'alert_engine.dart';
 import 'identity_manager.dart';
 import 'location_helper.dart';
+import 'utils.dart';
 
 class DeviceStateManager {
   DeviceStateManager._();
@@ -16,14 +17,18 @@ class DeviceStateManager {
   static const int _placeTransitionCooldownSeconds = 120;
 
   final _readyController = StreamController<bool>.broadcast();
+  
+  final Battery _battery = Battery();
 
   bool _isReady = false;
   Timer? _ticker;
   Timer? _geoTicker;
+  Timer? _presenceTimer;
   bool? _gfInside;
   bool gpsEnabled = false;
   bool hasLocationPermission = false;
   bool hasBackgroundLocationPermission = false;
+  String? pairCode;
 
   StreamSubscription<geo.ServiceStatus>? _gpsSub;
 
@@ -35,9 +40,20 @@ class DeviceStateManager {
   }
   
   void start() {
+  print("DEVICE STATE MANAGER STARTED");
     _ticker?.cancel();
     _geoTicker?.cancel();
+	_presenceTimer?.cancel();
+    //_batteryTimer?.cancel();
+	
+    _updatePresence();
 
+    _presenceTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _updatePresence(),
+    );	
+	
+	
     _geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
       try {
         final pos = await LocationService.getCurrentLocationSafe(
@@ -47,6 +63,7 @@ class DeviceStateManager {
         if (pos == null) return;
 
         final locatorId = await IdentityManager.getOrCreateDeviceId();
+		final generatedCode = AppUtils.generatePairCode(locatorId);
         final requesterId = await _getPairedRequesterId(locatorId);
         if (requesterId == null || requesterId.isEmpty) return;
 
@@ -86,6 +103,8 @@ class DeviceStateManager {
   }
 
 Future<void> _checkState() async {
+print("DEBUG: _checkState tetiklendi");
+
   final whenInUsePerm = await Permission.locationWhenInUse.status;
   final alwaysPerm = await Permission.locationAlways.status;
   final gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
@@ -318,4 +337,36 @@ await AlertEngine.send(
       print('PLACE ${transitionType.toUpperCase()} => $placeName ($dist m)');
     }
   }
+  
+    Future<void> _updatePresence() async {
+    final locatorId = await IdentityManager.getOrCreateDeviceId();
+    final currentPairCode = AppUtils.generatePairCode(locatorId);
+
+    if (pairCode != currentPairCode) {
+    pairCode = currentPairCode;
+    // Burada "notifyListeners()" veya benzeri bir tetikleyici 
+    // kullanarak UI'a "Veri değişti, ekranı yenile" diyebiliriz.
+	}
+
+    final level = await _battery.batteryLevel;
+    final gpsOn = await geo.Geolocator.isLocationServiceEnabled();
+    final pos = await LocationService.getCurrentLocationSafe(
+      accuracy: geo.LocationAccuracy.high,
+      timeLimit: const Duration(seconds: 20),
+    );
+    if (pos == null) return;
+
+    await FirebaseFirestore.instance.collection('locators').doc(locatorId).set({
+      'lastSeen': FieldValue.serverTimestamp(),
+      'battery': level,
+      'gpsEnabled': gpsOn,
+      'lat': pos.latitude,
+      'lng': pos.longitude,
+      'acc': pos.accuracy,
+      'pairCode': currentPairCode,
+    }, SetOptions(merge: true));
+
+    print('PRESENCE => battery=$level gps=$gpsOn pairCode=$currentPairCode');
+  }
+
 }

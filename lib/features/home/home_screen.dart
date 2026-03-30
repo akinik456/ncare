@@ -14,6 +14,7 @@ import '../../core/identity_manager.dart';
 import '../../core/location_helper.dart';
 import '../../core/locator_settings_reader.dart';
 import '../../core/device_state_manager.dart';
+import '../../core/utils.dart';
 import '../setup/setup_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -24,7 +25,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const String _pairCodeAlphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 
   String? locatorId;
   String? locatorName;
@@ -32,7 +32,6 @@ class _HomeScreenState extends State<HomeScreen> {
   String? displayname;
   String? pairCode;
 
-  Timer? _presenceTimer;
   Timer? _batteryTimer;
   final Battery _battery = Battery();
   int? _lastBatteryLevel;
@@ -41,12 +40,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
 
-    _updatePresence();
-
-    _presenceTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) => _updatePresence(),
-    );
     _initLocatorId();
 	_loadLocatorName();
     _startBatteryMonitor();
@@ -54,7 +47,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    _presenceTimer?.cancel();
     _batteryTimer?.cancel();
     super.dispose();
   }
@@ -63,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final id = await IdentityManager.getOrCreateDeviceId();
 	await FirebaseMessaging.instance.subscribeToTopic("locator_$id");
 	print('_initLocatorId  FCM OK => $id');
-    final generatedCode = _generatePairCode(id);
+    final generatedCode = AppUtils.generatePairCode(id);
 
     if (!mounted) return;
 
@@ -338,54 +330,6 @@ Future<void> _sendCallMeAll() async {
     });
   }
 
-  Future<void> _updatePresence() async {
-    final locatorId = await IdentityManager.getOrCreateDeviceId();
-    final currentPairCode = _generatePairCode(locatorId);
-
-    if (pairCode != currentPairCode && mounted) {
-      setState(() {
-        pairCode = currentPairCode;
-      });
-    }
-
-    final level = await _battery.batteryLevel;
-    final gpsOn = await Geolocator.isLocationServiceEnabled();
-    final pos = await LocationService.getCurrentLocationSafe(
-      accuracy: LocationAccuracy.high,
-      timeLimit: const Duration(seconds: 20),
-    );
-    if (pos == null) return;
-
-    await FirebaseFirestore.instance.collection('locators').doc(locatorId).set({
-      'lastSeen': FieldValue.serverTimestamp(),
-      'battery': level,
-      'gpsEnabled': gpsOn,
-      'lat': pos.latitude,
-      'lng': pos.longitude,
-      'acc': pos.accuracy,
-      'pairCode': currentPairCode,
-    }, SetOptions(merge: true));
-
-    print('PRESENCE => battery=$level gps=$gpsOn pairCode=$currentPairCode');
-  }
-
-  String _generatePairCode(String locatorId) {
-    int hash = 17;
-    for (final unit in locatorId.codeUnits) {
-      hash = (hash * 31 + unit) & 0x7fffffff;
-    }
-
-    const base = _pairCodeAlphabet;
-    final buffer = StringBuffer();
-    int value = hash;
-
-    for (int i = 0; i < 6; i++) {
-      buffer.write(base[value % base.length]);
-      value = value ~/ base.length;
-    }
-
-    return buffer.toString();
-  }
 
   Future<void> _syncPairCode(String locatorId, String pairCode) async {
     try {
@@ -673,7 +617,7 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
     }
 
     final theme = Theme.of(context);
-    final currentPairCode = pairCode ?? _generatePairCode(locatorId!);
+    final currentPairCode = pairCode ?? AppUtils.generatePairCode(locatorId!);
 
     final qrData = jsonEncode({
       'type': 'ncare_locator',

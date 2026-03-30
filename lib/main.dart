@@ -13,6 +13,7 @@ import 'core/notification_service.dart';
 import 'core/notification_gateway.dart';
 import 'core/fcm_manager.dart';
 import 'core/location_helper.dart';
+import 'core/background_engine.dart';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -92,6 +93,7 @@ String? myLocatorId;
 if (role == 'locator') {
   myLocatorId = await IdentityManager.getOrCreateDeviceId();
   final locatorTopic = 'locator_$myLocatorId';
+  await BackgroundEngine.initialize();
 } else {
   print("LOCATOR FLOW SKIPPED => role=$role");
   final requesterId = await IdentityManager.getOrCreateDeviceId();
