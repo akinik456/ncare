@@ -4,16 +4,13 @@ import 'dart:convert';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../../core/alert_engine.dart';
 import '../../core/device_state_manager.dart';
 import '../../core/identity_manager.dart';
-import '../../core/location_helper.dart';
 import '../../core/locator_settings_reader.dart';
-import '../../core/device_state_manager.dart';
 import '../../core/utils.dart';
 import '../setup/setup_screen.dart';
 

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
-import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 import '../firebase_options.dart';
 import 'device_state_manager.dart';
 import 'role_manager.dart';

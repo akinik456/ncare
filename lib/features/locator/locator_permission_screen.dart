@@ -144,7 +144,7 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> {
                             ),
                             child: const Icon(
                               Icons.location_on_rounded,
-                              color: const Color(0xFF020617),
+                              color: Color(0xFF020617),
                               size: 34,
                             ),
                           ),

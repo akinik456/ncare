@@ -1,0 +1,46 @@
+Adım 1: Strateji Belirleme
+Şu anki kuralların muhtemelen şöyledir:
+
+JavaScript
+allow read, write: if request.time < timestamp.date(2026, 4, 4);
+Bunu, yalnızca kimliği doğrulanmış (authenticated) kullanıcıların kendi verilerine erişebileceği bir yapıya dönüştürmeliyiz.
+
+Adım 2: Güvenlik Kurallarını Güncelleme
+Firebase Konsolu > Firestore Database > Rules (Kurallar) sekmesine git ve aşağıdaki kodu yapıştır:
+
+JavaScript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Kullanıcı dokümanları: Sadece ilgili kullanıcı kendi verisini okuyabilir ve yazabilir
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Konum veya Takip verileri (StalkGuard özelinde)
+    // Eğer konumları paylaşıyorsanız, okuma iznini 'auth != null' yapabiliriz
+    match /locations/{docId} {
+      allow read: if request.auth != null; 
+      allow write: if request.auth != null && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Genel kural: Diğer her şey varsayılan olarak kapalı (En güvenli yaklaşım)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+Adım 3: Neleri Değiştirdik?
+request.auth != null: Artık internetteki herhangi biri değil, sadece uygulamana Firebase üzerinden giriş yapmış (Login olmuş) kullanıcılar işlem yapabilir.
+
+request.auth.uid == userId: Bir kullanıcı, sadece kendi ID'sine sahip dökümanı değiştirebilir. Bu, bir kullanıcının başkasının verilerini silmesini veya değiştirmesini engeller.
+
+allow write Kısıtlaması: Yazma işlemini yaparken, verinin içindeki userId alanının, o anki giriş yapan kişinin UID'si ile eşleştiğinden emin oluruz.
+
+Yapılması Gerekenler:
+Flutter tarafında: Kullanıcıların signInAnonymously() veya başka bir yöntemle (Google, Email vb.) giriş yaptığından emin ol. Eğer giriş yapmadan veri yazmaya çalışırlarsa "Permission Denied" hatası alırsın.
+
+Yayınla (Publish): Kuralları yapıştırdıktan sonra sağ üstteki "Yayınla" butonuna basmayı unutma.
+
+Bu kurallar StalkGuard'ın güvenliğini sağlar ve o "4 gün kaldı" uyarısını ortadan kaldırır. Uygulamanın veri yapısında (Koleksiyon isimleri vb.) farklılık varsa söyle, ona göre kuralları daha spesifik hale getirelim.

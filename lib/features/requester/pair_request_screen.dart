@@ -22,7 +22,7 @@ class _PairRequestScreenState extends State<PairRequestScreen> {
 
   Future<void> _sendPairRequest() async {
     final groupId = await IdentityManager.getLocalGroupId();
-	if(groupId == null || groupId!.isEmpty){
+	if(groupId == null || groupId.isEmpty){
 	return;
 	}
     

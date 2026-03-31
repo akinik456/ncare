@@ -98,7 +98,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
             p.locality,
             p.administrativeArea,
             p.country,
-          ].where((e) => e != null && e!.trim().isNotEmpty).cast<String>().toList();
+          ].where((e) => e != null && e.trim().isNotEmpty).cast<String>().toList();
           _address = parts.toSet().join(', ');
         }
       } catch (_) {

@@ -2,8 +2,6 @@ import 'dart:async';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart' as geo;
-import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'alert_engine.dart';
 import 'identity_manager.dart';
@@ -13,21 +11,22 @@ import 'utils.dart';
 class DeviceStateManager {
   DeviceStateManager._();
   static final DeviceStateManager instance = DeviceStateManager._();
-
   static const int _placeTransitionCooldownSeconds = 120;
-
+  // --- DINAMIK PERIYOT DEĞİŞKENLERİ ---
+  int _currentIntervalSeconds = 3600; // Başlangıç: 1 Saat
+  bool _isActiveRequest = false; 
+  Timer? _presenceTimer;
+  Timer? _autoSleepTimer;
+  bool? _gfInside;
+  bool gpsEnabled = false;
+  bool hasLocationPermission = false;
+  bool hasBackgroundLocationPermission = false;
   final _readyController = StreamController<bool>.broadcast();
-  
   final Battery _battery = Battery();
 
   bool _isReady = false;
   Timer? _ticker;
   Timer? _geoTicker;
-  Timer? _presenceTimer;
-  bool? _gfInside;
-  bool gpsEnabled = false;
-  bool hasLocationPermission = false;
-  bool hasBackgroundLocationPermission = false;
   String? pairCode;
 
   StreamSubscription<geo.ServiceStatus>? _gpsSub;
@@ -38,135 +37,105 @@ class DeviceStateManager {
     yield _isReady;
     yield* _readyController.stream;
   }
-  
+
+  // --- VİTES ARTIRMA (REQUESTER EKRANI AÇINCA ÇAĞRILIR) ---
+  void boostTracking() {
+    print("STALKGUARD: Canlı takip isteği alındı. Periyot: 20sn.");
+    _isActiveRequest = true;
+    _currentIntervalSeconds = 20; 
+    _restartPresenceTimer();
+
+    // 5 dakika sonra otomatik olarak ekonomi moduna (1 saat) dön
+    _autoSleepTimer?.cancel();
+    _autoSleepTimer = Timer(const Duration(minutes: 5), () {
+      print("STALKGUARD: Zaman aşımı. Ekonomi moduna dönülüyor (3600sn).");
+      _isActiveRequest = false;
+      _currentIntervalSeconds = 3600; 
+      _restartPresenceTimer();
+    });
+  }
+
+  void _restartPresenceTimer() {
+    _presenceTimer?.cancel();
+    _presenceTimer = Timer.periodic(
+      Duration(seconds: _currentIntervalSeconds),
+      (_) => _updatePresence(),
+    );
+  }
+
   void start() {
-  print("DEVICE STATE MANAGER STARTED");
+    print("STALKGUARD: Sistem Başlatıldı. Mod: Standby (1 Saat)");
     _ticker?.cancel();
     _geoTicker?.cancel();
-	_presenceTimer?.cancel();
-    //_batteryTimer?.cancel();
-	
-    _updatePresence();
+    
+    _restartPresenceTimer();
 
-    _presenceTimer = Timer.periodic(
-      const Duration(seconds: 30),
-      (_) => _updatePresence(),
-    );	
-	
-	
+    // Geofence kontrolü (60sn bir, sadece yerel kontrol)
     _geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
       try {
         final pos = await LocationService.getCurrentLocationSafe(
           accuracy: geo.LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 20),
+          timeLimit: const Duration(seconds: 15),
         );
         if (pos == null) return;
 
         final locatorId = await IdentityManager.getOrCreateDeviceId();
-		final generatedCode = AppUtils.generatePairCode(locatorId);
-        final requesterId = await _getPairedRequesterId(locatorId);
-        if (requesterId == null || requesterId.isEmpty) return;
-
-        await _handleSingleCenterGeofence(
-          requesterId: requesterId,
-          locatorId: locatorId,
-          pos: pos,
-        );
-
-        await _handleSavedPlacesGeofence(
-          requesterId: requesterId,
-          locatorId: locatorId,
-          pos: pos,
-        );
+        await _handleSingleCenterGeofence(locatorId: locatorId, pos: pos);
+        await _handleSavedPlacesGeofence(locatorId: locatorId, pos: pos);
       } catch (e) {
-        print('GF ERROR => $e');
+        print('GF Error: $e');
       }
     });
 
     _gpsSub?.cancel();
     _checkState();
-
-    _gpsSub = geo.Geolocator.getServiceStatusStream().listen((_) {
-      _checkState();
-    });
-
-    _ticker = Timer.periodic(const Duration(seconds: 2), (_) => _checkState());
+    _gpsSub = geo.Geolocator.getServiceStatusStream().listen((_) => _checkState());
+    _ticker = Timer.periodic(const Duration(seconds: 5), (_) => _checkState());
   }
 
-  Future<void> recheckNow() async => _checkState();
-
-  Future<void> requestPermissions() async {
-    await Permission.location.request();
-    await Permission.locationWhenInUse.request();
-	await Permission.locationAlways.request();
-    await recheckNow();
-  }
-
-Future<void> _checkState() async {
-print("DEBUG: _checkState tetiklendi");
-
-  final whenInUsePerm = await Permission.locationWhenInUse.status;
-  final alwaysPerm = await Permission.locationAlways.status;
-  final gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
-
-  final hasLocationPermission =
-      whenInUsePerm.isGranted || alwaysPerm.isGranted;
-  final hasBackgroundLocationPermission = alwaysPerm.isGranted;
-
-  _updateReady(
-    hasLocationPermission &&
-        hasBackgroundLocationPermission &&
-        gpsEnabled,
-  );
-
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final gpsSent = prefs.getBool('gpsOffAlertSent') ?? false;
-
+  Future<void> _updatePresence() async {
     final locatorId = await IdentityManager.getOrCreateDeviceId();
-    final groupId = await IdentityManager.getLocalGroupId();
-    if (groupId == null || groupId.isEmpty) return;
+    final currentPairCode = AppUtils.generatePairCode(locatorId);
+    final level = await _battery.batteryLevel;
+    final gpsOn = await geo.Geolocator.isLocationServiceEnabled();
 
-    final locatorDoc = await FirebaseFirestore.instance
-        .collection('locators')
-        .doc(locatorId)
-        .get();
+    Map<String, dynamic> updateData = {
+      'lastSeen': FieldValue.serverTimestamp(),
+      'battery': level,
+      'gpsEnabled': gpsOn,
+      'pairCode': currentPairCode,
+    };
 
-    final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
-
-    final requesterId =
-        (locatorDoc.data()?['pairedRequesterId'] ?? '').toString().trim();
-
-    if (requesterId.isEmpty) return;
-
-    final settingsDoc = await FirebaseFirestore.instance
-        .collection('groups')
-        .doc(groupId)
-        .collection('locators')
-        .doc(locatorId)
-        .get();
-
-    final gpsOffAlarmEnabled =
-        (settingsDoc.data()?['gpsOffAlarmEnabled'] ?? false) == true;
-
-    if (!gpsEnabled && gpsOffAlarmEnabled && !gpsSent) {
-      await AlertEngine.send(
-        groupId: groupId,
-        locatorId: locatorId,
-        locatorName: locatorName,
-        alertType: 'gps_off',
+    // TASARRUF: Sadece aktif istek varsa GPS çalıştır, yoksa sadece pil/durum bas
+    if (_isActiveRequest || _currentIntervalSeconds < 3600) {
+      final pos = await LocationService.getCurrentLocationSafe(
+        accuracy: geo.LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
       );
-
-      await prefs.setBool('gpsOffAlertSent', true);
+      if (pos != null) {
+        updateData.addAll({
+          'lat': pos.latitude,
+          'lng': pos.longitude,
+          'acc': pos.accuracy,
+        });
+      }
     }
 
-    if (gpsEnabled && gpsSent) {
-      await prefs.setBool('gpsOffAlertSent', false);
-    }
-  } catch (e) {
-    print('GPS OFF ALERT ERROR => $e');
+    await FirebaseFirestore.instance
+        .collection('locators')
+        .doc(locatorId)
+        .set(updateData, SetOptions(merge: true));
+
+    print('PRESENCE UPDATED - Periyot: $_currentIntervalSeconds s');
   }
-}
+
+  Future<void> _checkState() async {
+    final gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
+    final permission = await geo.Geolocator.checkPermission();
+    final hasPermission = permission == geo.LocationPermission.always || 
+                         permission == geo.LocationPermission.whileInUse;
+    _updateReady(gpsEnabled && hasPermission);
+  }
 
   void _updateReady(bool value) {
     if (_isReady == value) return;
@@ -174,25 +143,12 @@ print("DEBUG: _checkState tetiklendi");
     _readyController.add(_isReady);
   }
 
-  Future<String?> _getPairedRequesterId(String locatorId) async {
-    final doc = await FirebaseFirestore.instance
-        .collection('locators')
-        .doc(locatorId)
-        .get();
-
-    final data = doc.data();
-    if (data == null) return null;
-
-    return data['pairedRequesterId']?.toString();
-  }
-
-  Future<void> _handleSingleCenterGeofence({
-    required String requesterId,
+Future<void> _handleSingleCenterGeofence({
     required String locatorId,
     required geo.Position pos,
   }) async {
-  final groupId = await IdentityManager.getLocalGroupId();
-		if (groupId == null || groupId.isEmpty) return;
+    final groupId = await IdentityManager.getLocalGroupId();
+    if (groupId == null || groupId.isEmpty) return;
     final gfDoc = await FirebaseFirestore.instance
         .collection('groups')
         .doc(groupId)
@@ -208,7 +164,7 @@ print("DEBUG: _checkState tetiklendi");
     final cLng = (gf?['geofenceCenterLng'] as num?)?.toDouble();
 
     if (!enabled || radius == null || cLat == null || cLng == null) return;
-	
+
     final dist = geo.Geolocator.distanceBetween(
       pos.latitude,
       pos.longitude,
@@ -230,7 +186,6 @@ print("DEBUG: _checkState tetiklendi");
           .get();
       final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
 
-
       print('GF EXIT ALERT => $dist');
     }
 
@@ -248,12 +203,11 @@ print("DEBUG: _checkState tetiklendi");
   }
 
   Future<void> _handleSavedPlacesGeofence({
-    required String requesterId,
     required String locatorId,
     required geo.Position pos,
   }) async {
-  final groupId = await IdentityManager.getLocalGroupId();
-		if (groupId == null || groupId.isEmpty) return;
+    final groupId = await IdentityManager.getLocalGroupId();
+    if (groupId == null || groupId.isEmpty) return;
     final locatorDoc = await FirebaseFirestore.instance
         .collection('locators')
         .doc(locatorId)
@@ -275,8 +229,7 @@ print("DEBUG: _checkState tetiklendi");
 
       final lat = (data['lat'] as num?)?.toDouble();
       final lng = (data['lng'] as num?)?.toDouble();
-      final radiusMeters =
-          (data['radiusMeters'] as num?)?.toDouble() ?? 180.0;
+      final radiusMeters = (data['radiusMeters'] as num?)?.toDouble() ?? 180.0;
       final placeName = (data['name'] ?? 'Place').toString();
       final lastState = (data['lastState'] ?? 'unknown').toString();
       final lastTransitionAt = data['lastTransitionAt'] as Timestamp?;
@@ -289,8 +242,8 @@ print("DEBUG: _checkState tetiklendi");
         lat,
         lng,
       );
-	  final groupId = await IdentityManager.getLocalGroupId();
-if (groupId == null || groupId.isEmpty) return;
+      final groupId = await IdentityManager.getLocalGroupId();
+      if (groupId == null || groupId.isEmpty) return;
 
       final newState = dist <= radiusMeters ? 'inside' : 'outside';
 
@@ -305,29 +258,31 @@ if (groupId == null || groupId.isEmpty) return;
       if (lastState == newState) continue;
 
       final now = DateTime.now();
-      final canTransition = lastTransitionAt == null ||
+      final canTransition =
+          lastTransitionAt == null ||
           now.difference(lastTransitionAt.toDate()).inSeconds >=
               _placeTransitionCooldownSeconds;
 
       if (!canTransition) continue;
 
-      final transitionType =
-    lastState == 'outside' && newState == 'inside' ? 'arrive' : 'left';
-final currentAlertType = 'place_${transitionType}_${placeDoc.id}';
+      final transitionType = lastState == 'outside' && newState == 'inside'
+          ? 'arrive'
+          : 'left';
+      final currentAlertType = 'place_${transitionType}_${placeDoc.id}';
 
-await AlertEngine.send(
-  groupId: groupId,
-  locatorId: locatorId,
-  locatorName: locatorName,
-  alertType: currentAlertType,
-  extra: {
-    'subtype': transitionType,
-    'placeId': placeDoc.id,
-    'placeName': placeName,
-    'distance': dist,
-    'radiusMeters': radiusMeters,
-  },
-);
+      await AlertEngine.send(
+        groupId: groupId,
+        locatorId: locatorId,
+        locatorName: locatorName,
+        alertType: currentAlertType,
+        extra: {
+          'subtype': transitionType,
+          'placeId': placeDoc.id,
+          'placeName': placeName,
+          'distance': dist,
+          'radiusMeters': radiusMeters,
+        },
+      );
 
       await placeDoc.reference.set({
         'lastState': newState,
@@ -337,36 +292,4 @@ await AlertEngine.send(
       print('PLACE ${transitionType.toUpperCase()} => $placeName ($dist m)');
     }
   }
-  
-    Future<void> _updatePresence() async {
-    final locatorId = await IdentityManager.getOrCreateDeviceId();
-    final currentPairCode = AppUtils.generatePairCode(locatorId);
-
-    if (pairCode != currentPairCode) {
-    pairCode = currentPairCode;
-    // Burada "notifyListeners()" veya benzeri bir tetikleyici 
-    // kullanarak UI'a "Veri değişti, ekranı yenile" diyebiliriz.
-	}
-
-    final level = await _battery.batteryLevel;
-    final gpsOn = await geo.Geolocator.isLocationServiceEnabled();
-    final pos = await LocationService.getCurrentLocationSafe(
-      accuracy: geo.LocationAccuracy.high,
-      timeLimit: const Duration(seconds: 20),
-    );
-    if (pos == null) return;
-
-    await FirebaseFirestore.instance.collection('locators').doc(locatorId).set({
-      'lastSeen': FieldValue.serverTimestamp(),
-      'battery': level,
-      'gpsEnabled': gpsOn,
-      'lat': pos.latitude,
-      'lng': pos.longitude,
-      'acc': pos.accuracy,
-      'pairCode': currentPairCode,
-    }, SetOptions(merge: true));
-
-    print('PRESENCE => battery=$level gps=$gpsOn pairCode=$currentPairCode');
-  }
-
 }

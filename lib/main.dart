@@ -1,4 +1,3 @@
-import 'package:flutter/widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -290,7 +289,7 @@ print("BG_HANDLER RL RECEIVED");
   }
   
 final stillPaired = await _isStillPaired(
-  locatorId: myLocatorId!,
+  locatorId: myLocatorId,
   requesterId: requesterId,
 );
 print("BG_HANDLER stillPaired => $stillPaired");

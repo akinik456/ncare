@@ -10,7 +10,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/identity_manager.dart';
 import '../../core/notification_service.dart';
 import '../../core/location_helper.dart';
-import '../setup/setup_screen.dart';
 import 'add_locator_screen.dart';
 import 'pairing_options_screen.dart';
 import 'package:intl/intl.dart';
@@ -1273,7 +1272,7 @@ if (_groupId == null || _groupId!.isEmpty) ...[
     final hasFix = (status == 'ok' && lat != null && lng != null);
 
     if (hasFix && pendingRequestId != null) {
-      final currentPending = pendingRequestId!;
+      final currentPending = pendingRequestId;
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
 
@@ -1348,7 +1347,7 @@ if (_groupId == null || _groupId!.isEmpty) ...[
         }
 
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _resolveAddress(lat!, lng!);
+          _resolveAddress(lat, lng);
         });
 
         return Container(

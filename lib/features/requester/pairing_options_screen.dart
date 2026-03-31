@@ -767,8 +767,8 @@ SizedBox(
 const SizedBox(height: 20),
 
 OutlinedButton(
-child: const Text('Remove locator'),
 onPressed: _saving ? null : _removeLocator,
+child: const Text('Remove locator'),
 
 ),
 
