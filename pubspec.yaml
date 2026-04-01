@@ -50,6 +50,7 @@ dependencies:
   flutter_background_service: ^5.0.7
   
   firebase_core: any
+  firebase_auth: ^6.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

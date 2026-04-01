@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/identity_manager.dart';
 import '../../core/role_manager.dart';
+import '../../core/auth_service.dart';
 import '../requester/requester_screen.dart';
 import '../locator/locator_permission_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -57,7 +58,8 @@ class _NameScreenState extends State<NameScreen> {
 
     if (role == "requester" && _isCreatingGroup) {
       final groupId = const Uuid().v4();
-
+	  final authId = AuthService.currentAuthId;
+	  
       await IdentityManager.setLocalGroupId(groupId);
 
       await FirebaseFirestore.instance.collection('groups').doc(groupId).set({
@@ -69,6 +71,7 @@ class _NameScreenState extends State<NameScreen> {
         ),
         'maxDevicesCount': 10,
         'groupMasterDeviceId': deviceId,
+		'groupMasterAuthId': authId,
       });
 
       await FirebaseFirestore.instance
@@ -77,6 +80,7 @@ class _NameScreenState extends State<NameScreen> {
           .collection('devices')
           .doc(deviceId)
           .set({
+		'authId': authId,
         'deviceId': deviceId,
         'groupId': groupId,
         'role': 'requester',
@@ -87,7 +91,8 @@ class _NameScreenState extends State<NameScreen> {
       });
 
       await FirebaseFirestore.instance.collection('requesters').doc(deviceId).set({
-        'deviceId': deviceId,
+        'authId': authId,
+		'deviceId': deviceId,
         'role': 'requester',
         'name': name,
         'joinedAt': now,
@@ -105,7 +110,8 @@ class _NameScreenState extends State<NameScreen> {
       );
     } else if (role == "requester") {
       await FirebaseFirestore.instance.collection('requesters').doc(deviceId).set({
-        'deviceId': deviceId,
+        'authId': AuthService.currentAuthId,
+		'deviceId': deviceId,
         'role': 'requester',
         'name': name,
         'joinedAt': now,
@@ -123,6 +129,7 @@ class _NameScreenState extends State<NameScreen> {
       );
     } else {
       await FirebaseFirestore.instance.collection('locators').doc(deviceId).set({
+	    'authId': AuthService.currentAuthId,
         'deviceId': deviceId,
         'role': 'locator',
         'name': name,

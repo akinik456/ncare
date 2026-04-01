@@ -11,6 +11,7 @@ import 'core/locator_ui_state.dart';
 import 'core/notification_service.dart';
 import 'core/notification_gateway.dart';
 import 'core/fcm_manager.dart';
+import 'core/auth_service.dart';
 import 'core/location_helper.dart';
 import 'core/background_engine.dart';
 
@@ -22,7 +23,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
-
+import 'package:firebase_auth/firebase_auth.dart';
 import 'features/requester/requester_screen.dart';
 import 'core/identity_manager.dart';
 import 'package:battery_plus/battery_plus.dart';
@@ -42,12 +43,12 @@ Future<void> main() async {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 	
-	
-
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
-  );
+  );  
   
+  await AuthService.initializeAuth();
+ 
   await FcmManager.ensureSubscriptions();
   
   FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
