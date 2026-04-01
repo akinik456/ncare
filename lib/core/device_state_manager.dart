@@ -2,18 +2,20 @@ import 'dart:async';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart' as geo;
-
+import 'package:firebase_database/firebase_database.dart';
 import 'alert_engine.dart';
 import 'identity_manager.dart';
 import 'location_helper.dart';
 import 'utils.dart';
+import '../../services/rtdb.dart';
+
 
 class DeviceStateManager {
   DeviceStateManager._();
   static final DeviceStateManager instance = DeviceStateManager._();
   static const int _placeTransitionCooldownSeconds = 120;
   // --- DINAMIK PERIYOT DEĞİŞKENLERİ ---
-  int _currentIntervalSeconds = 3600; // Başlangıç: 1 Saat
+  int _currentIntervalSeconds = 30; // Başlangıç: 1 Saat
   bool _isActiveRequest = false; 
   Timer? _presenceTimer;
   Timer? _autoSleepTimer;
@@ -42,15 +44,15 @@ class DeviceStateManager {
   void boostTracking() {
     print("STALKGUARD: Canlı takip isteği alındı. Periyot: 20sn.");
     _isActiveRequest = true;
-    _currentIntervalSeconds = 20; 
+    _currentIntervalSeconds = 30; 
     _restartPresenceTimer();
 
     // 5 dakika sonra otomatik olarak ekonomi moduna (1 saat) dön
     _autoSleepTimer?.cancel();
     _autoSleepTimer = Timer(const Duration(minutes: 5), () {
-      print("STALKGUARD: Zaman aşımı. Ekonomi moduna dönülüyor (3600sn).");
+      print("Zaman aşımı. Ekonomi moduna dönülüyor (3600sn).");
       _isActiveRequest = false;
-      _currentIntervalSeconds = 3600; 
+      _currentIntervalSeconds = 30; 
       _restartPresenceTimer();
     });
   }
@@ -93,41 +95,42 @@ class DeviceStateManager {
     _ticker = Timer.periodic(const Duration(seconds: 5), (_) => _checkState());
   }
 
-  Future<void> _updatePresence() async {
-    final locatorId = await IdentityManager.getOrCreateDeviceId();
-    final currentPairCode = AppUtils.generatePairCode(locatorId);
-    final level = await _battery.batteryLevel;
-    final gpsOn = await geo.Geolocator.isLocationServiceEnabled();
+Future<void> _updatePresence() async {
+  final locatorId = await IdentityManager.getOrCreateDeviceId();
+  final groupId = await IdentityManager.getLocalGroupId(); // Grup ID'sini al
+  final level = await _battery.batteryLevel;
+  final gpsOn = await geo.Geolocator.isLocationServiceEnabled();
 
-    Map<String, dynamic> updateData = {
-      'lastSeen': FieldValue.serverTimestamp(),
-      'battery': level,
-      'gpsEnabled': gpsOn,
-      'pairCode': currentPairCode,
-    };
+  Map<String, dynamic> rtdbData = {
+    'battery': level,
+    'gpsEnabled': gpsOn,
+    'lastSeen': ServerValue.timestamp,
+    'status': 'online', 
+  };
 
-    // TASARRUF: Sadece aktif istek varsa GPS çalıştır, yoksa sadece pil/durum bas
-    if (_isActiveRequest || _currentIntervalSeconds < 3600) {
-      final pos = await LocationService.getCurrentLocationSafe(
-        accuracy: geo.LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 15),
-      );
-      if (pos != null) {
-        updateData.addAll({
-          'lat': pos.latitude,
-          'lng': pos.longitude,
-          'acc': pos.accuracy,
-        });
-      }
+  // Konum varsa ekle
+  
+    final pos = await LocationService.getCurrentLocationSafe(
+      accuracy: geo.LocationAccuracy.high,
+      timeLimit: const Duration(seconds: 1),
+    );
+    if (pos != null) {
+	print("pos is not null");
+      rtdbData.addAll({
+        'lat': pos.latitude,
+        'lng': pos.longitude,
+        'acc': pos.accuracy,
+      });
     }
+  
 
-    await FirebaseFirestore.instance
-        .collection('locators')
-        .doc(locatorId)
-        .set(updateData, SetOptions(merge: true));
-
-    print('PRESENCE UPDATED - Periyot: $_currentIntervalSeconds s');
-  }
+  // FIRESTORE YERİNE RTDB'YE BASIYORUZ
+  await RTDBService().updateStatus(
+    groupId: groupId ?? "unknown_group",
+    deviceId: locatorId,
+    data: rtdbData,
+  );
+}
 
   Future<void> _checkState() async {
     final gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();

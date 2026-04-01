@@ -14,6 +14,7 @@ import '../../core/locator_settings_reader.dart';
 import '../../core/utils.dart';
 import '../setup/setup_screen.dart';
 
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -32,15 +33,31 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _batteryTimer;
   final Battery _battery = Battery();
   int? _lastBatteryLevel;
+  
+  String? groupId;
+  String? deviceId;
+
 
   @override
   void initState() {
     super.initState();
+	_initEverything();
+	}
+	
+	Future<void> _initEverything() async {
+    await _initLocatorId();
+    await _loadLocatorName();
+    
+    groupId = await IdentityManager.getLocalGroupId(); 
+    deviceId = await IdentityManager.getOrCreateDeviceId();
+    
 
-    _initLocatorId();
-	_loadLocatorName();
     _startBatteryMonitor();
-  }
+    
+    // UI'ı güncellemek gerekirse
+    if (mounted) setState(() {});
+  }    
+
 
   @override
   void dispose() {

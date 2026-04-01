@@ -16,8 +16,6 @@ import 'package:intl/intl.dart';
 import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import '../../services/rtdb.dart';
-import 'package:firebase_database/firebase_database.dart';
 
 class RequesterScreen extends StatefulWidget {
   const RequesterScreen({super.key});
@@ -50,14 +48,12 @@ class _RequesterScreenState extends State<RequesterScreen> with SingleTickerProv
   Timer? _reqLocationTimer;
   String? _requesterDeviceId;
   StreamSubscription? _callAlertSub;
-String? _currentRequesterName;
 
   @override
   void initState() {
     super.initState();
 	NotificationService.suppressForegroundAlerts = true;
     _initRequesterId();	
-	_loadMyName();
 	_loadAlertSettings();
 	_presenceUiTimer = Timer.periodic(
   const Duration(seconds: 15),
@@ -128,19 +124,6 @@ print('myLat $_myLat , myLng $_myLng');
   _groupId=gid;  
   });
   _listenCallAlerts();
-}
-
-Future<void> _loadMyName() async {
-  final doc = await FirebaseFirestore.instance
-      .collection('requesters')
-      .doc(requesterId) // Senin Auth ID'n
-      .get();
-  
-  if (mounted) {
-    setState(() {
-      _currentRequesterName = doc.data()?['name'] ?? 'Guest';
-    });
-  }
 }
 
 String shortCode(String id) {
@@ -948,152 +931,176 @@ if (_groupId == null || _groupId!.isEmpty) ...[
       );
     }
 
-return Wrap(
-  spacing: 8,
-  runSpacing: 8,
-  children: docs.map((doc) {
-    final deviceData = doc.data();
-    final locatorId = doc.id;
-    final name = (deviceData['name'] ?? deviceData['deviceId'] ?? locatorId).toString();
-    final selected = locatorId == _selectedLocatorId;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: docs.map((doc) {
+        final deviceData = doc.data();
+        final locatorId = doc.id;
+        final name =
+            (deviceData['name'] ?? deviceData['deviceId'] ?? locatorId)
+                .toString();
 
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedLocatorId = locatorId;
-        });
-        // Seçildiğinde RTDB'ye "İzliyorum" mührünü bas (İstediğin yeni mantık)
-        RTDBService().setWatchingStatus(
-          groupId: _groupId!,
-          locatorId: locatorId,
-          requesterId: requesterId!,
-          requesterName: _currentRequesterName ?? "Requester",
-          isWatching: true,
-        );
-      },
-      onLongPress: () async {
-        final changed = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PairingOptionsScreen(
-              locatorId: locatorId,
-              locatorName: name,
-            ),
+        final selected = locatorId == _selectedLocatorId;
+
+        return GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedLocatorId = locatorId;
+            });
+          },
+          onLongPress: () async {
+            final changed = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PairingOptionsScreen(
+                  locatorId: locatorId,
+                  locatorName: name,
+                ),
+              ),
+            );
+
+            if (changed == true && mounted) {
+              setState(() {});
+            }
+          },
+          child: StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('locators')
+                .doc(locatorId)
+                .snapshots(),
+            builder: (context, snap) {
+              if (!snap.hasData) {
+                return const SizedBox();
+              }
+
+              final data = snap.data!.data() as Map<String, dynamic>?;
+              final ts = data?['lastSeen'] as Timestamp?;
+              final lastSeen = ts?.toDate();
+              final battery = data?['battery'] ?? 0;
+              final gpsOn = data?['gpsEnabled'] ?? true;
+
+              final online = lastSeen != null &&
+                  DateTime.now().difference(lastSeen).inSeconds < 120;
+
+              final lat = (data?['lat'] as num?)?.toDouble();
+              final lng = (data?['lng'] as num?)?.toDouble();
+              final acc = (data?['acc'] as num?)?.toDouble() ?? 0;
+
+              double? distance;
+
+              if (_myLat != null &&
+                  _myLng != null &&
+                  lat != null &&
+                  lng != null) {
+                distance = Geolocator.distanceBetween(
+                  _myLat!,
+                  _myLng!,
+                  lat,
+                  lng,
+                );
+              }
+
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: selected
+                            ? const Color(0xFF1D4ED8)
+                            : Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  online
+                      ? AnimatedBuilder(
+                          animation: _pulse,
+                          builder: (context, child) {
+                            return Transform.scale(
+                              scale: _pulse.value,
+                              child: child,
+                            );
+                          },
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Colors.white70,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                  const SizedBox(width: 6),
+                  Text(
+                    online ? "ONLINE" : formatLastSeen(lastSeen),
+                    style: TextStyle(
+                      color: online ? Colors.green : Colors.white70,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (online) ...[
+                    const SizedBox(width: 12),
+                    Text(
+                      "🔋$battery%",
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      gpsOn ? "📍GPS" : "⚠️GPS",
+                      style: TextStyle(
+                        color: gpsOn ? Colors.white70 : Colors.orange,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    if (distance != null) ...[
+                      const SizedBox(width: 12),
+                      Text(
+                        formatDistance(distance, acc),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
+              );
+            },
           ),
         );
-        if (changed == true && mounted) setState(() {});
-      },
-      child: StreamBuilder<DatabaseEvent>(
-        // --- RTDB VERİ KAYNAĞI ---
-        stream: RTDBService().getGroupPresenceStream(_groupId!),
-        builder: (context, snap) {
-          // Default değerler
-          bool online = false;
-          int battery = 0;
-          bool gpsOn = true;
-          double? lat, lng, acc;
-          DateTime? lastSeen;
-
-          if (snap.hasData && snap.data!.snapshot.value != null) {
-            final allLocators = snap.data!.snapshot.value as Map<dynamic, dynamic>;
-            final myData = allLocators[locatorId] as Map<dynamic, dynamic>?;
-
-            if (myData != null) {
-              online = myData['status'] == 'online';
-              battery = myData['battery'] ?? 0;
-              gpsOn = myData['gpsEnabled'] ?? true;
-              lat = (myData['lat'] as num?)?.toDouble();
-              lng = (myData['lng'] as num?)?.toDouble();
-              acc = (myData['acc'] as num?)?.toDouble() ?? 0;
-              
-              final ts = myData['lastSeen'] as int?;
-              if (ts != null) {
-                lastSeen = DateTime.fromMillisecondsSinceEpoch(ts);
-              }
-            }
-          }
-
-          // Mesafe hesaplama mantığı (Eski haliyle aynı)
-          double? distance;
-          if (_myLat != null && _myLng != null && lat != null && lng != null) {
-            distance = Geolocator.distanceBetween(_myLat!, _myLng!, lat, lng);
-          }
-
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: selected ? Colors.white : Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: selected ? const Color(0xFF1D4ED8) : Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              online
-                  ? AnimatedBuilder(
-                      animation: _pulse,
-                      builder: (context, child) => Transform.scale(scale: _pulse.value, child: child),
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                      ),
-                    )
-                  : Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(color: Colors.white70, shape: BoxShape.circle),
-                    ),
-              const SizedBox(width: 6),
-              Text(
-                online ? "ONLINE" : formatLastSeen(lastSeen),
-                style: TextStyle(
-                  color: online ? Colors.green : Colors.white70,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (online) ...[
-                const SizedBox(width: 12),
-                Text(
-                  "🔋$battery%",
-                  style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  gpsOn ? "📍GPS" : "⚠️GPS",
-                  style: TextStyle(
-                    color: gpsOn ? Colors.white70 : Colors.orange,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (distance != null) ...[
-                  const SizedBox(width: 12),
-                  Text(
-                    formatDistance(distance, acc ?? 0),
-                    style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ],
-            ],
-          );
-        },
-      ),
+      }).toList(),
     );
-  }).toList(),
-);
-
   },
 ),
                   ),
