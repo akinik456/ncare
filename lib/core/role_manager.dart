@@ -1,4 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
+import 'background_engine.dart';
+
 
 class RoleManager {
   static const _key = 'device_role';
@@ -12,4 +14,5 @@ class RoleManager {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_key, role);
   }
+  
 }

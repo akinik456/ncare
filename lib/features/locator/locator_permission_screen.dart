@@ -21,11 +21,22 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> {
     setState(() => _busy = true);
 
     try {
-      final locStatus = await Permission.locationWhenInUse.request();
+      // 1. Adım: Konum İzni (En kritik olan)
+      final locStatus = await Permission.location.request();
+      
+      // 2. Adım: Hareket Algılama (Activity Recognition)
+      // Konumdan hemen sonra bunu tetikliyoruz
+      final activityStatus = await Permission.activityRecognition.request();
+
+      // 3. Adım: Bildirim İzni
       final notifStatus = await Permission.notification.request();
 
-      final ok = locStatus.isGranted &&
-          (notifStatus.isGranted || notifStatus.isLimited);
+      // Durum Kontrolü
+      final bool isLocationOk = locStatus.isGranted;
+      final bool isActivityOk = activityStatus.isGranted;
+      final bool isNotifOk = notifStatus.isGranted || notifStatus.isLimited;
+
+      final ok = isLocationOk && isActivityOk && isNotifOk;
 
       if (ok) {
         await RoleManager.setRole('locator');
@@ -78,7 +89,9 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> {
           ],
         ),
       );
-    } finally {
+    } catch (e) {
+      print("İzin istenirken hata: $e");
+    }finally {
       if (mounted) setState(() => _busy = false);
     }
   }

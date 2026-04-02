@@ -15,7 +15,7 @@ class DeviceStateManager {
   static final DeviceStateManager instance = DeviceStateManager._();
   static const int _placeTransitionCooldownSeconds = 120;
   // --- DINAMIK PERIYOT DEĞİŞKENLERİ ---
-  int _currentIntervalSeconds = 30; // Başlangıç: 1 Saat
+  int _currentIntervalSeconds = 3600; // Başlangıç: 1 Saat
   bool _isActiveRequest = false; 
   Timer? _presenceTimer;
   Timer? _autoSleepTimer;
@@ -42,7 +42,7 @@ class DeviceStateManager {
 
   // --- VİTES ARTIRMA (REQUESTER EKRANI AÇINCA ÇAĞRILIR) ---
   void boostTracking() {
-    print("STALKGUARD: Canlı takip isteği alındı. Periyot: 20sn.");
+    print(" Canlı takip isteği alındı. Periyot: 20sn.");
     _isActiveRequest = true;
     _currentIntervalSeconds = 30; 
     _restartPresenceTimer();
@@ -61,12 +61,12 @@ class DeviceStateManager {
     _presenceTimer?.cancel();
     _presenceTimer = Timer.periodic(
       Duration(seconds: _currentIntervalSeconds),
-      (_) => _updatePresence(),
+      (_) => updatePresence(),
     );
   }
 
   void start() {
-    print("STALKGUARD: Sistem Başlatıldı. Mod: Standby (1 Saat)");
+    print(" Sistem Başlatıldı. Mod: Standby (1 Saat)");
     _ticker?.cancel();
     _geoTicker?.cancel();
     
@@ -95,7 +95,7 @@ class DeviceStateManager {
     _ticker = Timer.periodic(const Duration(seconds: 5), (_) => _checkState());
   }
 
-Future<void> _updatePresence() async {
+Future<void> updatePresence() async {
   final locatorId = await IdentityManager.getOrCreateDeviceId();
   final groupId = await IdentityManager.getLocalGroupId(); // Grup ID'sini al
   final level = await _battery.batteryLevel;

@@ -109,8 +109,6 @@ print('myLat $_myLat , myLng $_myLng');
 	final deviceId=await
 	IdentityManager.getOrCreateDeviceId();
 	 
-    await FirebaseMessaging.instance.subscribeToTopic(id);
-	print('_initRequesterId  FCM OK => $id');
     if (!mounted) return;
 
     setState(() {

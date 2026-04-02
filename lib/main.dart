@@ -18,6 +18,7 @@ import 'core/background_engine.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:pedometer/pedometer.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -32,37 +33,33 @@ import 'package:battery_plus/battery_plus.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  print('ROLE => ${await RoleManager.getRole()}');
-  print('REQ ID => ${await IdentityManager.getOrCreateDeviceId()}');
+  bool setupDone = await SetupManager.isSetupDone();
+  final String? role = await RoleManager.getRole();
 
-  await SystemChrome.setEnabledSystemUIMode(
-    SystemUiMode.manual,
-    overlays: SystemUiOverlay.values,
-  );
-  
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-    FlutterLocalNotificationsPlugin();
-	
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );  
-  
-  await AuthService.initializeAuth();
+    if (role != null) {
+	{
+	print('ROLE => $role');
+	print('REQ ID => ${await IdentityManager.getOrCreateDeviceId()}');
+	  if (role == 'locator') {
+	  //await BackgroundEngine.initialize();
+	  }
+	  
+	  await FcmManager.prepareApp();
+	  
+	  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+		FlutterLocalNotificationsPlugin();
+
+	  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+	  await NotificationService.init();
+	  print("APP_START");
+	  DeviceStateManager.instance.start();
+	  setupDone = await SetupManager.isSetupDone();
+	  print("SETUP CHECK DONE");
+	  
+
  
-  await FcmManager.ensureSubscriptions();
-  
-  FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
-	print("FCM TOKEN REFRESH => $token");
-	await FcmManager.ensureSubscriptions();
-	});
 
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  await NotificationService.init();
 
-  print("APP_START");
-  DeviceStateManager.instance.start();
-  final setupDone = await SetupManager.isSetupDone();
-  print("SETUP CHECK DONE");
   
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
   'ncare_alerts',
@@ -85,9 +82,7 @@ const InitializationSettings initSettings =
 
 await flutterLocalNotificationsPlugin.initialize(initSettings);
 	
-  final role = await RoleManager.getRole();
-  print("ROLE => $role");
-  
+    
 String? myLocatorId;
 
 if (role == 'locator') {
@@ -247,9 +242,17 @@ FirebaseMessaging.onMessage.listen((message) async {
     LocatorUiState.instance.reset();
   }
 });
-
-  runApp(NCareApp(setupDone: setupDone));
-}
+	}
+	} else {
+    print('ROLE => NULL (Bakir cihaz, ağır yükler pas geçildi)');
+  }
+  await SystemChrome.setEnabledSystemUIMode(
+    SystemUiMode.manual,
+    overlays: SystemUiOverlay.values,
+  );
+runApp(NCareApp(setupDone: setupDone));
+}   
+  
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -426,8 +429,9 @@ Future<bool> _isStillPaired({
 }
 
 class NCareApp extends StatelessWidget {
-  final bool setupDone;
-  const NCareApp({super.key, required this.setupDone});
+  
+ final bool setupDone; 
+ const NCareApp({super.key, required this.setupDone});
 
   @override
   Widget build(BuildContext context) {

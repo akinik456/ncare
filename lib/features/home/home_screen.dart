@@ -7,12 +7,14 @@ import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import '../../core/alert_engine.dart';
 import '../../core/device_state_manager.dart';
 import '../../core/identity_manager.dart';
 import '../../core/locator_settings_reader.dart';
 import '../../core/utils.dart';
 import '../setup/setup_screen.dart';
+import '../../core/background_engine.dart';
 
 
 class HomeScreen extends StatefulWidget {
@@ -36,12 +38,22 @@ class _HomeScreenState extends State<HomeScreen> {
   
   String? groupId;
   String? deviceId;
-
+	String _movementStatus = "Hareketsiz"; // Bunu ekle
 
   @override
   void initState() {
     super.initState();
 	_initEverything();
+	
+	// Arka plandan gelen mesajları dinle
+  FlutterBackgroundService().on('onTrackingStatusChanged').listen((event) {
+    if (mounted) {
+      setState(() {
+        // BackgroundEngine'deki "active" true ise takip moduna geçtik demektir
+        _movementStatus = event?['active'] == true ? "Takip Aktif (Hızlı)" : "Hareketsiz (Enerji Tasarrufu)";
+      });
+    }
+  });
 	}
 	
 	Future<void> _initEverything() async {
@@ -67,9 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _initLocatorId() async {
     final id = await IdentityManager.getOrCreateDeviceId();
-	await FirebaseMessaging.instance.subscribeToTopic("locator_$id");
-	print('_initLocatorId  FCM OK => $id');
-    final generatedCode = AppUtils.generatePairCode(id);
+	final generatedCode = AppUtils.generatePairCode(id);
 
     if (!mounted) return;
 
@@ -671,7 +681,24 @@ return Scaffold(
         ),
 
         const SizedBox(height: 6),
+// --- EKLEDİĞİMİZ TAKİP DURUMU TEXTİ ---
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(
+color: _movementStatus.contains("Aktif") ? Colors.teal.shade50 : Colors.blueGrey.shade50,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          _movementStatus,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: _movementStatus.contains("Aktif") ? Colors.teal : Colors.blueGrey,
+          ),
+        ),
+      ),
 
+      const SizedBox(height: 12),
         Expanded(
           child: Center(
             child: SingleChildScrollView(

@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../core/identity_manager.dart';
 import '../../core/role_manager.dart';
 import '../../core/auth_service.dart';
+import '../../core/fcm_manager.dart';
 import '../requester/requester_screen.dart';
 import '../locator/locator_permission_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -57,92 +58,96 @@ class _NameScreenState extends State<NameScreen> {
     final now = FieldValue.serverTimestamp();
 
     if (role == "requester" && _isCreatingGroup) {
-      final groupId = const Uuid().v4();
+	  await FcmManager.prepareApp();
+
+	  final groupId = const Uuid().v4();
 	  final authId = AuthService.currentAuthId;
 	  
-      await IdentityManager.setLocalGroupId(groupId);
+	  print("SYSTEM: Grup kuruluyor. GroupID: $groupId, AuthID: $authId");
 
-      await FirebaseFirestore.instance.collection('groups').doc(groupId).set({
-        'groupId': groupId,
-        'createdAt': now,
-        'isPaid': false,
-        'trialExpiresAt': Timestamp.fromDate(
-          DateTime.now().add(const Duration(days: 7)),
-        ),
-        'maxDevicesCount': 10,
-        'groupMasterDeviceId': deviceId,
+	  await IdentityManager.setLocalGroupId(groupId);
+	  await FirebaseFirestore.instance.collection('groups').doc(groupId).set({
+		'groupId': groupId,
+		'createdAt': now,
+		'isPaid': false,
+		'trialExpiresAt': Timestamp.fromDate(
+		  DateTime.now().add(const Duration(days: 7)),
+		),
+		'maxDevicesCount': 10,
+		'groupMasterDeviceId': deviceId,
 		'groupMasterAuthId': authId,
-      });
-
-      await FirebaseFirestore.instance
-          .collection('groups')
-          .doc(groupId)
-          .collection('devices')
-          .doc(deviceId)
-          .set({
+	  });
+	  await FirebaseFirestore.instance
+		  .collection('groups')
+		  .doc(groupId)
+		  .collection('devices')
+		  .doc(deviceId)
+		  .set({
 		'authId': authId,
-        'deviceId': deviceId,
-        'groupId': groupId,
-        'role': 'requester',
-        'name': name,
-        'joinedAt': now,
-        'active': true,
-        'isMaster': true,
-      });
-
-      await FirebaseFirestore.instance.collection('requesters').doc(deviceId).set({
-        'authId': authId,
 		'deviceId': deviceId,
-        'role': 'requester',
-        'name': name,
-        'joinedAt': now,
-        'active': true,
-        'isMaster': true,
-      });
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isCreatingGroup', false);
-
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const RequesterScreen()),
-      );
-    } else if (role == "requester") {
-      await FirebaseFirestore.instance.collection('requesters').doc(deviceId).set({
-        'authId': AuthService.currentAuthId,
+		'groupId': groupId,
+		'role': 'requester',
+		'name': name,
+		'joinedAt': now,
+		'active': true,
+		'isMaster': true,
+	  });
+	  await FirebaseFirestore.instance.collection('requesters').doc(deviceId).set({
+		'authId': authId,
 		'deviceId': deviceId,
-        'role': 'requester',
-        'name': name,
-        'joinedAt': now,
-        'active': true,
-        'isMaster': false,
-      });
+		'role': 'requester',
+		'name': name,
+		'joinedAt': now,
+		'active': true,
+		'isMaster': true,
+	  });
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isCreatingGroup', false);
+	  final prefs = await SharedPreferences.getInstance();
+	  await prefs.setBool('isCreatingGroup', false);
 
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const RequesterScreen()),
-      );
-    } else {
-      await FirebaseFirestore.instance.collection('locators').doc(deviceId).set({
-	    'authId': AuthService.currentAuthId,
-        'deviceId': deviceId,
-        'role': 'locator',
-        'name': name,
-        'joinedAt': now,
-        'active': true,
-      });
+	  if (!mounted) return;
+	  Navigator.pushReplacement(
+		context,
+		MaterialPageRoute(builder: (_) => const RequesterScreen()),
+	  );
+	} else if (role == "requester") {
+	  await FcmManager.prepareApp();
+	  await FirebaseFirestore.instance.collection('requesters').doc(deviceId).set({
+		'authId': AuthService.currentAuthId,
+		'deviceId': deviceId,
+		'role': 'requester',
+		'name': name,
+		'joinedAt': now,
+		'active': true,
+		'isMaster': false,
+	  });
 
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const LocatorPermissionScreen()),
-      );
-    }
+	  final prefs = await SharedPreferences.getInstance();
+	  await prefs.setBool('isCreatingGroup', false);
+
+	  if (!mounted) return;
+
+	  Navigator.pushReplacement(
+		context,
+		MaterialPageRoute(builder: (_) => const RequesterScreen()),
+	  );
+	}else {
+	  await FcmManager.prepareApp();
+	  await FirebaseFirestore.instance.collection('locators').doc(deviceId).set({
+		'authId': AuthService.currentAuthId,
+		'deviceId': deviceId,
+		'role': 'locator',
+		'name': name,
+		'joinedAt': now,
+		'active': true,
+	  });
+
+	  if (!mounted) return;
+	  Navigator.pushReplacement(
+		context,
+		MaterialPageRoute(builder: (_) => const LocatorPermissionScreen()),
+	  );
+	}
   }
 
   @override
