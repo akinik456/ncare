@@ -53,11 +53,14 @@ void onStart(ServiceInstance service) async {
 // --- KRİTİK EKLEME BURASI ---
   // Servis başlar başlamaz RTDB vasiyetini (onDisconnect) kuruyoruz.
   final locatorId = await IdentityManager.getOrCreateDeviceId();
+  if (groupId != null && deviceId != null) {
   RTDBService().startLocatorHeartbeat(
-        groupId: groupId!,
-        deviceId: deviceId!,
-        initialBattery: level,
-      );
+    groupId: groupId,
+    deviceId: deviceId,
+    initialBattery: level,
+  );
+}
+
   // ----------------------------
 
   // Senin asıl mantığını (Presence, Battery, Geofence) burada ateşliyoruz
