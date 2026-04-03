@@ -14,25 +14,29 @@ import '../../services/rtdb.dart';
 
 class BackgroundEngine {
   static Future<void> initialize() async {
-  print("BackgroundEngine initialize called");
-    final service = FlutterBackgroundService();
+  print("BackgroundEngine: Konfigüre ediliyor...");
+  final service = FlutterBackgroundService();
 
-    await service.configure(
-      androidConfiguration: AndroidConfiguration(
-        onStart: onStart,
-        autoStart: true,
-        isForegroundMode: true,
-        notificationChannelId: 'ncare_alerts',
-        initialNotificationTitle: 'Sistem Aktif',
-        initialNotificationContent: 'Hareket takibi hazır...',
-        foregroundServiceNotificationId: 888,
-      ),
-      iosConfiguration: IosConfiguration(
-        autoStart: true,
-        onForeground: onStart,
-      ),
-    );
-  }
+  await service.configure(
+    androidConfiguration: AndroidConfiguration(
+      onStart: onStart,
+      autoStart: false, // BURAYI FALSE YAP: Kontrol bizde olsun
+      isForegroundMode: true,
+      notificationChannelId: 'ncare_alerts',
+      initialNotificationTitle: 'NCare Servis',
+      initialNotificationContent: 'Sistem hazırlanıyor...',
+      foregroundServiceNotificationId: 888,
+    ),
+    iosConfiguration: IosConfiguration(
+      autoStart: false, // iOS tarafında da manuel kontrol
+      onForeground: onStart,
+    ),
+  );
+  
+  // Yapılandırma bitti, şimdi manuel olarak marşa bas
+  await service.startService();
+  print("BackgroundEngine: Marşa basıldı!");
+}
 }
 
 @pragma('vm:entry-point')

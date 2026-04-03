@@ -698,43 +698,54 @@ color: _movementStatus.contains("Aktif") ? Colors.teal.shade50 : Colors.blueGrey
         ),
       ),
 
-      const SizedBox(height: 12),
-        Expanded(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 520),
-child: StreamBuilder<bool>(
-  initialData: DeviceStateManager.instance.isReady,
-  stream: DeviceStateManager.instance.readyStream,
-  builder: (context, snapshot) {
-    
-    final ready = snapshot.data ?? false;
-	
-	final gpsEnabled = DeviceStateManager.instance.gpsEnabled;
-final hasLocationPermission =
-    DeviceStateManager.instance.hasLocationPermission;
-final hasBackgroundLocationPermission =
-    DeviceStateManager.instance.hasBackgroundLocationPermission;
+      Expanded(
+  child: Center(
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        // HATA BURADAYDI: builder'dan önce StreamBuilder eklemelisin
+        child: StreamBuilder<bool>(
+          stream: DeviceStateManager.instance.readyStream,
+		  initialData: DeviceStateManager.instance.isReady,
+          
+          builder: (context, snapshot) {
+  final ready = snapshot.data ?? false;
+  
+  // Manager'dan güncel durumları çekiyoruz
+  final gpsEn = DeviceStateManager.instance.gpsEnabled;
+  print("izin ekranından gelindi gpsenabled:$gpsEn");
+  final hasBgLoc = DeviceStateManager.instance.hasBackgroundLocationPermission;
+  final hasActivity = DeviceStateManager.instance.hasActivityPermission;
+  final batteryOptimized = DeviceStateManager.instance.isBatteryOptimized;
 
-    final statusTitle = ready
-        ? 'Locator Device Ready'
-        : !hasBackgroundLocationPermission
-            ? 'Background Location Required'
-            : !gpsEnabled
-                ? 'Location Service Off'
-                : 'Location Permission Required';
+  // ÖNCELİK SIRASINA GÖRE MESAJ BELİRLEME
+  String statusTitle;
+  String statusMessage;
+  IconData statusIcon = Icons.warning_amber_rounded;
 
-    final statusMessage = ready
-        ? 'This device is ready to receive location requests.'
-        : !hasBackgroundLocationPermission
-            ? 'Set location access to "Allow all the time" in system settings.'
-            : !gpsEnabled
-                ? 'Turn on location services to keep this locator ready.'
-                : 'Grant location permission to continue.';
+  if (ready) {
+    statusTitle = 'Locator Device Ready';
+    statusMessage = 'This device is ready to receive location requests.';
+    statusIcon = Icons.check_circle_rounded;
+  } else if (!gpsEn) {
+    statusTitle = 'Location Service Off';
+    statusMessage = 'Please turn on GPS/Location services in system settings.';
+  } else if (!hasBgLoc) {
+    statusTitle = 'Background Location Required';
+    statusMessage = 'Set location access to "Allow all the time" to work in background.';
+  } else if (!hasActivity) {
+    statusTitle = 'Activity Access Required';
+    statusMessage = 'Physical activity permission is needed for smart tracking.';
+  } else if (batteryOptimized) {
+    statusTitle = 'Battery Optimization Active';
+    statusMessage = 'Set battery to "Unrestricted" to prevent tracking gaps.';
+  } else {
+    statusTitle = 'Permissions Required';
+    statusMessage = 'Grant necessary permissions to continue tracking.';
+  }
 
-    return Column(
+  return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Container(

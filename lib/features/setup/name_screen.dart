@@ -6,9 +6,11 @@ import '../../core/identity_manager.dart';
 import '../../core/role_manager.dart';
 import '../../core/auth_service.dart';
 import '../../core/fcm_manager.dart';
+import '../../core/background_engine.dart';
 import '../requester/requester_screen.dart';
 import '../locator/locator_permission_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:restart_app/restart_app.dart';
 
 class NameScreen extends StatefulWidget {
   const NameScreen({super.key});
@@ -104,7 +106,7 @@ class _NameScreenState extends State<NameScreen> {
 
 	  final prefs = await SharedPreferences.getInstance();
 	  await prefs.setBool('isCreatingGroup', false);
-
+		Restart.restartApp();
 	  if (!mounted) return;
 	  Navigator.pushReplacement(
 		context,
@@ -124,7 +126,7 @@ class _NameScreenState extends State<NameScreen> {
 
 	  final prefs = await SharedPreferences.getInstance();
 	  await prefs.setBool('isCreatingGroup', false);
-
+		Restart.restartApp();
 	  if (!mounted) return;
 
 	  Navigator.pushReplacement(
@@ -141,8 +143,7 @@ class _NameScreenState extends State<NameScreen> {
 		'joinedAt': now,
 		'active': true,
 	  });
-
-	  if (!mounted) return;
+	if (!mounted) return;
 	  Navigator.pushReplacement(
 		context,
 		MaterialPageRoute(builder: (_) => const LocatorPermissionScreen()),

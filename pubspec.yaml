@@ -53,6 +53,7 @@ dependencies:
   pedometer: ^4.2.0
   device_info_plus: ^10.1.0
   android_intent_plus: ^5.0.2
+  restart_app: ^1.2.1
   
   
   firebase_core: any

@@ -3,6 +3,8 @@ import 'package:battery_plus/battery_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:firebase_database/firebase_database.dart';
+import 'package:permission_handler/permission_handler.dart';
+
 import 'alert_engine.dart';
 import 'identity_manager.dart';
 import 'location_helper.dart';
@@ -23,6 +25,9 @@ class DeviceStateManager {
   bool gpsEnabled = false;
   bool hasLocationPermission = false;
   bool hasBackgroundLocationPermission = false;
+  bool hasActivityPermission = false; // Yeni
+  bool isBatteryOptimized = false;     // Yeni
+  
   final _readyController = StreamController<bool>.broadcast();
   final Battery _battery = Battery();
 
@@ -133,13 +138,33 @@ Future<void> updatePresence() async {
 }
 
   Future<void> _checkState() async {
-    final gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
-    final permission = await geo.Geolocator.checkPermission();
-    final hasPermission = permission == geo.LocationPermission.always || 
-                         permission == geo.LocationPermission.whileInUse;
-    _updateReady(gpsEnabled && hasPermission);
-  }
+  print(" checkstate aktif");
+  // 1. GPS ve Konum Kontrolleri
+  gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
+  final permission = await geo.Geolocator.checkPermission();
+  
+  hasLocationPermission = permission != geo.LocationPermission.denied && 
+                          permission != geo.LocationPermission.deniedForever;
+                          
+  hasBackgroundLocationPermission = permission == geo.LocationPermission.always;
 
+  // 2. Fiziksel Aktivite Kontrolü
+  hasActivityPermission = await Permission.activityRecognition.isGranted;
+
+  // 3. Pil Optimizasyonu (Kısıtlanmamış mı?)
+  // isIgnored true ise her şey yolunda (kısıtlama yok) demektir.
+  final isBatteryIgnored = await Permission.ignoreBatteryOptimizations.isGranted;
+  isBatteryOptimized = !isBatteryIgnored; 
+
+  // 4. Genel Hazır Olma Durumu
+  // Hepsi OK ise cihaz 'Ready'
+  final ready = gpsEnabled && 
+                hasBackgroundLocationPermission && 
+                hasActivityPermission && 
+                !isBatteryOptimized;
+
+  _updateReady(ready);
+}
   void _updateReady(bool value) {
     if (_isReady == value) return;
     _isReady = value;
