@@ -8,6 +8,7 @@ import '../../core/auth_service.dart';
 import '../../core/fcm_manager.dart';
 import '../../core/background_engine.dart';
 import '../requester/requester_screen.dart';
+import '../requester/requester_permission_screen.dart';
 import '../locator/locator_permission_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:restart_app/restart_app.dart';
@@ -106,11 +107,10 @@ class _NameScreenState extends State<NameScreen> {
 
 	  final prefs = await SharedPreferences.getInstance();
 	  await prefs.setBool('isCreatingGroup', false);
-		Restart.restartApp();
 	  if (!mounted) return;
 	  Navigator.pushReplacement(
 		context,
-		MaterialPageRoute(builder: (_) => const RequesterScreen()),
+		MaterialPageRoute(builder: (_) => const RequesterPermissionScreen()),
 	  );
 	} else if (role == "requester") {
 	  await FcmManager.prepareApp();
@@ -126,12 +126,11 @@ class _NameScreenState extends State<NameScreen> {
 
 	  final prefs = await SharedPreferences.getInstance();
 	  await prefs.setBool('isCreatingGroup', false);
-		Restart.restartApp();
 	  if (!mounted) return;
 
 	  Navigator.pushReplacement(
 		context,
-		MaterialPageRoute(builder: (_) => const RequesterScreen()),
+		MaterialPageRoute(builder: (_) => const RequesterPermissionScreen()),
 	  );
 	}else {
 	  await FcmManager.prepareApp();
