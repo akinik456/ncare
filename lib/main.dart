@@ -36,7 +36,7 @@ Future<void> main() async {
   bool setupDone = await SetupManager.isSetupDone();
   final String? role = await RoleManager.getRole();
 
-    if (role != null) {
+    if (role != null) 
 	{
 	print('ROLE => $role');
 	print('REQ ID => ${await IdentityManager.getOrCreateDeviceId()}');
@@ -55,11 +55,6 @@ Future<void> main() async {
 	  DeviceStateManager.instance.start();
 	  setupDone = await SetupManager.isSetupDone();
 	  print("SETUP CHECK DONE");
-	  
-
- 
-
-
   
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
   'ncare_alerts',
@@ -242,7 +237,7 @@ FirebaseMessaging.onMessage.listen((message) async {
     LocatorUiState.instance.reset();
   }
 });
-	}
+	
 	} else {
     print('ROLE => NULL (Bakir cihaz, ağır yükler pas geçildi)');
   }

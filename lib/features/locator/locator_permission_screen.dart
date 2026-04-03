@@ -1,6 +1,6 @@
-
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'dart:io';
 
 import '../../core/role_manager.dart';
 import '../home/home_screen.dart';
@@ -9,89 +9,82 @@ class LocatorPermissionScreen extends StatefulWidget {
   const LocatorPermissionScreen({super.key});
 
   @override
-  State<LocatorPermissionScreen> createState() =>
-      _LocatorPermissionScreenState();
+  State<LocatorPermissionScreen> createState() => _LocatorPermissionScreenState();
 }
 
-class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> {
+class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> with WidgetsBindingObserver {
+  // Otomatik kontrol edilen izinler
+  bool _isLocationOk = false;
+  bool _isActivityOk = false;
+  bool _isBatteryOk = false;
+  bool _isNotificationOk = false;
+  
+  // Manuel işaretlenen izinler (Android kısıtlamaları nedeniyle)
+  bool _isAutoStartOk = false;
+  bool _isProtectedAppOk = false;
+
   bool _busy = false;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkPermissions(); // İlk açılışta kontrol et
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Kullanıcı ayarlardan geri geldiğinde tetiklenir
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPermissions();
+    }
+  }
+
+  /// Donanım ve sistem izinlerini check eder
+  Future<void> _checkPermissions() async {
+    final loc = await Permission.location.isGranted;
+    final activity = await Permission.activityRecognition.isGranted;
+    final battery = await Permission.ignoreBatteryOptimizations.isGranted;
+    final notif = await Permission.notification.isGranted;
+
+    if (mounted) {
+      setState(() {
+        _isLocationOk = loc;
+        _isActivityOk = activity;
+        _isBatteryOk = battery;
+        _isNotificationOk = notif;
+      });
+    }
+  }
+
+  // Tüm izinler tamam mı?
+  bool get _allPermissionsGranted =>
+      _isLocationOk && 
+      _isActivityOk && 
+      _isBatteryOk && 
+      _isNotificationOk && 
+      _isAutoStartOk && 
+      _isProtectedAppOk;
+
   Future<void> _continue() async {
-    if (_busy) return;
+    if (!_allPermissionsGranted || _busy) return;
+    
     setState(() => _busy = true);
-
     try {
-      // 1. Adım: Konum İzni (En kritik olan)
-      final locStatus = await Permission.location.request();
-      
-      // 2. Adım: Hareket Algılama (Activity Recognition)
-      // Konumdan hemen sonra bunu tetikliyoruz
-      final activityStatus = await Permission.activityRecognition.request();
-
-      // 3. Adım: Bildirim İzni
-      final notifStatus = await Permission.notification.request();
-
-      // Durum Kontrolü
-      final bool isLocationOk = locStatus.isGranted;
-      final bool isActivityOk = activityStatus.isGranted;
-      final bool isNotifOk = notifStatus.isGranted || notifStatus.isLimited;
-
-      final ok = isLocationOk && isActivityOk && isNotifOk;
-
-      if (ok) {
-        await RoleManager.setRole('locator');
-        if (!mounted) return;
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
-          (_) => false,
-        );
-        return;
-      }
-
+      await RoleManager.setRole('locator');
       if (!mounted) return;
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          title: const Text(
-            'Permissions required',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF0F172A),
-            ),
-          ),
-          content: const Text(
-            'Location and notification permissions are required for locator mode.',
-            style: TextStyle(
-              color: Color(0xFF475569),
-              height: 1.45,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                Navigator.pop(context);
-                await openAppSettings();
-              },
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF0D9488),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Open settings'),
-            ),
-          ],
-        ),
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+        (_) => false,
       );
-    } catch (e) {
-      print("İzin istenirken hata: $e");
-    }finally {
+    } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -105,249 +98,182 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF020617),
-              Color(0xFF020617),
-              Color(0xFF0F172A),
-            ],
+            colors: [Color(0xFF020617), Color(0xFF0F172A)],
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(32),
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Color(0xFF0F766E),
-                            Color(0xFF0D9488),
-                            Color(0xFF14B8A6),
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF0D9488).withOpacity(0.20),
-                            blurRadius: 28,
-                            offset: const Offset(0, 14),
-                          ),
-                        ],
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildHeader(),
+                      const SizedBox(height: 32),
+                      _buildSectionTitle("System Permissions"),
+                      _buildPermissionItem(
+                        title: 'Location Access',
+                        subtitle: 'Always allow for real-time tracking',
+                        icon: Icons.location_on_rounded,
+                        isGranted: _isLocationOk,
+                        onTap: () => Permission.location.request(),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 64,
-                            height: 64,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(22),
-                              color: Colors.white.withOpacity(0.16),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.16),
-                              ),
-                            ),
-                            child: const Icon(
-                              Icons.location_on_rounded,
-                              color: Color(0xFF020617),
-                              size: 34,
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          const Text(
-                            'Locator Permissions',
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: -0.8,
-                              height: 1.0,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            'Allow the required permissions so this device can respond to location requests properly.',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFFE6FFFB),
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
+                      _buildPermissionItem(
+                        title: 'Physical Activity',
+                        subtitle: 'Required for motion detection',
+                        icon: Icons.directions_run_rounded,
+                        isGranted: _isActivityOk,
+                        onTap: () => Permission.activityRecognition.request(),
                       ),
-                    ),
-                    const SizedBox(height: 22),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(30),
-                        color: Colors.white,
-                        border: Border.all(
-                          color: const Color(0xFF334155),
-                          width: 1.1,
-                        ),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x100F172A),
-                            blurRadius: 20,
-                            offset: Offset(0, 8),
-                          ),
-                        ],
+                      _buildPermissionItem(
+                        title: 'Battery Optimization',
+                        subtitle: 'Disable restrictions for background life',
+                        icon: Icons.battery_charging_full_rounded,
+                        isGranted: _isBatteryOk,
+                        onTap: () => Permission.ignoreBatteryOptimizations.request(),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Required to continue',
-                            style: TextStyle(
-                              fontSize: 23,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: -0.4,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'NCare needs these permissions for locator mode.',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF94A3B8),
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          const _PermissionItem(
-                            icon: Icons.my_location_rounded,
-                            title: 'Location',
-                            subtitle: 'Share current location when a request arrives',
-                            accent: Color(0xFF0D9488),
-                          ),
-                          const SizedBox(height: 12),
-                          const _PermissionItem(
-                            icon: Icons.notifications_active_rounded,
-                            title: 'Notifications',
-                            subtitle: 'Keep alerts and request flow visible on device',
-                            accent: Color(0xFF2563EB),
-                          ),
-                          const SizedBox(height: 20),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              onPressed: _busy ? null : _continue,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFF0D9488),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 18),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(22),
-                                ),
-                                textStyle: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              child: _busy
-                                  ? const SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.4,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Text('Continue'),
-                            ),
-                          ),
-                        ],
+                      _buildPermissionItem(
+                        title: 'Notifications',
+                        subtitle: 'Important for request visibility',
+                        icon: Icons.notifications_active_rounded,
+                        isGranted: _isNotificationOk,
+                        onTap: () => Permission.notification.request(),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 24),
+                      _buildSectionTitle("Manufacturer Settings"),
+                      _buildPermissionItem(
+                        title: 'Auto-Start',
+                        subtitle: 'Allow app to start on device boot',
+                        icon: Icons.power_settings_new_rounded,
+                        isGranted: _isAutoStartOk,
+                        isManual: true,
+                        onTap: () => setState(() => _isAutoStartOk = !_isAutoStartOk),
+                      ),
+                      _buildPermissionItem(
+                        title: 'Protected Apps',
+                        subtitle: 'Keep NCare alive in background memory',
+                        icon: Icons.app_settings_alt_rounded,
+                        isGranted: _isProtectedAppOk,
+                        isManual: true,
+                        onTap: () => setState(() => _isProtectedAppOk = !_isProtectedAppOk),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+              _buildBottomBar(),
+            ],
           ),
         ),
       ),
     );
   }
-}
 
-class _PermissionItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color accent;
+  Widget _buildHeader() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF14B8A6).withOpacity(0.1),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Icon(Icons.shield_rounded, color: Color(0xFF14B8A6), size: 32),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'Permissions',
+          style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -1),
+        ),
+        const Text(
+          'NCare requires these to function in background.',
+          style: TextStyle(fontSize: 16, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+        ),
+      ],
+    );
+  }
 
-  const _PermissionItem({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.accent,
-  });
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16, left: 4),
+      child: Text(
+        title.toUpperCase(),
+        style: const TextStyle(color: Color(0xFF5EEAD4), fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1.2),
+      ),
+    );
+  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: const Color(0xFFE2E8F0),
-          width: 1.0,
+  Widget _buildPermissionItem({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isGranted,
+    required VoidCallback onTap,
+    bool isManual = false,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isGranted ? const Color(0xFF14B8A6).withOpacity(0.05) : const Color(0xFF1E293B).withOpacity(0.4),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isGranted ? const Color(0xFF14B8A6).withOpacity(0.5) : const Color(0xFF334155),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: isGranted ? const Color(0xFF14B8A6) : const Color(0xFF64748B), size: 26),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                  Text(subtitle, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500)),
+                ],
+              ),
+            ),
+            if (isManual && !isGranted)
+              const Icon(Icons.touch_app_rounded, color: Colors.orangeAccent, size: 20)
+            else
+              Icon(
+                isGranted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                color: isGranted ? const Color(0xFF14B8A6) : const Color(0xFF475569),
+              ),
+          ],
         ),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 54,
-            height: 54,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              color: accent.withOpacity(0.10),
-            ),
-            child: Icon(
-              icon,
-              color: accent,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF64748B),
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+    );
+  }
+
+  Widget _buildBottomBar() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF020617),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 40, offset: const Offset(0, -10))],
+      ),
+      child: FilledButton(
+        onPressed: _allPermissionsGranted ? _continue : null,
+        style: FilledButton.styleFrom(
+          backgroundColor: const Color(0xFF14B8A6),
+          disabledBackgroundColor: const Color(0xFF1E293B),
+          minimumSize: const Size(double.infinity, 64),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        ),
+        child: _busy
+            ? const CircularProgressIndicator(color: Colors.white)
+            : Text(
+                _allPermissionsGranted ? 'CONTINUE' : 'GRANT REQUIRED PERMISSIONS',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1),
+              ),
       ),
     );
   }
