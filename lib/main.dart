@@ -14,7 +14,7 @@ import 'core/fcm_manager.dart';
 import 'core/auth_service.dart';
 import 'core/location_helper.dart';
 import 'core/background_engine.dart';
-
+import 'core/splash_screen.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,11 +28,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'features/requester/requester_screen.dart';
 import 'core/identity_manager.dart';
 import 'package:battery_plus/battery_plus.dart';
-
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
+  WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   bool setupDone = await SetupManager.isSetupDone();
   final String? role = await RoleManager.getRole();
 
@@ -241,10 +241,12 @@ FirebaseMessaging.onMessage.listen((message) async {
 	} else {
     print('ROLE => NULL (Bakir cihaz, ağır yükler pas geçildi)');
   }
+  FlutterNativeSplash.remove();
   await SystemChrome.setEnabledSystemUIMode(
     SystemUiMode.manual,
     overlays: SystemUiOverlay.values,
   );
+
 runApp(NCareApp(setupDone: setupDone));
 }   
   
@@ -433,18 +435,22 @@ class NCareApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'NCare',
-      theme: ThemeData(useMaterial3: true),
+      theme: ThemeData(
+        useMaterial3: true,
+        // Splash ile uyumlu olması için arka planı buradan da sabitleyebilirsin
+        scaffoldBackgroundColor: const Color(0xFF0F172A), 
+      ),
       home: FutureBuilder<String?>(
         future: RoleManager.getRole(),
         builder: (context, snapshot) {
+          // 1. VERİ BEKLENİRKEN: Beyaz ekran/Loading yerine Splash gösteriyoruz
           if (snapshot.connectionState != ConnectionState.done) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
+            return const SplashScreen(); // Az önce oluşturduğumuz şık ekran
           }
 
           final role = snapshot.data;
 
+          // 2. VERİ GELDİKTEN SONRA: Role göre yönlendir
           if (role == 'locator') {
             return const HomeScreen();
           }
@@ -453,6 +459,7 @@ class NCareApp extends StatelessWidget {
             return const RequesterScreen();
           }
 
+          // Role henüz yoksa (ilk kurulum)
           return const RoleScreen();
         },
       ),
