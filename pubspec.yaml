@@ -51,7 +51,8 @@ dependencies:
   google_api_availability: ^5.0.1
   sensors_plus: ^7.0.0
   pedometer: ^4.2.0
-
+  device_info_plus: ^10.1.0
+  android_intent_plus: ^5.0.2
   
   
   firebase_core: any

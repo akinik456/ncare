@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:android_intent_plus/android_intent.dart';
 
 import '../../core/role_manager.dart';
 import '../home/home_screen.dart';
@@ -90,6 +92,81 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> with 
       if (mounted) setState(() => _busy = false);
     }
   }
+  
+Future<void> _openManufacturerSetting(String type) async {
+  if (!Platform.isAndroid) return;
+
+  final deviceInfo = await DeviceInfoPlugin().androidInfo;
+  final manufacturer = deviceInfo.manufacturer.toLowerCase();
+
+  // XIAOMI / REDMI / POCO Grubu
+  if (manufacturer.contains('xiaomi') || manufacturer.contains('redmi') || manufacturer.contains('poco')) {
+    if (type == 'autostart') {
+      try {
+        await const AndroidIntent(
+          action: 'miui.intent.action.OP_AUTO_START',
+          package: 'com.miui.securitycenter',
+        ).launch();
+      } catch (e) {
+        await openAppSettings(); // Fallback: Genel ayarlar
+      }
+    } else if (type == 'protected') {
+  try {
+    // Xiaomi Güvenlik (Security Center) - Hız Artırıcı ve Bellek Ayarları
+    await const AndroidIntent(
+      action: 'android.intent.action.MAIN',
+      package: 'com.miui.securitycenter',
+      componentName: 'com.miui.securitycenter.memorycleaner.MemorySettingsActivity', // Nokta atışı burası
+    ).launch();
+  } catch (e) {
+    try {
+      // Eğer yukarıdaki 'MemorySettings' hata verirse, Güvenlik ana sayfasını açalım
+      // Kullanıcı oradan 'Hız Artır' (Speed Boost) butonuna kendisi basar.
+      await const AndroidIntent(
+        action: 'android.intent.action.MAIN',
+        package: 'com.miui.securitycenter',
+      ).launch();
+    } catch (e) {
+      // O da olmazsa genel ayarlara düşür (Fallback)
+      await openAppSettings();
+    }
+  }
+}
+  } 
+  // SAMSUNG Grubu
+  else if (manufacturer.contains('samsung')) {
+    // Samsung'da genelde "Battery and Device Care" sayfası açılır
+    await openAppSettings(); 
+  }
+  // DİĞERLERİ
+  else {
+    await openAppSettings();
+  }
+}  
+
+void _showXiaomiGuide() {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: const Color(0xFF0F172A),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text("Xiaomi Memory Lock", style: TextStyle(color: Colors.white)),
+      content: const Text(
+        "Lütfen açılan ekranda şu yolu izleyin:\n\n"
+        "1. Sağ üstteki 'Ayarlar' (Dişli) ikonuna basın.\n"
+        "2. 'Uygulamaları Kilitle' (App Lock) seçeneğine girin.\n"
+        "3. NCare şalterini aktif edin.",
+        style: TextStyle(color: Color(0xFF94A3B8)),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("ANLADIM, AÇ", style: TextStyle(color: Color(0xFF14B8A6))),
+        ),
+      ],
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -180,21 +257,36 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> with 
                       const SizedBox(height: 16),
                       _buildSectionTitle("Manufacturer Settings"),
                       _buildPermissionItem(
-                        title: 'Auto-Start',
-                        subtitle: 'Allow app to start on device boot',
-                        icon: Icons.power_settings_new_rounded,
-                        isGranted: _isAutoStartOk,
-                        isManual: true,
-                        onTap: () => setState(() => _isAutoStartOk = !_isAutoStartOk),
-                      ),
+  title: 'Auto-Start',
+  subtitle: 'Allow app to start on device boot',
+  icon: Icons.power_settings_new_rounded,
+  isGranted: _isAutoStartOk,
+  isManual: true,
+  onTap: () async {
+    await _openManufacturerSetting('autostart');
+    setState(() => _isAutoStartOk = !_isAutoStartOk); // Kullanıcı geri gelince yeşil yansın
+  },
+),
                       _buildPermissionItem(
-                        title: 'Protected Apps',
-                        subtitle: 'Keep NCare alive in background memory',
-                        icon: Icons.app_settings_alt_rounded,
-                        isGranted: _isProtectedAppOk,
-                        isManual: true,
-                        onTap: () => setState(() => _isProtectedAppOk = !_isProtectedAppOk),
-                      ),
+  title: 'Protected Apps',
+  subtitle: 'Keep NCare alive in background memory',
+  icon: Icons.app_settings_alt_rounded,
+  isGranted: _isProtectedAppOk,
+  isManual: true,
+  onTap: () async {
+  final deviceInfo = await DeviceInfoPlugin().androidInfo;
+  if (deviceInfo.manufacturer.toLowerCase().contains('xiaomi')) {
+    // Önce tarif et
+    _showXiaomiGuide();
+    
+    // 2 saniye sonra ayarı aç (Kullanıcı diyaloğu okuyabilsin)
+    await Future.delayed(const Duration(seconds: 10));
+  }
+
+  await _openManufacturerSetting('security');
+  setState(() => _isProtectedAppOk = !_isProtectedAppOk);
+},
+),
                     ],
                   ),
                 ),
