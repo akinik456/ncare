@@ -22,7 +22,7 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> with 
   // Manuel işaretlenen izinler (Android kısıtlamaları nedeniyle)
   bool _isAutoStartOk = false;
   bool _isProtectedAppOk = false;
-
+  bool _manualBatteryConfirm = false;
   bool _busy = false;
 
   @override
@@ -48,10 +48,12 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> with 
 
   /// Donanım ve sistem izinlerini check eder
   Future<void> _checkPermissions() async {
-    final loc = await Permission.location.isGranted;
+    final loc = await Permission.locationAlways.isGranted;
     final activity = await Permission.activityRecognition.isGranted;
     final battery = await Permission.ignoreBatteryOptimizations.isGranted;
     final notif = await Permission.notification.isGranted;
+	bool _isBatteryOk = false;
+	bool _manualBatteryConfirm = false; // Kullanıcı "yaptım" derse diye
 
     if (mounted) {
       setState(() {
@@ -67,7 +69,7 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> with 
   bool get _allPermissionsGranted =>
       _isLocationOk && 
       _isActivityOk && 
-      _isBatteryOk && 
+      (_isBatteryOk || _manualBatteryConfirm) && 
       _isNotificationOk && 
       _isAutoStartOk && 
       _isProtectedAppOk;
@@ -106,20 +108,36 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> with 
             children: [
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24), 
+                child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildHeader(),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 20),
                       _buildSectionTitle("System Permissions"),
                       _buildPermissionItem(
-                        title: 'Location Access',
-                        subtitle: 'Always allow for real-time tracking',
-                        icon: Icons.location_on_rounded,
-                        isGranted: _isLocationOk,
-                        onTap: () => Permission.location.request(),
-                      ),
+  title: 'Location Access',
+  subtitle: 'Set to "Allow all the time" for tracking', // Alt yazıyı da netleştirdik
+  icon: Icons.location_on_rounded,
+  isGranted: _isLocationOk,
+  onTap: () async {
+    // 1. Önce standart izni iste (While in use)
+    final status = await Permission.location.request();
+    
+    if (status.isGranted) {
+      // 2. Eğer standart izin tamamsa, Arka Plan (Always) iznini iste
+      // Bu çağrı Android 10+ cihazlarda direkt sistemin "İzin Ayarları" sayfasını açar
+      final backgroundStatus = await Permission.locationAlways.request();
+      
+      if (backgroundStatus.isDenied) {
+        // Eğer hala "Always" değilse, kullanıcıyı manuel olarak ikna etmemiz gerekebilir
+        print("Kullanıcı Always seçmedi, sadece While In Use var.");
+      }
+    }
+    
+    _checkPermissions(); // Durumu güncelle (Tick yeşil yansın)
+  },
+),
                       _buildPermissionItem(
                         title: 'Physical Activity',
                         subtitle: 'Required for motion detection',
@@ -128,12 +146,30 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> with 
                         onTap: () => Permission.activityRecognition.request(),
                       ),
                       _buildPermissionItem(
-                        title: 'Battery Optimization',
-                        subtitle: 'Disable restrictions for background life',
-                        icon: Icons.battery_charging_full_rounded,
-                        isGranted: _isBatteryOk,
-                        onTap: () => Permission.ignoreBatteryOptimizations.request(),
-                      ),
+  title: 'Battery Optimization',
+  subtitle: 'Set to "No Restrictions" for background life',
+  icon: Icons.battery_charging_full_rounded,
+  // EĞER sistem onay veriyorsa VEYA kullanıcı manuel onayladıysa YEŞİL YANSIN
+  isGranted: _isBatteryOk || _manualBatteryConfirm, 
+  onTap: () async {
+    // 1. Önce standart Android diyaloğunu dene
+    final status = await Permission.ignoreBatteryOptimizations.request();
+    
+    if (status.isGranted) {
+      _checkPermissions(); // Sistem onayladıysa otomatik yeşil yanar
+    } else {
+      // 2. Sistem hala kısıtlı diyorsa (Xiaomi vb. üretici engeli), ayarları aç
+      await openAppSettings();
+      
+      // Kullanıcı ayardan dönünce (resumed) _checkPermissions zaten çalışacak.
+      // Eğer hala yeşil değilse, kullanıcı bir kez daha bastığında 
+      // veya ayardan döndüğünde manuel onayı biz veriyoruz.
+      setState(() => _manualBatteryConfirm = true);
+    }
+  },
+  // Sistem izni görmüyorsa ama manuel onay varsa "manuel" ikonunu gizle
+  isManual: !_isBatteryOk && !_manualBatteryConfirm, 
+),
                       _buildPermissionItem(
                         title: 'Notifications',
                         subtitle: 'Important for request visibility',
@@ -141,7 +177,7 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> with 
                         isGranted: _isNotificationOk,
                         onTap: () => Permission.notification.request(),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
                       _buildSectionTitle("Manufacturer Settings"),
                       _buildPermissionItem(
                         title: 'Auto-Start',
@@ -176,21 +212,26 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> with 
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
             color: const Color(0xFF14B8A6).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
           ),
           child: const Icon(Icons.shield_rounded, color: Color(0xFF14B8A6), size: 32),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
         const Text(
-          'Permissions',
-          style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -1),
+        'Permissions',
+        style: TextStyle(
+          fontSize: 30, // 34 -> 30 (Hala büyük ve heybetli ama yer kaplamıyor)
+          fontWeight: FontWeight.w900, 
+          color: Colors.white, 
+          letterSpacing: -1
         ),
+      ),
         const Text(
           'NCare requires these to function in background.',
-          style: TextStyle(fontSize: 16, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+          style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
         ),
       ],
     );
@@ -198,10 +239,10 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> with 
 
   Widget _buildSectionTitle(String title) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16, left: 4),
+      padding: const EdgeInsets.only(bottom: 8, left: 4),
       child: Text(
         title.toUpperCase(),
-        style: const TextStyle(color: Color(0xFF5EEAD4), fontSize: 12, fontWeight: FontWeight.w800, letterSpacing: 1.2),
+        style: const TextStyle(color: Color(0xFF5EEAD4), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2),
       ),
     );
   }
@@ -271,9 +312,18 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> with 
         child: _busy
             ? const CircularProgressIndicator(color: Colors.white)
             : Text(
-                _allPermissionsGranted ? 'CONTINUE' : 'GRANT REQUIRED PERMISSIONS',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1),
-              ),
+        _allPermissionsGranted ? 'CONTINUE' : 'GRANT REQUIRED PERMISSIONS',
+        style: TextStyle(
+          fontSize: 16, 
+          fontWeight: FontWeight.w900, 
+          letterSpacing: 1,
+          // İzinler eksikse yazıyı tamamen kaybetmek yerine 
+          // beyazın %30-40 şeffaf haliyle gösteriyoruz ki okunsun
+          color: _allPermissionsGranted 
+              ? Colors.white 
+              : Colors.white.withOpacity(0.4), 
+        ),
+      ),
       ),
     );
   }
