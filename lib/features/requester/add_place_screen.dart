@@ -233,7 +233,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
         backgroundColor: const Color(0xFF020617),
         surfaceTintColor: Colors.transparent,
         title: const Text(
-          'NCare',
+          'LynraCare',
           style: TextStyle(
             fontWeight: FontWeight.w800,
             color: Colors.white,

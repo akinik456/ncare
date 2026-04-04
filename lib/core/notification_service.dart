@@ -12,9 +12,9 @@ class NotificationService {
   static bool _initialized = false;
   
   static const AndroidNotificationChannel _alertsChannel =AndroidNotificationChannel(
-    'ncare_alerts',
-    'NCare Alerts',
-    description: 'Important alerts from NCare',
+    'LynraCare_alerts',
+    'LynraCare Alerts',
+    description: 'Important alerts from LynraCare',
     importance: Importance.high,
   );  
 
@@ -69,8 +69,8 @@ class NotificationService {
       body,
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'ncare_alerts',
-          'NCare Alerts',
+          'LynraCare_alerts',
+          'LynraCare Alerts',
           importance: Importance.high,
           priority: Priority.high,
         ),
@@ -111,7 +111,7 @@ class NotificationService {
 
     String title = message.notification?.title?.trim().isNotEmpty == true
         ? message.notification!.title!
-        : 'NCare Alert';
+        : 'LynraCare Alert';
 
     String body = message.notification?.body?.trim().isNotEmpty == true
         ? message.notification!.body!
@@ -158,12 +158,12 @@ class NotificationService {
       body,
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'ncare_alerts',
-          'NCare Alerts',
-          channelDescription: 'Important alerts from NCare',
+          'LynraCare_alerts',
+          'LynraCare Alerts',
+          channelDescription: 'Important alerts from LynraCare',
           importance: Importance.high,
           priority: Priority.high,
-          ticker: 'NCare alert',
+          ticker: 'LynraCare alert',
         ),
       ),
     );

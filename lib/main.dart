@@ -5,6 +5,9 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'core/device_state_manager.dart';
 import 'core/setup_manager.dart';
 import 'features/home/home_screen.dart';
+import 'features/setup/name_screen.dart';
+import 'features/locator/locator_permission_screen.dart';
+import 'features/requester/requester_permission_screen.dart';
 import 'core/role_manager.dart';
 import 'features/role/role_screen.dart';
 import 'core/locator_ui_state.dart';
@@ -19,7 +22,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pedometer/pedometer.dart';
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -35,14 +37,10 @@ Future<void> main() async {
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   bool setupDone = await SetupManager.isSetupDone();
   final String? role = await RoleManager.getRole();
-
     if (role != null) 
 	{
 	print('ROLE => $role');
 	print('REQ ID => ${await IdentityManager.getOrCreateDeviceId()}');
-	  if (role == 'locator') {
-	  //await BackgroundEngine.initialize();
-	  }
 	  
 	  await FcmManager.prepareApp();
 	  
@@ -53,15 +51,13 @@ Future<void> main() async {
 	  await NotificationService.init();
 	  print("APP_START");
 	  DeviceStateManager.instance.start();
-	  setupDone = await SetupManager.isSetupDone();
 	  print("SETUP CHECK DONE");
   
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
-  'ncare_alerts',
-  'NCare Alerts',
-  description: 'Important alerts from NCare',
-  importance: Importance.high,
-  
+  'LynraCare_alerts',
+  'LynraCare Alerts',
+  description: 'Important alerts from LynraCare',
+  importance: Importance.high,  
 );
 
 await flutterLocalNotificationsPlugin
@@ -80,7 +76,7 @@ await flutterLocalNotificationsPlugin.initialize(initSettings);
     
 String? myLocatorId;
 
-if (role == 'locator') {
+if (role == 'locator' && setupDone) {
   myLocatorId = await IdentityManager.getOrCreateDeviceId();
   final locatorTopic = 'locator_$myLocatorId';
   await BackgroundEngine.initialize();
@@ -246,8 +242,7 @@ FirebaseMessaging.onMessage.listen((message) async {
     SystemUiMode.manual,
     overlays: SystemUiOverlay.values,
   );
-
-runApp(NCareApp(setupDone: setupDone));
+runApp(LynraCareApp(setupDone: setupDone));
 }   
   
 
@@ -425,16 +420,16 @@ Future<bool> _isStillPaired({
   return entry != null && entry['active'] == true;
 }
 
-class NCareApp extends StatelessWidget {
+class LynraCareApp extends StatelessWidget {
   
  final bool setupDone; 
- const NCareApp({super.key, required this.setupDone});
+ const LynraCareApp({super.key, required this.setupDone});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'NCare',
+      title: 'LynraCare',
       theme: ThemeData(
         useMaterial3: true,
         // Splash ile uyumlu olması için arka planı buradan da sabitleyebilirsin
@@ -447,19 +442,19 @@ class NCareApp extends StatelessWidget {
           if (snapshot.connectionState != ConnectionState.done) {
             return const SplashScreen(); // Az önce oluşturduğumuz şık ekran
           }
-
           final role = snapshot.data;
-
-          // 2. VERİ GELDİKTEN SONRA: Role göre yönlendir
           if (role == 'locator') {
-            return const HomeScreen();
-          }
-
+		  	 if (setupDone) {
+				return const HomeScreen();
+			 }
+			 return const NameScreen(); 			  
+			} 
           if (role == 'requester') {
+		    if (setupDone) {
             return const RequesterScreen();
+			}
+		  return const NameScreen();
           }
-
-          // Role henüz yoksa (ilk kurulum)
           return const RoleScreen();
         },
       ),

@@ -5,6 +5,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:android_intent_plus/android_intent.dart';
 
 import '../../core/role_manager.dart';
+import '../../core/setup_manager.dart';
 import '../home/home_screen.dart';
 import 'package:restart_app/restart_app.dart';
 
@@ -79,6 +80,7 @@ class _LocatorPermissionScreenState extends State<LocatorPermissionScreen> with 
 
   Future<void> _continue() async {
     if (!_allPermissionsGranted || _busy) return;
+	await SetupManager.setSetupDone();
     Restart.restartApp();
     setState(() => _busy = true);
     try {
@@ -156,7 +158,7 @@ void _showXiaomiGuide() {
         "Lütfen açılan ekranda şu yolu izleyin:\n\n"
         "1. Sağ üstteki 'Ayarlar' (Dişli) ikonuna basın.\n"
         "2. 'Uygulamaları Kilitle' (App Lock) seçeneğine girin.\n"
-        "3. NCare şalterini aktif edin.",
+        "3. LynraCare şalterini aktif edin.",
         style: TextStyle(color: Color(0xFF94A3B8)),
       ),
       actions: [
@@ -252,7 +254,7 @@ void _showXiaomiGuide() {
                       _buildSectionTitle("Manufacturer Settings"),
                       _buildPermissionItem(
   title: 'Auto-Start',
-  subtitle: 'Enable NCare in Autostart list',
+  subtitle: 'Enable LynraCare in Autostart list',
   icon: Icons.power_settings_new_rounded,
   isGranted: _isAutoStartOk,
   onTap: () async {
@@ -279,7 +281,7 @@ void _showXiaomiGuide() {
             ],
           ),
           content: const Text(
-            "In the opening screen, please find 'NCare' and turn the switch ON to ensure background reliability.\n\nThis window will close in 5 seconds...",
+            "In the opening screen, please find 'LynraCare' and turn the switch ON to ensure background reliability.\n\nThis window will close in 5 seconds...",
             style: TextStyle(color: Color(0xFF94A3B8), fontSize: 16),
           ),
         );
@@ -298,7 +300,7 @@ void _showXiaomiGuide() {
 ),
                       _buildPermissionItem(
   title: 'Memory Lock (Protected)',
-  subtitle: 'Prevent system from killing NCare',
+  subtitle: 'Prevent system from killing LynraCare',
   icon: Icons.app_settings_alt_rounded,
   isGranted: _isProtectedAppOk,
   onTap: () async {
@@ -317,9 +319,9 @@ void _showXiaomiGuide() {
             ],
           ),
           content: const Text(
-            "To keep NCare running in the background, please follow these steps:\n\n"
-            "• Xiaomi: Security app > Boost Speed > Settings (top right) > App Lock > Enable NCare.\n"
-            "• Others: Open 'Recent Apps' screen, long press NCare or swipe down, and tap the 'Lock' icon.\n\n"
+            "To keep LynraCare running in the background, please follow these steps:\n\n"
+            "• Xiaomi: Security app > Boost Speed > Settings (top right) > App Lock > Enable LynraCare.\n"
+            "• Others: Open 'Recent Apps' screen, long press LynraCare or swipe down, and tap the 'Lock' icon.\n\n"
             "This ensures the system won't close the app to save RAM.",
             style: TextStyle(color: Color(0xFF94A3B8), fontSize: 15, height: 1.5),
           ),
@@ -376,7 +378,7 @@ void _showXiaomiGuide() {
         ),
       ),
         const Text(
-          'NCare requires these to function in background.',
+          'LynraCare requires these to function in background.',
           style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
         ),
       ],

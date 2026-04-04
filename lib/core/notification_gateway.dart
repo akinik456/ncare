@@ -13,7 +13,7 @@ class NotificationGateway {
 
     final prefs = await SharedPreferences.getInstance();
 
-    String title = 'NCare Alert';
+    String title = 'LynraCare Alert';
     String body = '';
 
     switch (type) {

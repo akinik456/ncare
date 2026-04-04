@@ -8,6 +8,8 @@ import '../../core/role_manager.dart';
 import 'package:restart_app/restart_app.dart';
 
 import 'package:flutter/material.dart';
+import '../../core/setup_manager.dart';
+
 import 'package:permission_handler/permission_handler.dart';
 
 class RequesterPermissionScreen extends StatelessWidget {
@@ -59,6 +61,7 @@ class RequesterPermissionScreen extends StatelessWidget {
                     
                     // 2. İzin versin ya da vermesin (kendi tercihi), Requester Home'a uçur
                     if (context.mounted) {
+					await SetupManager.setSetupDone();
 					Restart.restartApp();
                       Navigator.pushReplacementNamed(context, 'requester_screen');
                     }

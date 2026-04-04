@@ -89,7 +89,7 @@ class _PairRequestScreenState extends State<PairRequestScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF020617),
         surfaceTintColor: Colors.transparent,
-        title: const Text('NCare', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+        title: const Text('LynraCare', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
       ),
       body: SafeArea(
         child: Padding(

@@ -512,3 +512,29 @@ Bence sıradaki adım:
 ve en kritik 1. maddeyi düzeltelim.
 
 ****************************************
+
+brom sana şimdi iki tane dart dosyası göndereceğim 
+locator_permission_screen 1. dosya ve referans olarak kullanılacak . 
+Senden istediğim 1. dosyayı referans alarak diğer dosyayı 
+aynı tasarım dili kullanarak düzenlemen. 
+Kesinlikle kod kısmını değiştirmiyoruz.
+Text,buton,fonks. değişmeyecek.yapacağımız sadece 
+referans dosyada kullanılan renk,font,font size referans almak.
+
+*******************************************
+brom seninle flutter kullanarak android app geliştiriyoruz çok fazla ilerleme 
+kaydettik.projeyi şöyle özetleyim.App kurulurken iki rolden biri 
+seçiliyor;Requester veya locator .Requester dilediği zaman locator e 
+request location (rl ) gönderir locator de status 
+( battery,gps on/off) ile birlikte konumunu gönderir.
+Ayrıca locator birkaç alert üretebilir ; gps kapandı , 
+battery threshold altına düştü gefoence arrive-left birde 
+locator req. e call me isteği gönderebiliyor.
+Roller arası haberleşme bu kadar.Database olarak firestore ve 
+RTDB kullanıyoruz.Firestore genel daha az değişen dataları RTDB 
+ise status gibi daha sık değişen dataları tutuyor.
+Locator un her koşulda çalışması gerekiyor.
+Yani rl ye cevap vermeli ve alert üretebilmeli her koşulda 
+fg,bg de restart sonrası vs. 
+Seninle yazdığımız background_engine var.
+bugün seninle bu konu üzerinde çalışacağız

@@ -619,7 +619,7 @@ Future<void> _joinGroup() async {
         surfaceTintColor: Colors.transparent,
         titleSpacing: 20,
         title: const Text(
-          'NCare',
+          'LynraCare',
           style: TextStyle(
             fontWeight: FontWeight.w800,
             color: Color(0xFF0F172A),

@@ -16,14 +16,14 @@ class BackgroundEngine {
   static Future<void> initialize() async {
   print("BackgroundEngine: Konfigüre ediliyor...");
   final service = FlutterBackgroundService();
-
+	if (await service.isRunning()) return;
   await service.configure(
     androidConfiguration: AndroidConfiguration(
       onStart: onStart,
-      autoStart: false, // BURAYI FALSE YAP: Kontrol bizde olsun
+      autoStart: true, 
       isForegroundMode: true,
-      notificationChannelId: 'ncare_alerts',
-      initialNotificationTitle: 'NCare Servis',
+      notificationChannelId: 'LynraCare_alerts',
+      initialNotificationTitle: 'LynraCare Servis',
       initialNotificationContent: 'Sistem hazırlanıyor...',
       foregroundServiceNotificationId: 888,
     ),
@@ -31,12 +31,10 @@ class BackgroundEngine {
       autoStart: false, // iOS tarafında da manuel kontrol
       onForeground: onStart,
     ),
-  );
-  
-  // Yapılandırma bitti, şimdi manuel olarak marşa bas
+  );  
   await service.startService();
   print("BackgroundEngine: Marşa basıldı!");
-}
+ }
 }
 
 @pragma('vm:entry-point')
@@ -46,9 +44,11 @@ print("onStart_called");
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  //final role = await RoleManager.getRole();
-  //if (role != 'locator') return;
-print("role locator BG");
+  final role = await RoleManager.getRole();
+  if (role != 'locator') {
+    service.stopSelf();
+    return;
+  }
   final String? groupId = await IdentityManager.getLocalGroupId();
   final String? deviceId = await IdentityManager.getOrCreateDeviceId();
   

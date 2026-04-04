@@ -49,7 +49,6 @@ class _HomeScreenState extends State<HomeScreen> {
   FlutterBackgroundService().on('onTrackingStatusChanged').listen((event) {
     if (mounted) {
       setState(() {
-        // BackgroundEngine'deki "active" true ise takip moduna geçtik demektir
         _movementStatus = event?['active'] == true ? "Takip Aktif (Hızlı)" : "Hareketsiz (Enerji Tasarrufu)";
       });
     }
@@ -644,7 +643,7 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
     final currentPairCode = pairCode ?? AppUtils.generatePairCode(locatorId!);
 
     final qrData = jsonEncode({
-      'type': 'ncare_locator',
+      'type': 'Lynracare_locator',
       'locatorId': locatorId,
       'locatorName': locatorName ?? 'Locator',
     });

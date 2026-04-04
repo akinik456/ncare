@@ -74,7 +74,7 @@ Future<void> _save() async {
         backgroundColor: const Color(0xFF020617),
         surfaceTintColor: Colors.transparent,
         title: const Text(
-          'NCare',
+          'LynraCare',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
         ),
       ),

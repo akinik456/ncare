@@ -63,7 +63,7 @@ class RoleScreen extends StatelessWidget {
                     const SizedBox(height: 10),
 
                     Text(
-                      "NCare",
+                      "LynraCare",
                       textAlign: TextAlign.center,
                       style: theme.textTheme.headlineMedium?.copyWith(
                         fontSize: 38,
@@ -90,7 +90,7 @@ class RoleScreen extends StatelessWidget {
                     /// CREATE GROUP (TOP)
                     _MainCard(
                       title: "Create New Group",
-                      subtitle: "Start a fresh NCare group on this device",
+                      subtitle: "Start a fresh LynraCare group on this device",
                       icon: Icons.group_add_rounded,
                       color: const Color(0xFF6366F1),
                       onTap: () => _startNewGroup(context),

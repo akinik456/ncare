@@ -29,7 +29,7 @@ class _PairScreenState extends State<PairScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF020617),
         surfaceTintColor: Colors.transparent,
-        title: const Text("NCare", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+        title: const Text("LynraCare", style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
       ),
       body: MobileScanner(
         controller: controller,
@@ -40,7 +40,7 @@ class _PairScreenState extends State<PairScreen> {
           if (raw == null) return;
 
           final data = jsonDecode(raw);
-          if (data['type'] != 'ncare_pair') return;
+          if (data['type'] != 'Lynracare_pair') return;
 
           final requesterId = data['requesterId']?.toString();
           if (requesterId == null || requesterId.isEmpty) return;

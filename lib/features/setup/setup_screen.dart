@@ -67,7 +67,7 @@ void initState(){
         elevation: 0,
         titleSpacing: 20,
         title: const Text(
-          'NCare',
+          'LynraCare',
           style: TextStyle(
             fontWeight: FontWeight.w800,
             color: Colors.white,
@@ -222,7 +222,7 @@ void initState(){
                                 width: double.infinity,
                                 child: OutlinedButton.icon(
                                   onPressed: () async {
-                                    await SetupManager.setSetupDone();
+                                    print("Setup_Done");
                                     if (!context.mounted) return;
                                     Navigator.pushReplacement(
                                       context,
