@@ -13,12 +13,12 @@ class AuthService {
 		final user = _auth.currentUser;
 		if (user == null) {
 		  await _auth.signInAnonymously();
-		  print("Yeni anonim oturum açıldı. AuthId: ${currentAuthId}");
+		  print("LynraCareYeni anonim oturum açıldı. AuthId: ${currentAuthId}");
 		} else {
-		  print("Mevcut oturum devam ediyor. AuthId: ${currentAuthId}");
+		  print("LynraCareMevcut oturum devam ediyor. AuthId: ${currentAuthId}");
 		}
 	  } catch (e) {
-		print("Auth başlatma hatası: $e");
+		print("LynraCareAuth başlatma hatası: $e");
 	  }
 	}  
 

@@ -53,9 +53,9 @@ class _PairScreenState extends State<PairScreen> {
  		  await prefs.setString('pairedRequesterId', requesterId);
 		  try{
 		  
-		  print("SUBSCRIBED => $requesterId");
+		  print("LynraCareSUBSCRIBED => $requesterId");
 		  }catch(e){
-		  print("SUBSCRIBED ERR => $e");
+		  print("LynraCareSUBSCRIBED ERR => $e");
 		  }
 		  
 		  final locatorId = await 		  

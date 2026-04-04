@@ -23,8 +23,8 @@ Future<void> _save() async {
     final groupId = await IdentityManager.getLocalGroupId();
 	//if (groupId == null || groupId.isEmpty) return; 
 
-    print("REQUESTER ID => $requesterId");
-    print("LOCATOR ID => $locatorId");
+    print("LynraCareREQUESTER ID => $requesterId");
+    print("LynraCareLOCATOR ID => $locatorId");
 
     await FirebaseFirestore.instance
         .collection('groups')
@@ -37,7 +37,7 @@ Future<void> _save() async {
       'createdAt': FieldValue.serverTimestamp(),
     });
 
-    print("REQUESTER SIDE LOCATOR SAVED");
+    print("LynraCareREQUESTER SIDE LOCATOR SAVED");
 
     final requesterDoc = await FirebaseFirestore.instance
 		.collection('groups')
@@ -55,12 +55,12 @@ Future<void> _save() async {
 	  'requesterName': requesterName,
 	}, SetOptions(merge: true));
 
-    print("TOP LEVEL PAIR SAVED");
+    print("LynraCareTOP LEVEL PAIR SAVED");
 
     if (!mounted) return;
     Navigator.popUntil(context, (route) => route.isFirst);
   } catch (e) {
-    print("SAVE LOCATOR ERR => $e");
+    print("LynraCareSAVE LOCATOR ERR => $e");
   }
 }
 

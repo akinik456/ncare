@@ -36,6 +36,7 @@ Future<void> main() async {
   WidgetsBinding widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   bool setupDone = await SetupManager.isSetupDone();
+  final groupId = await IdentityManager.getLocalGroupId();
   final String? role = await RoleManager.getRole();
     if (role != null) 
 	{
@@ -49,9 +50,9 @@ Future<void> main() async {
 
 	  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 	  await NotificationService.init();
-	  print("APP_START");
+	  print("LynraCareAPP_START");
 	  DeviceStateManager.instance.start();
-	  print("SETUP CHECK DONE");
+	  print("LynraCareSETUP CHECK DONE");
   
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
   'LynraCare_alerts',
@@ -76,12 +77,12 @@ await flutterLocalNotificationsPlugin.initialize(initSettings);
     
 String? myLocatorId;
 
-if (role == 'locator' && setupDone) {
+if (role == 'locator' && setupDone && groupId != null) {
   myLocatorId = await IdentityManager.getOrCreateDeviceId();
   final locatorTopic = 'locator_$myLocatorId';
   await BackgroundEngine.initialize();
 } else {
-  print("LOCATOR FLOW SKIPPED => role=$role");
+  print("LynraCareLOCATOR FLOW SKIPPED => role=$role");
   final requesterId = await IdentityManager.getOrCreateDeviceId();
 }  
 
@@ -92,7 +93,7 @@ FirebaseMessaging.onMessage.listen((message) async {
   final data = message.data;
   if (data['type'] != 'rl') return;
 
-  print("rl received");
+  print("LynraCarerl received");
 
   final requestId = data['requestId']?.toString();
   final requesterId = data['requesterId']?.toString();
@@ -113,13 +114,12 @@ FirebaseMessaging.onMessage.listen((message) async {
   if (targetLocatorId == null ||
       targetLocatorId.isEmpty ||
       targetLocatorId != myLocatorId) {
-    print("FG SKIP => target=$targetLocatorId mine=$myLocatorId");
+    print("LynraCareFG SKIP => target=$targetLocatorId mine=$myLocatorId");
     return;
   }
 
-  final groupId = await IdentityManager.getLocalGroupId();
   if (groupId == null || groupId.isEmpty) {
-    print("FG RL BLOCKED => no groupId");
+    print("LynraCareFG RL BLOCKED => no groupId");
     return;
   }
 
@@ -129,7 +129,7 @@ FirebaseMessaging.onMessage.listen((message) async {
   );
 
   if (!stillPaired) {
-    print("FG RL BLOCKED => requester not paired");
+    print("LynraCareFG RL BLOCKED => requester not paired");
     return;
   }
 
@@ -145,7 +145,7 @@ FirebaseMessaging.onMessage.listen((message) async {
       .doc(myLocatorId)
       .get();
 
-  print("myLocatorId:$myLocatorId");
+  print("LynraCaremyLocatorId:$myLocatorId");
 
   final cachedLat = (locatorDoc.data()?['lat'] as num?)?.toDouble();
   final cachedLng = (locatorDoc.data()?['lng'] as num?)?.toDouble();
@@ -181,7 +181,7 @@ FirebaseMessaging.onMessage.listen((message) async {
       }, SetOptions(merge: true));
 
       LocatorUiState.instance.onSentOk();
-      print("FG CACHED SENT => $requestId $cachedLat,$cachedLng age=$age");
+      print("LynraCareFG CACHED SENT => $requestId $cachedLat,$cachedLng age=$age");
       return;
     }
 
@@ -212,7 +212,7 @@ FirebaseMessaging.onMessage.listen((message) async {
     }, SetOptions(merge: true));
 
     LocatorUiState.instance.onSentOk();
-    print("FG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
+    print("LynraCareFG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
   } catch (e) {
     await FirebaseFirestore.instance
         .collection('groups')
@@ -248,7 +248,7 @@ runApp(LynraCareApp(setupDone: setupDone));
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-print("BG_HANDLER START => data=${message.data}");
+print("LynraCareBG_HANDLER START => data=${message.data}");
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -256,7 +256,7 @@ print("BG_HANDLER START => data=${message.data}");
 
   final role = await RoleManager.getRole();
   if (role != 'locator') {
-    print("BG LOCATOR FLOW SKIPPED => role=$role");
+    print("LynraCareBG LOCATOR FLOW SKIPPED => role=$role");
     return;
   }
 
@@ -268,7 +268,7 @@ print("BG_HANDLER START => data=${message.data}");
   final myLocatorId = await IdentityManager.getOrCreateDeviceId();
   final requesterDeviceId =
     (data['requesterDeviceId'] ?? '').toString().trim();
-	print("requesterDeviceId:$requesterDeviceId");
+	print("LynraCarerequesterDeviceId:$requesterDeviceId");
   if (type != 'rl' ||
       requestId == null ||
       requestId.isEmpty ||
@@ -276,11 +276,11 @@ print("BG_HANDLER START => data=${message.data}");
       requesterId.isEmpty) {
     return;
   }
-print("BG_HANDLER RL RECEIVED");
+print("LynraCareBG_HANDLER RL RECEIVED");
   if (targetLocatorId == null ||
       targetLocatorId.isEmpty ||
       targetLocatorId != myLocatorId) {
-    print("BG SKIP => target=$targetLocatorId mine=$myLocatorId");
+    print("LynraCareBG SKIP => target=$targetLocatorId mine=$myLocatorId");
     return;
   }
   
@@ -288,15 +288,15 @@ final stillPaired = await _isStillPaired(
   locatorId: myLocatorId,
   requesterId: requesterId,
 );
-print("BG_HANDLER stillPaired => $stillPaired");
+print("LynraCareBG_HANDLER stillPaired => $stillPaired");
 if (!stillPaired) {
-  print("BG RL BLOCKED => requester not paired");
+  print("LynraCareBG RL BLOCKED => requester not paired");
   return;
 }
 
 final groupId = await IdentityManager.getLocalGroupId();
 if (groupId == null || groupId.isEmpty) {
-  print("FG RL BLOCKED => no groupId");
+  print("LynraCareFG RL BLOCKED => no groupId");
   return;
 }
   await NotificationService.showFromRemoteMessage(message);
@@ -343,7 +343,7 @@ if (groupId == null || groupId.isEmpty) {
         'via': 'cached_bg',
       }, SetOptions(merge: true));
       //LocatorUiState.instance.onSentOk();
-      print("BG CACHED SENT => $requestId $cachedLat,$cachedLng age=$age");
+      print("LynraCareBG CACHED SENT => $requestId $cachedLat,$cachedLng age=$age");
       return;
 	  
     }
@@ -375,10 +375,10 @@ if (groupId == null || groupId.isEmpty) {
   timeLimit: const Duration(seconds: 20),
 );
 		if (pos == null) {
-  print("BG FRESH POS NULL");
+  print("LynraCareBG FRESH POS NULL");
   return;
 }
- print("BG FRESH BEFORE WRITE");   
+ print("LynraCareBG FRESH BEFORE WRITE");   
     await responseRef.set({
       'locatorId': myLocatorId,
 	  'requesterDeviceId': requesterDeviceId,
@@ -391,9 +391,9 @@ if (groupId == null || groupId.isEmpty) {
       'via': 'bg',
     }, SetOptions(merge: true));
 
-    print("BG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
+    print("LynraCareBG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
   } catch (e) {
-  print("BG_HANDLER ERROR => $e");
+  print("LynraCareBG_HANDLER ERROR => $e");
     await responseRef.set({
       'locatorId': myLocatorId,
 	  'requesterDeviceId': requesterDeviceId,

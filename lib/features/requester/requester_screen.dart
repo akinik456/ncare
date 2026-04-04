@@ -396,7 +396,7 @@ String lastSeenText(Timestamp ts) {
 void _listenCallAlerts() {
   if (_groupId == null || _groupId!.isEmpty) return;
 
-  print("callme Listener Started");
+  print("LynraCarecallme Listener Started");
 
   _callAlertSub?.cancel();
 
@@ -460,7 +460,7 @@ void _listenCallAlerts() {
 	   _callRequestTs = formattedTs;
     });
   }, onError: (e) {
-    print("CALL_ME LISTENER ERROR => $e");
+    print("LynraCareCALL_ME LISTENER ERROR => $e");
   });
 }
 
@@ -934,7 +934,7 @@ if (_groupId == null || _groupId!.isEmpty) ...[
 }
 
     if (docs.isEmpty) {
-	print("docs is Empty");
+	print("LynraCaredocs is Empty");
       return Text(
         _groupId == null
             ? 'Create or join a group first'

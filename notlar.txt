@@ -538,3 +538,4 @@ Yani rl ye cevap vermeli ve alert üretebilmeli her koşulda
 fg,bg de restart sonrası vs. 
 Seninle yazdığımız background_engine var.
 bugün seninle bu konu üzerinde çalışacağız
+

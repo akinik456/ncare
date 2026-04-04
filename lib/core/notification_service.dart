@@ -39,19 +39,19 @@ class NotificationService {
         sound: true,
       );
     } catch (e) {
-      print("FCM Foreground options skip (background mode)");
+      print("LynraCareLynraCareFCM Foreground options skip (background mode)");
     }
 
     // 4. ON_MESSAGE LISTEN: Uygulama açıkken gelenleri yakalar.
     // Sadece bir kez (init anında) kurulur.
     FirebaseMessaging.onMessage.listen((message) async {
-      print("FCM FOREGROUND => Message received: ${message.messageId}");
+      print("LynraCareLynraCareFCM FOREGROUND => Message received: ${message.messageId}");
       if (suppressForegroundAlerts) return;
       await showFromRemoteMessage(message);
     });
 
     _initialized = true;
-    print("NOTIFICATION_SERVICE: Başarıyla kuruldu.");
+    print("LynraCareLynraCareNOTIFICATION_SERVICE: Başarıyla kuruldu.");
   }
 /// Emniyet Kemeri: Her gösterimden önce init kontrolü yapar.
   static Future<void> _ensureReady() async => await init();

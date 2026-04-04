@@ -30,7 +30,7 @@ class RTDBService {
 
     if (connected) {
       // İnternet geldiği an burası tetiklenir!
-      print("🚀 RTDB: Bağlantı kuruldu, online yapılıyor...");
+      print("LynraCare🚀 RTDB: Bağlantı kuruldu, online yapılıyor...");
       
       // onDisconnect mühürünü tekrar bas (Her bağlantıda yenilenmeli)
       locatorRef.onDisconnect().update({
@@ -83,9 +83,9 @@ Future<void> updateStatus({
     // update() kullanarak sadece paketteki alanları günceller, 
     // mevcut diğer verileri (status gibi) bozmaz.
     await locatorRef.update(data);
-	print("RTDB Update Success");
+	print("LynraCareRTDB Update Success");
   } catch (e) {
-    print("RTDB Update Error: $e");
+    print("LynraCareRTDB Update Error: $e");
   }
 }  
   

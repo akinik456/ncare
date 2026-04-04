@@ -47,7 +47,7 @@ class DeviceStateManager {
 
   // --- VİTES ARTIRMA (REQUESTER EKRANI AÇINCA ÇAĞRILIR) ---
   void boostTracking() {
-    print(" Canlı takip isteği alındı. Periyot: 20sn.");
+    print("LynraCare Canlı takip isteği alındı. Periyot: 20sn.");
     _isActiveRequest = true;
     _currentIntervalSeconds = 30; 
     _restartPresenceTimer();
@@ -55,7 +55,7 @@ class DeviceStateManager {
     // 5 dakika sonra otomatik olarak ekonomi moduna (1 saat) dön
     _autoSleepTimer?.cancel();
     _autoSleepTimer = Timer(const Duration(minutes: 5), () {
-      print("Zaman aşımı. Ekonomi moduna dönülüyor (3600sn).");
+      print("LynraCareZaman aşımı. Ekonomi moduna dönülüyor (3600sn).");
       _isActiveRequest = false;
       _currentIntervalSeconds = 30; 
       _restartPresenceTimer();
@@ -71,7 +71,7 @@ class DeviceStateManager {
   }
 
   void start() {
-    print(" Sistem Başlatıldı. Mod: Standby (1 Saat)");
+    print("LynraCare Sistem Başlatıldı. Mod: Standby (1 Saat)");
     _ticker?.cancel();
     _geoTicker?.cancel();
     
@@ -120,7 +120,7 @@ Future<void> updatePresence() async {
       timeLimit: const Duration(seconds: 1),
     );
     if (pos != null) {
-	print("pos is not null");
+	print("LynraCarepos is not null");
       rtdbData.addAll({
         'lat': pos.latitude,
         'lng': pos.longitude,
@@ -138,7 +138,7 @@ Future<void> updatePresence() async {
 }
 
   Future<void> _checkState() async {
-  print(" checkstate aktif");
+  print("LynraCare checkstate aktif");
   // 1. GPS ve Konum Kontrolleri
   gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
   final permission = await geo.Geolocator.checkPermission();

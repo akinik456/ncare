@@ -680,7 +680,7 @@ Future<void> _removeLocator() async {
     setState(() {
       _batteryAlarmEnabled = v;
     });
-	print("prefs set");
+	print("LynraCareprefs set");
   },
 ),
 if (_batteryAlarmEnabled) ...[

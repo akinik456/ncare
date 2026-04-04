@@ -8,6 +8,8 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:restart_app/restart_app.dart';
+
 import '../../core/alert_engine.dart';
 import '../../core/device_state_manager.dart';
 import '../../core/identity_manager.dart';
@@ -150,7 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
 Future<void> _sendCallMeAlert() async {
-  print("callme called");
+  print("LynraCarecallme called");
 
   final settings = await LocatorSettingsReader.load();
   if (settings == null) return;
@@ -166,10 +168,10 @@ Future<void> _sendCallMeAlert() async {
     return;
   }
 
-  print("settings.callEnabled:${settings.callEnabled}");
+  print("LynraCaresettings.callEnabled:${settings.callEnabled}");
 
   final locatorId = await IdentityManager.getOrCreateDeviceId();
-  print("locatorId:$locatorId");
+  print("LynraCarelocatorId:$locatorId");
 
   final locatorDoc = await FirebaseFirestore.instance
       .collection('locators')
@@ -182,7 +184,7 @@ Future<void> _sendCallMeAlert() async {
 
   if (groupId.isEmpty) return;
 
-  print("groupId:$groupId");
+  print("LynraCaregroupId:$groupId");
 
   await FirebaseFirestore.instance
       .collection('groups')
@@ -485,8 +487,14 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
     }, SetOptions(merge: true));
 
 
+	if(pairedRequestersCount==1)
+	{
+	Restart.restartApp();
+	}
+
   } catch (e) {
     print('APPROVE PENDING PAIR ERROR => $e');
+	return;
   }
 }
 
@@ -713,7 +721,7 @@ color: _movementStatus.contains("Aktif") ? Colors.teal.shade50 : Colors.blueGrey
   
   // Manager'dan güncel durumları çekiyoruz
   final gpsEn = DeviceStateManager.instance.gpsEnabled;
-  print("izin ekranından gelindi gpsenabled:$gpsEn");
+  print("LynraCareizin ekranından gelindi gpsenabled:$gpsEn");
   final hasBgLoc = DeviceStateManager.instance.hasBackgroundLocationPermission;
   final hasActivity = DeviceStateManager.instance.hasActivityPermission;
   final batteryOptimized = DeviceStateManager.instance.isBatteryOptimized;

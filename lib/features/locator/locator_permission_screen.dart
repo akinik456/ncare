@@ -211,7 +211,7 @@ void _showXiaomiGuide() {
       
       if (backgroundStatus.isDenied) {
         // Eğer hala "Always" değilse, kullanıcıyı manuel olarak ikna etmemiz gerekebilir
-        print("Kullanıcı Always seçmedi, sadece While In Use var.");
+        print("LynraCareKullanıcı Always seçmedi, sadece While In Use var.");
       }
     }
     
