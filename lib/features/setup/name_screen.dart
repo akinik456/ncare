@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
@@ -61,93 +60,91 @@ class _NameScreenState extends State<NameScreen> {
     final now = FieldValue.serverTimestamp();
 
     if (role == "requester" && _isCreatingGroup) {
-	  await FcmManager.prepareApp();
+      await FcmManager.prepareApp();
 
-	  final groupId = const Uuid().v4();
-	  final authId = AuthService.currentAuthId;
-	  
-	  print("SYSTEM: Grup kuruluyor. GroupID: $groupId, AuthID: $authId");
+      final groupId = const Uuid().v4();
+      final authId = AuthService.currentAuthId;
+      
+      await IdentityManager.setLocalGroupId(groupId);
+      await FirebaseFirestore.instance.collection('groups').doc(groupId).set({
+        'groupId': groupId,
+        'createdAt': now,
+        'isPaid': false,
+        'trialExpiresAt': Timestamp.fromDate(
+          DateTime.now().add(const Duration(days: 7)),
+        ),
+        'maxDevicesCount': 10,
+        'groupMasterDeviceId': deviceId,
+        'groupMasterAuthId': authId,
+      });
+      await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(groupId)
+          .collection('devices')
+          .doc(deviceId)
+          .set({
+        'authId': authId,
+        'deviceId': deviceId,
+        'groupId': groupId,
+        'role': 'requester',
+        'name': name,
+        'joinedAt': now,
+        'active': true,
+        'isMaster': true,
+      });
+      await FirebaseFirestore.instance.collection('requesters').doc(deviceId).set({
+        'authId': authId,
+        'deviceId': deviceId,
+        'role': 'requester',
+        'name': name,
+        'joinedAt': now,
+        'active': true,
+        'isMaster': true,
+      });
 
-	  await IdentityManager.setLocalGroupId(groupId);
-	  await FirebaseFirestore.instance.collection('groups').doc(groupId).set({
-		'groupId': groupId,
-		'createdAt': now,
-		'isPaid': false,
-		'trialExpiresAt': Timestamp.fromDate(
-		  DateTime.now().add(const Duration(days: 7)),
-		),
-		'maxDevicesCount': 10,
-		'groupMasterDeviceId': deviceId,
-		'groupMasterAuthId': authId,
-	  });
-	  await FirebaseFirestore.instance
-		  .collection('groups')
-		  .doc(groupId)
-		  .collection('devices')
-		  .doc(deviceId)
-		  .set({
-		'authId': authId,
-		'deviceId': deviceId,
-		'groupId': groupId,
-		'role': 'requester',
-		'name': name,
-		'joinedAt': now,
-		'active': true,
-		'isMaster': true,
-	  });
-	  await FirebaseFirestore.instance.collection('requesters').doc(deviceId).set({
-		'authId': authId,
-		'deviceId': deviceId,
-		'role': 'requester',
-		'name': name,
-		'joinedAt': now,
-		'active': true,
-		'isMaster': true,
-	  });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isCreatingGroup', false);
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const RequesterPermissionScreen()),
+      );
+    } else if (role == "requester") {
+      await FcmManager.prepareApp();
+      await FirebaseFirestore.instance.collection('requesters').doc(deviceId).set({
+        'authId': AuthService.currentAuthId,
+        'deviceId': deviceId,
+        'role': 'requester',
+        'name': name,
+        'joinedAt': now,
+        'active': true,
+        'isMaster': false,
+      });
 
-	  final prefs = await SharedPreferences.getInstance();
-	  await prefs.setBool('isCreatingGroup', false);
-	  if (!mounted) return;
-	  Navigator.pushReplacement(
-		context,
-		MaterialPageRoute(builder: (_) => const RequesterPermissionScreen()),
-	  );
-	} else if (role == "requester") {
-	  await FcmManager.prepareApp();
-	  await FirebaseFirestore.instance.collection('requesters').doc(deviceId).set({
-		'authId': AuthService.currentAuthId,
-		'deviceId': deviceId,
-		'role': 'requester',
-		'name': name,
-		'joinedAt': now,
-		'active': true,
-		'isMaster': false,
-	  });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isCreatingGroup', false);
+      if (!mounted) return;
 
-	  final prefs = await SharedPreferences.getInstance();
-	  await prefs.setBool('isCreatingGroup', false);
-	  if (!mounted) return;
-
-	  Navigator.pushReplacement(
-		context,
-		MaterialPageRoute(builder: (_) => const RequesterPermissionScreen()),
-	  );
-	}else {
-	  await FcmManager.prepareApp();
-	  await FirebaseFirestore.instance.collection('locators').doc(deviceId).set({
-		'authId': AuthService.currentAuthId,
-		'deviceId': deviceId,
-		'role': 'locator',
-		'name': name,
-		'joinedAt': now,
-		'active': true,
-	  });
-	if (!mounted) return;
-	  Navigator.pushReplacement(
-		context,
-		MaterialPageRoute(builder: (_) => const LocatorPermissionScreen()),
-	  );
-	}
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const RequesterPermissionScreen()),
+      );
+    } else {
+      await FcmManager.prepareApp();
+      await FirebaseFirestore.instance.collection('locators').doc(deviceId).set({
+        'authId': AuthService.currentAuthId,
+        'deviceId': deviceId,
+        'role': 'locator',
+        'name': name,
+        'joinedAt': now,
+        'active': true,
+      });
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LocatorPermissionScreen()),
+      );
+    }
   }
 
   @override
@@ -156,8 +153,8 @@ class _NameScreenState extends State<NameScreen> {
 
     final heroTitle = isRequester ? 'Requester Setup' : 'Locator Setup';
     final inputTitle = isRequester
-        ? 'Name shown on locator device'
-        : 'Name shown on requester device';
+        ? 'Name shown on locator'
+        : 'Name shown on requester';
     final helperText = isRequester
         ? 'Enter the name that paired locator devices will see for this phone.'
         : 'Enter the name that requester devices will see for this phone.';
@@ -170,217 +167,176 @@ class _NameScreenState extends State<NameScreen> {
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF020617),
-              Color(0xFF020617),
-              Color(0xFF0F172A),
-            ],
+            colors: [Color(0xFF020617), Color(0xFF0F172A)],
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(32),
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: isRequester
-                              ? const [
-                                  Color(0xFF1D4ED8),
-                                  Color(0xFF2563EB),
-                                  Color(0xFF3B82F6),
-                                ]
-                              : const [
-                                  Color(0xFF0F766E),
-                                  Color(0xFF0D9488),
-                                  Color(0xFF14B8A6),
-                                ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: (isRequester
-                                    ? const Color(0xFF2563EB)
-                                    : const Color(0xFF0D9488))
-                                .withOpacity(0.20),
-                            blurRadius: 28,
-                            offset: const Offset(0, 14),
-                          ),
-                        ],
-                      ),
-                      child: Column(
+          child: Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Header Section (LocatorPermissionScreen Header Stili)
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            width: 64,
-                            height: 64,
+                            padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(22),
-                              color: Colors.white.withOpacity(0.16),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.16),
-                              ),
+                              color: const Color(0xFF14B8A6).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(14),
                             ),
                             child: Icon(
-                              isRequester
-                                  ? Icons.travel_explore_rounded
-                                  : Icons.phone_android_rounded,
-                              color: Colors.white,
-                              size: 34,
+                              isRequester ? Icons.travel_explore_rounded : Icons.phone_android_rounded,
+                              color: const Color(0xFF14B8A6),
+                              size: 32,
                             ),
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 12),
                           Text(
                             heroTitle,
                             style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: -0.8,
-                              height: 1.0,
-                            ),
+                                fontSize: 30,
+                                fontWeight: FontWeight.w900,
+                                color: Colors.white,
+                                letterSpacing: -1),
                           ),
-                          const SizedBox(height: 10),
                           Text(
                             helperText,
                             style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFFE6F2FF),
-                              height: 1.4,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 22),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(30),
-                        color: const Color(0xFF020617),
-                        border: Border.all(
-                          color: const Color(0xFF334155),
-                          width: 1.1,
-                        ),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x100F172A),
-                            blurRadius: 20,
-                            offset: Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            inputTitle,
-                            style: const TextStyle(
-                              fontSize: 23,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF64748B),
-                              letterSpacing: -0.4,
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          TextField(
-                            controller: controller,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => saving ? null : _save(),
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF0F172A),
-                            ),
-                            decoration: InputDecoration(
-                              hintText: hintText,
-                              hintStyle: const TextStyle(
+                                fontSize: 14,
                                 color: Color(0xFF94A3B8),
-                                fontWeight: FontWeight.w600,
-                              ),
-                              filled: true,
-                              fillColor: const Color(0xFFF8FAFC),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 18,
-                                vertical: 18,
-                              ),
-                              prefixIcon: Icon(
-                                isRequester
-                                    ? Icons.badge_rounded
-                                    : Icons.person_pin_circle_rounded,
-                                color: isRequester
-                                    ? const Color(0xFF2563EB)
-                                    : const Color(0xFF0D9488),
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(20),
-                                borderSide: BorderSide.none,
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(20),
-                                borderSide: const BorderSide(
-                                  color: Color(0xFFE2E8F0),
-                                  width: 1.1,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(20),
-                                borderSide: BorderSide(
-                                  color: isRequester
-                                      ? const Color(0xFF2563EB)
-                                      : const Color(0xFF0D9488),
-                                  width: 1.6,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              onPressed: saving ? null : _save,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: isRequester
-                                    ? const Color(0xFF2563EB)
-                                    : const Color(0xFF0D9488),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 18),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(22),
-                                ),
-                                textStyle: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              child: saving
-                                  ? const SizedBox(
-                                      width: 22,
-                                      height: 22,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2.4,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Text('Continue'),
-                            ),
+                                fontWeight: FontWeight.w500),
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 32),
+
+                      // Input Section (Permission Item kart stiliyle harmanlandı)
+                      Text(
+                        "IDENTIFICATION",
+                        style: TextStyle(
+                            color: const Color(0xFF5EEAD4),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1E293B).withOpacity(0.4),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: const Color(0xFF334155),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              inputTitle,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: controller,
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => saving ? null : _save(),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: hintText,
+                                hintStyle: const TextStyle(
+                                  color: Color(0xFF64748B),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                filled: true,
+                                fillColor: const Color(0xFF020617).withOpacity(0.5),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 16,
+                                ),
+                                prefixIcon: Icon(
+                                  isRequester
+                                      ? Icons.badge_rounded
+                                      : Icons.person_pin_circle_rounded,
+                                  color: const Color(0xFF14B8A6),
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide.none,
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF334155),
+                                    width: 1,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(
+                                    color: Color(0xFF14B8A6),
+                                    width: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
+              
+              // Bottom Bar (LocatorPermissionScreen Bottom Bar Stili)
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF020617),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 40,
+                        offset: const Offset(0, -10))
+                  ],
+                ),
+                child: FilledButton(
+                  onPressed: saving ? null : _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF14B8A6),
+                    disabledBackgroundColor: const Color(0xFF1E293B),
+                    minimumSize: const Size(double.infinity, 64),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20)),
+                  ),
+                  child: saving
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          'CONTINUE',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1,
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
