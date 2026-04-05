@@ -18,7 +18,7 @@ class DeviceStateManager {
   static final DeviceStateManager instance = DeviceStateManager._();
   static const int _placeTransitionCooldownSeconds = 120;
   // --- DINAMIK PERIYOT DEĞİŞKENLERİ ---
-  int _currentIntervalSeconds = 30; // Başlangıç: 1 Saat
+  int _currentIntervalSeconds = 3600; // Başlangıç: 1 Saat
   bool _isWorkerMode = false; // Isolate kimliğini tutacak bayrak
   bool _isActiveRequest = false; 
   Timer? _presenceTimer;
@@ -293,20 +293,23 @@ class DeviceStateManager {
     }
   }
   
-    // --- VİTES ARTIRMA (REQUESTER EKRANI AÇINCA ÇAĞRILIR) ---
-  void boostTracking() {
-    print("LynraCare Canlı takip isteği alındı. Periyot: 20sn.");
-    _isActiveRequest = true;
-    _currentIntervalSeconds = 20; 
-    _restartPresenceTimer();
+ void boostTracking({required bool active, int customPeriod = 30}) {
+  _autoSleepTimer?.cancel(); 
 
-    // 5 dakika sonra otomatik olarak ekonomi moduna (1 saat) dön
-    _autoSleepTimer?.cancel();
+  if (active) {
+    print("LynraCare: VİTES YÜKSELTİLDİ. Periyot: ${customPeriod}sn.");
+    _currentIntervalSeconds = customPeriod; 
+    _restartPresenceTimer();
+    updatePresence(); 
+
     _autoSleepTimer = Timer(const Duration(minutes: 5), () {
-      print("LynraCareZaman aşımı. Ekonomi moduna dönülüyor (3600sn).");
-      _isActiveRequest = false;
-      _currentIntervalSeconds = 20; 
-      _restartPresenceTimer();
+      print("LynraCare: Zaman aşımı. Ekonomi moduna geçiliyor.");
+      boostTracking(active: false); // Kendi kendini kapatır
     });
+  } else {
+    print("LynraCare: EKONOMİ MODU. Periyot: 3600sn (1 Saat).");
+    _currentIntervalSeconds = 3600; 
+    _restartPresenceTimer();
   }
+}
 }

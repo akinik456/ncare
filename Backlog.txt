@@ -27,5 +27,7 @@ E/FirebaseMessaging(26069): Topic operation failed: SERVICE_NOT_AVAILABLE. Will 
 
 RoleManager.setRole  çok fazla 
 
-1. Kullanıcı Kontrolü (Zorunlu Gereksinim)
+10. Kullanıcı Kontrolü (Zorunlu Gereksinim)
 Google Play politikaları ve iyi bir kullanıcı deneyimi için, kullanıcının bu takibi istediği zaman (mesela ayarlardan bir butona basarak) durdurabilmesi gerekir. Eğer o dinleyiciyi koymazsan, kullanıcı uygulamadan "Çıkış Yap" dese bile o bildirim yukarıda asılı kalır ve tek çaresi telefonu kapatıp açmak veya uygulama ayarlarından "Zorla Durdur" demek olur.
+
+11 call me rtdb ye taşınmalı mı?

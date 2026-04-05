@@ -135,47 +135,52 @@ void onStart(ServiceInstance service) async {
       initialBattery: initialLevel,
     );
     // Hareket algılama mantığını başlat
-    //_startMovementLogic(service, groupId, deviceId);
+   _startMovementLogic(service, groupId, deviceId);
    DeviceStateManager.instance.start(isWorker: true);   
 }
 
 @pragma('vm:entry-point')
 void _startMovementLogic(ServiceInstance service, String groupId, String deviceId) {
-  int _startSteps = 0;
-  bool _isMoving = false;
+  int? _initialSteps;
   bool _isTrackingActive = false;
   Timer? _stopTimer;
-  print("LynraCareAdım Sayar başladı");
+
+  print("LynraCare: Pedometre dinleme başladı.");
+
   Pedometer.stepCountStream.listen((StepCount event) {
-	print("LynraCareADIM GELDİ: ${event.steps}");
-    if (!_isMoving) {
-      _isMoving = true;
-      _startSteps = event.steps;
-      
-      // UI'ı bilgilendir (Opsiyonel)
-      service.invoke('onMovementDetected', {"status": "moving"});
+    if (_initialSteps == null) {
+      _initialSteps = event.steps;
+      print("LynraCare: Kalibrasyon Tamam. Başlangıç Adımı: $_initialSteps");
+      return;
     }
 
-    int currentSessionSteps = event.steps - _startSteps;
+    int currentSessionSteps = event.steps - _initialSteps!;
+    
+    // UI'a her adımda veriyi gönder (Rakamlar canlı artsın)
+    service.invoke('onTrackingStatusChanged', {
+      "active": _isTrackingActive,
+      "currentSteps": currentSessionSteps
+    });
 
-    // 15 ADIM BARAJI - VİTES YÜKSELT
     if (currentSessionSteps >= 15 && !_isTrackingActive) {
       _isTrackingActive = true;
-      
-      DeviceStateManager.instance.updatePresence();
-      
-      service.invoke('onTrackingStatusChanged', {"active": true});
-	  print("LynraCareSteps >15 updatePresence_called");
+      // DOĞRU ÇAĞRI: Parametre ismiyle (active:) çağırıyoruz
+      DeviceStateManager.instance.boostTracking(active: true, customPeriod: 30);
+      print("LynraCare: 15 Adım aşıldı! Sistem 'Takip' modunda.");
     }
-	if (!_isMoving) return;
-    // Hareket devam ettiği sürece durma sayacını sıfırla
+
     _stopTimer?.cancel();
     _stopTimer = Timer(const Duration(minutes: 5), () {
-      // HAREKET DURDU - VİTES DÜŞÜR
-      _isMoving = false;
+      print("LynraCare: 5 dakikadır hareket yok. Vites düşürülüyor.");
       _isTrackingActive = false;
-      _startSteps = 0;
-      service.invoke('onTrackingStatusChanged', {"active": false});
+      _initialSteps = null;
+      
+      DeviceStateManager.instance.boostTracking(active: false);
+      
+      service.invoke('onTrackingStatusChanged', {
+        "active": false,
+        "currentSteps": 0
+      });
     });
-  }, onError: (error) => print("LynraCarePedometer Hatası: $error"));
+  }, onError: (e) => print("LynraCare: Pedometer Error: $e"));
 }

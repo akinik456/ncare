@@ -40,22 +40,29 @@ class _HomeScreenState extends State<HomeScreen> {
   
   String? groupId;
   String? deviceId;
-	String _movementStatus = "Hareketsiz"; // Bunu ekle
+  String _movementStatus = "Hareketsiz"; // Bunu ekle
+  int _displaySteps = 0;
 
-  @override
-  void initState() {
-    super.initState();
-	_initEverything();
-	
-	// Arka plandan gelen mesajları dinle
+
+@override
+void initState() {
+  super.initState();
+  _initEverything();
+
   FlutterBackgroundService().on('onTrackingStatusChanged').listen((event) {
-    if (mounted) {
-      setState(() {
-        _movementStatus = event?['active'] == true ? "Takip Aktif (Hızlı)" : "Hareketsiz (Enerji Tasarrufu)";
-      });
-    }
+    // DOĞRU MANTIK: mounted değilse (sayfa kapalıysa) setState yapma
+    if (!mounted) return; 
+
+    setState(() {
+      _displaySteps = event?['currentSteps'] ?? 0;
+      final bool isActive = event?['active'] ?? false;
+      
+      _movementStatus = isActive 
+          ? "Takip Aktif ($_displaySteps Adım)" 
+          : "Hareketsiz (Bekliyor: $_displaySteps/15)";
+    });
   });
-	}
+}
 	
 	Future<void> _initEverything() async {
     await _initLocatorId();
@@ -688,23 +695,54 @@ return Scaffold(
         ),
 
         const SizedBox(height: 6),
-// --- EKLEDİĞİMİZ TAKİP DURUMU TEXTİ ---
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        decoration: BoxDecoration(
-color: _movementStatus.contains("Aktif") ? Colors.teal.shade50 : Colors.blueGrey.shade50,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          _movementStatus,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: _movementStatus.contains("Aktif") ? Colors.teal : Colors.blueGrey,
-          ),
+// --- GÜNCELLENMİŞ TAKİP VE ADIM DURUMU ---
+Container(
+  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+  decoration: BoxDecoration(
+    color: _movementStatus.contains("Aktif") 
+        ? Colors.teal.shade50 
+        : Colors.blueGrey.shade50,
+    borderRadius: BorderRadius.circular(12),
+    border: Border.all(
+      color: _movementStatus.contains("Aktif") 
+          ? Colors.teal.withOpacity(0.2) 
+          : Colors.blueGrey.withOpacity(0.2),
+    ),
+  ),
+  child: Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        _movementStatus,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: _movementStatus.contains("Aktif") ? Colors.teal : Colors.blueGrey,
         ),
       ),
-
+      const SizedBox(height: 2),
+      Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.directions_walk, 
+            size: 16, 
+            color: _movementStatus.contains("Aktif") ? Colors.teal : Colors.blueGrey
+          ),
+          const SizedBox(width: 4),
+          Text(
+            "$_displaySteps Adım",
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+              color: _movementStatus.contains("Aktif") ? Colors.teal.shade700 : Colors.blueGrey.shade700,
+            ),
+          ),
+        ],
+      ),
+    ],
+  ),
+),
       Expanded(
   child: Center(
     child: SingleChildScrollView(
