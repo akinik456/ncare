@@ -12,22 +12,51 @@ gösterilmeli ya da silinmeli
 
 6 start da subscribe için takılabiliyor , sık oluyor. 
 
-5 batteryAlarmEnabled , batteryAlertThreshold Firestore da isimleri kontrol et ya english ya da türkçe
+7 batteryAlarmEnabled , batteryAlertThreshold Firestore da isimleri kontrol et ya english ya da türkçe
 
-6 max. device count
+8 max. device count
 
-7 s2 android 9 gps on/off görmüyor
+9 s2 android 9 gps on/off görmüyor
 
-8 req loc silme
+10 req loc silme
 
-9 status da lastseen çok eski ise batery ve konum anlamsız
+11 status da lastseen çok eski ise batery ve konum anlamsız
 
 http://127.0.0.1:64696/zvDmK48QK94=/devtools/?uri=ws://127.0.0.1:64696/zvDmK48QK94=/ws
 E/FirebaseMessaging(26069): Topic operation failed: SERVICE_NOT_AVAILABLE. Will retry Topic operation.
 
 RoleManager.setRole  çok fazla 
 
-10. Kullanıcı Kontrolü (Zorunlu Gereksinim)
+12. Kullanıcı Kontrolü (Zorunlu Gereksinim)
 Google Play politikaları ve iyi bir kullanıcı deneyimi için, kullanıcının bu takibi istediği zaman (mesela ayarlardan bir butona basarak) durdurabilmesi gerekir. Eğer o dinleyiciyi koymazsan, kullanıcı uygulamadan "Çıkış Yap" dese bile o bildirim yukarıda asılı kalır ve tek çaresi telefonu kapatıp açmak veya uygulama ayarlarından "Zorla Durdur" demek olur.
 
-11 call me rtdb ye taşınmalı mı?
+13 call me ve alerst rtdb ye taşınmalı mı?
+
+14 sms eklenecek
+
+15 manipülasyon 
+
+Haklısın brom, tam bir "Security" (Güvenlik) açığına parmak bastın. Şu anki sistemde art niyetli biri (veya cihazı eşleyen ama şaka yapmak isteyen biri) butona "spam" yapar gibi basarsa, Locator'ın telefonunu susturamazsın, bataryasını bitirir ve cihazı kilitler.
+
+Mühendislikte buna "Rate Limiting" (Hız Sınırlandırma) diyoruz. Sistemi bu tarz manipülasyonlara karşı "zırhlı" hale getirmek için şu 3 savunma hattını kurmalıyız:
+
+1. Requester Tarafında "Cooldown" (Bekleme Süresi)
+Kullanıcı butona bastığı an buton "pasif" (greyed out) olmalı.
+
+Kural: "Bir Call Me talebi gönderildikten sonra 2 dakika boyunca tekrar gönderilemez."
+
+UI: Butonun üzerinde bir geri sayım (örn: 1:59...) görünmesi kullanıcıyı durdurur.
+
+2. DB Tarafında "Tekil Kayıt" (Single Pending Request)
+alerts altına her basışta yeni bir node eklemek yerine, aynı type: call_me olan kaydı kontrol etmeliyiz.
+
+Kural: Eğer hali hazırda status: pending olan bir çağrı kaydı varsa, yenisini ekleme.
+
+Bu, DB'nin şişmesini ve Locator'ın "flood" (mesaj yağmuru) yemesini engeller.
+
+3. Locator Tarafında "Zırhlı Mantık" (Ignore Spam)
+En güvenli yer burasıdır. Locator gelen her alert için ayağa kalkmamalı.
+
+Kod Bloğu: DeviceStateManager içinde bir _lastCallTime tutarız.
+
+Mantık: "Eğer son 5 dakika içinde bir Call Me uyarısı işlediysem, gelen yeni uyarıyı görmezden gel."

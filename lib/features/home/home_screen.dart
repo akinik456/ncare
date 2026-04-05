@@ -158,140 +158,56 @@ void initState() {
     }
   }
 
-Future<void> _sendCallMeAlert() async {
-  print("LynraCarecallme called");
+Future<void> _sendCallMeRequest({
+  String? requesterId,
+  String? requesterName,
+}) async {
+  // 1. Ortak Verileri Hazırla
+  final bool isAll = requesterId == null;
+  final String locatorId = await IdentityManager.getOrCreateDeviceId();
 
-  final settings = await LocatorSettingsReader.load();
-  if (settings == null) return;
+  final locatorDoc = await FirebaseFirestore.instance
+      .collection('locators')
+      .doc(locatorId)
+      .get();
+      
+  final String locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
+  final String groupId = (locatorDoc.data()?['groupId'] ?? '').toString().trim();
+  
+  if (groupId.isEmpty) return;
 
-  if (!settings.callEnabled) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Call request is disabled for this locator'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-    return;
+  // 2. Firestore'a Yaz (Mevcut Bildirim/FCM Yapısı İçin)
+  final alertData = {
+    'type': 'call_me',
+    'groupId': groupId,
+    'locatorId': locatorId,
+    'locatorName': locatorName,
+    'targetMode': isAll ? 'all' : 'single',
+    'ts': FieldValue.serverTimestamp(),
+  };
+
+  if (!isAll) {
+    alertData['requesterDeviceId'] = requesterId;
+    alertData['requesterName'] = requesterName!;
   }
 
-  print("LynraCaresettings.callEnabled:${settings.callEnabled}");
-
-  final locatorId = await IdentityManager.getOrCreateDeviceId();
-  print("LynraCarelocatorId:$locatorId");
-
-  final locatorDoc = await FirebaseFirestore.instance
-      .collection('locators')
-      .doc(locatorId)
-      .get();
-
-  final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
-  final groupId =
-      (locatorDoc.data()?['groupId'] ?? '').toString().trim();
-
-  if (groupId.isEmpty) return;
-
-  print("LynraCaregroupId:$groupId");
-
   await FirebaseFirestore.instance
       .collection('groups')
       .doc(groupId)
       .collection('locators')
       .doc(locatorId)
       .collection('alerts')
-      .add({
-    'type': 'call_me',
-    'groupId': groupId,
-    'locatorId': locatorId,
-    'locatorName': locatorName,
-    'targetMode': 'all',
-    'ts': FieldValue.serverTimestamp(),
-  });
+      .add(alertData);
 
-  if (!mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('Call request sent'),
-      duration: Duration(seconds: 2),
-    ),
-  );
-}
-
-Future<void> _sendCallMeSingle(
-  String requesterId,
-  String requesterName,
-) async {
-  final locatorId = await IdentityManager.getOrCreateDeviceId();
-
-  final locatorDoc = await FirebaseFirestore.instance
-      .collection('locators')
-      .doc(locatorId)
-      .get();
-  final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
-
-  final groupId =
-      (locatorDoc.data()?['groupId'] ?? '').toString().trim();
-  if (groupId.isEmpty) return;
-
-  await FirebaseFirestore.instance
-      .collection('groups')
-      .doc(groupId)
-      .collection('locators')
-      .doc(locatorId)
-      .collection('alerts')
-      .add({
-    'type': 'call_me',
-    'groupId': groupId,
-    'locatorId': locatorId,
-    'locatorName': locatorName,
-    'targetMode': 'single',
-    'requesterDeviceId': requesterId,
-    'requesterName': requesterName,
-    'ts': FieldValue.serverTimestamp(),
-  });
+  // --- RTDB KATMANI (GELECEK ADIMIN TEMELİ) ---
+  // Buraya birazdan RTDB yazma kodunu da ekleyeceğiz ki "Noter" kaydı tutulsun.
+  // --------------------------------------------
 
   if (!mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
-      content: Text('Call request sent to $requesterName'),
+      content: Text(isAll ? 'Call request sent to everybody' : 'Call request sent to $requesterName'),
       duration: const Duration(seconds: 2),
-    ),
-  );
-}
-
-Future<void> _sendCallMeAll() async {
-  final locatorId = await IdentityManager.getOrCreateDeviceId();
-
-  final locatorDoc = await FirebaseFirestore.instance
-      .collection('locators')
-      .doc(locatorId)
-      .get();
-  final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
-
-  final groupId =
-      (locatorDoc.data()?['groupId'] ?? '').toString().trim();
-  if (groupId.isEmpty) return;
-
-  await FirebaseFirestore.instance
-      .collection('groups')
-      .doc(groupId)
-      .collection('locators')
-      .doc(locatorId)
-      .collection('alerts')
-      .add({
-    'type': 'call_me',
-    'groupId': groupId,
-    'locatorId': locatorId,
-    'locatorName': locatorName,
-    'targetMode': 'all',
-    'ts': FieldValue.serverTimestamp(),
-  });
-
-  if (!mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('Call request sent to everybody'),
-      duration: Duration(seconds: 2),
     ),
   );
 }
@@ -1096,7 +1012,10 @@ final pairedNames = pairedRequesters == null
             padding: const EdgeInsets.only(bottom: 8),
             child: FilledButton.icon(
               onPressed: () =>
-                  _sendCallMeSingle(requesterId, name),
+                  _sendCallMeRequest(
+				  requesterId: requesterId, 
+				  requesterName: name
+				),
               icon: const Icon(Icons.call),
               label: Text('Ask $name to call me'),
             ),
@@ -1105,7 +1024,7 @@ final pairedNames = pairedRequesters == null
 
         if (activeRequesters.length > 1)
           FilledButton.icon(
-            onPressed: _sendCallMeAll,
+            onPressed: ()=> _sendCallMeRequest(), // Parametre yoksa otomatik "all" moduna geçer
             icon: const Icon(Icons.campaign),
             label: const Text('Ask everyone to call me'),
           ),
