@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:firebase_database/firebase_database.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'alert_engine.dart';
 import 'identity_manager.dart';
@@ -139,6 +140,53 @@ class DeviceStateManager {
                   !isBatteryOptimized;
 
     _updateReady(ready);
+	try {
+      final prefs = await SharedPreferences.getInstance();
+      final gpsSent = prefs.getBool('gpsOffAlertSent') ?? false;
+
+      final locatorId = await IdentityManager.getOrCreateDeviceId();
+	  final groupId = await IdentityManager.getLocalGroupId();
+		if (groupId == null || groupId.isEmpty) return;
+      final locatorDoc = await FirebaseFirestore.instance
+          .collection('locators')
+          .doc(locatorId)
+          .get();
+
+      final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
+
+      final requesterId =
+          (locatorDoc.data()?['pairedRequesterId'] ?? '').toString().trim();
+
+      if (requesterId.isEmpty) return;
+
+      final settingsDoc = await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(groupId)
+          .collection('locators')
+          .doc(locatorId)
+          .get();
+
+      final gpsOffAlarmEnabled =
+          (settingsDoc.data()?['gpsOffAlarmEnabled'] ?? false) == true;
+
+      if (!gpsEnabled && gpsOffAlarmEnabled && !gpsSent) {
+          await AlertEngine.send(
+          groupId: groupId,
+          locatorId: locatorId,
+          locatorName: locatorName,
+          alertType: 'gps_off',
+        );
+
+        await prefs.setBool('gpsOffAlertSent', true);
+      }
+
+      if (gpsEnabled && gpsSent) {
+	  await prefs.setBool('gpsOffAlertSent', false);
+	  }      
+      
+    } catch (e) {
+      print('GPS OFF ALERT ERROR => $e');
+    }
   }
   
   void _updateReady(bool value) {
