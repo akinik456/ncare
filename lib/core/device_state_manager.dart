@@ -17,25 +17,25 @@ class DeviceStateManager {
   static final DeviceStateManager instance = DeviceStateManager._();
   static const int _placeTransitionCooldownSeconds = 120;
   // --- DINAMIK PERIYOT DEĞİŞKENLERİ ---
-  int _currentIntervalSeconds = 3600; // Başlangıç: 1 Saat
+  int _currentIntervalSeconds = 30; // Başlangıç: 1 Saat
+  bool _isWorkerMode = false; // Isolate kimliğini tutacak bayrak
   bool _isActiveRequest = false; 
   Timer? _presenceTimer;
   Timer? _autoSleepTimer;
-  bool? _gfInside;
+  Timer? _ticker;
+  Timer? _geoTicker;
+  
   bool gpsEnabled = false;
   bool hasLocationPermission = false;
   bool hasBackgroundLocationPermission = false;
-  bool hasActivityPermission = false; // Yeni
-  bool isBatteryOptimized = false;     // Yeni
+  bool hasActivityPermission = false; 
+  bool isBatteryOptimized = false;     
   
+  String? pairCode;
+  bool? _gfInside;
+  bool _isReady = false;
   final _readyController = StreamController<bool>.broadcast();
   final Battery _battery = Battery();
-
-  bool _isReady = false;
-  Timer? _ticker;
-  Timer? _geoTicker;
-  String? pairCode;
-
   StreamSubscription<geo.ServiceStatus>? _gpsSub;
 
   bool get isReady => _isReady;
@@ -44,24 +44,30 @@ class DeviceStateManager {
     yield _isReady;
     yield* _readyController.stream;
   }
-
-  // --- VİTES ARTIRMA (REQUESTER EKRANI AÇINCA ÇAĞRILIR) ---
-  void boostTracking() {
-    print("LynraCare Canlı takip isteği alındı. Periyot: 20sn.");
-    _isActiveRequest = true;
-    _currentIntervalSeconds = 30; 
-    _restartPresenceTimer();
-
-    // 5 dakika sonra otomatik olarak ekonomi moduna (1 saat) dön
-    _autoSleepTimer?.cancel();
-    _autoSleepTimer = Timer(const Duration(minutes: 5), () {
-      print("LynraCareZaman aşımı. Ekonomi moduna dönülüyor (3600sn).");
-      _isActiveRequest = false;
-      _currentIntervalSeconds = 30; 
+  
+  void start({bool isWorker = false}) {
+    _isWorkerMode = isWorker;
+    _ticker?.cancel();
+    _geoTicker?.cancel(); 
+	_presenceTimer?.cancel();
+	
+	print("LynraCare: Manager Mode => ${isWorker ? 'WORKER (BG)' : 'OBSERVER (UI)'}");
+    
+	// 1. ORTAK GÖREV: Durum Kontrolleri (Her iki tarafta da çalışır)
+    _checkState();
+	 _gpsSub?.cancel();
+    _gpsSub = geo.Geolocator.getServiceStatusStream().listen((_) => _checkState());
+	
+	// UI tarafı 10 saniyede bir, BG tarafı 30 saniyede bir check etsin (Gereksiz yük olmasın)
+    _ticker = Timer.periodic(Duration(seconds: isWorker ? 30 : 10), (_) => _checkState());
+	
+	// 2. ÖZEL GÖREV: Sadece İşçi (BGEngine) ise Timer'ları kur
+    if (_isWorkerMode) {
       _restartPresenceTimer();
-    });
+      _startGeofenceTicker();
+    }
   }
-
+  
   void _restartPresenceTimer() {
     _presenceTimer?.cancel();
     _presenceTimer = Timer.periodic(
@@ -70,164 +76,82 @@ class DeviceStateManager {
     );
   }
 
-  void start() {
-    print("LynraCare Sistem Başlatıldı. Mod: Standby (1 Saat)");
-    _ticker?.cancel();
-    _geoTicker?.cancel();
-    
-    _restartPresenceTimer();
-
-    // Geofence kontrolü (60sn bir, sadece yerel kontrol)
-    _geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
-      try {
-        final pos = await LocationService.getCurrentLocationSafe(
-          accuracy: geo.LocationAccuracy.high,
-          timeLimit: const Duration(seconds: 15),
-        );
-        if (pos == null) return;
-
-        final locatorId = await IdentityManager.getOrCreateDeviceId();
-        await _handleSingleCenterGeofence(locatorId: locatorId, pos: pos);
-        await _handleSavedPlacesGeofence(locatorId: locatorId, pos: pos);
-      } catch (e) {
-        print('GF Error: $e');
-      }
-    });
-
-    _gpsSub?.cancel();
-    _checkState();
-    _gpsSub = geo.Geolocator.getServiceStatusStream().listen((_) => _checkState());
-    _ticker = Timer.periodic(const Duration(seconds: 5), (_) => _checkState());
-  }
-
-Future<void> updatePresence() async {
+  // --- RTDB GÜNCELLEME ---  
+  Future<void> updatePresence() async {
+  print("LynraCare updatePresence started");
   final locatorId = await IdentityManager.getOrCreateDeviceId();
   final groupId = await IdentityManager.getLocalGroupId(); // Grup ID'sini al
-  final level = await _battery.batteryLevel;
-  final gpsOn = await geo.Geolocator.isLocationServiceEnabled();
-
-  Map<String, dynamic> rtdbData = {
-    'battery': level,
-    'gpsEnabled': gpsOn,
-    'lastSeen': ServerValue.timestamp,
-    'status': 'online', 
-  };
-
-  // Konum varsa ekle
   
+  if (groupId == null) return;
+  
+  int level = 0;
+    try { level = await _battery.batteryLevel; } catch (_) {}
+    final gpsOn = await geo.Geolocator.isLocationServiceEnabled();
+
+    Map<String, dynamic> rtdbData = {
+      'battery': level,
+      'gpsEnabled': gpsOn,
+      'lastSeen': ServerValue.timestamp,
+      'status': 'online', 
+    };
+	
+  // KONUM: 1 saniye yerine 10 saniye nefes payı verdik (Bina içi için kritik)
     final pos = await LocationService.getCurrentLocationSafe(
       accuracy: geo.LocationAccuracy.high,
-      timeLimit: const Duration(seconds: 1),
+      timeLimit: const Duration(seconds: 10), 
     );
+
     if (pos != null) {
-	print("LynraCarepos is not null");
+      print("LynraCare: Konum yakalandı. Accuracy: ${pos.accuracy}");
       rtdbData.addAll({
         'lat': pos.latitude,
         'lng': pos.longitude,
         'acc': pos.accuracy,
       });
-    }
+    } else {
+      print("LynraCare: Konum alınamadı (10sn Timeout).");
+    }	
+	
+	await RTDBService().updateStatus(
+      groupId: groupId,
+      deviceId: locatorId,
+      data: rtdbData,
+    );
+    print("LynraCare: RTDB updateStatus [${DateTime.now()}]");
+  }
   
-
-  // FIRESTORE YERİNE RTDB'YE BASIYORUZ
-  await RTDBService().updateStatus(
-    groupId: groupId ?? "unknown_group",
-    deviceId: locatorId,
-    data: rtdbData,
-  );
-}
-
+  // --- DURUM KONTROLÜ (UI İÇİN) ---
   Future<void> _checkState() async {
-  print("LynraCare checkstate aktif");
-  // 1. GPS ve Konum Kontrolleri
-  gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
-  final permission = await geo.Geolocator.checkPermission();
+    gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
+    final permission = await geo.Geolocator.checkPermission();
+    
+    hasLocationPermission = permission != geo.LocationPermission.denied && 
+                            permission != geo.LocationPermission.deniedForever;
+    hasBackgroundLocationPermission = permission == geo.LocationPermission.always;
+    hasActivityPermission = await Permission.activityRecognition.isGranted;
+
+    final isBatteryIgnored = await Permission.ignoreBatteryOptimizations.isGranted;
+    isBatteryOptimized = !isBatteryIgnored; 
+
+    final ready = gpsEnabled && 
+                  hasBackgroundLocationPermission && 
+                  hasActivityPermission && 
+                  !isBatteryOptimized;
+
+    _updateReady(ready);
+  }
   
-  hasLocationPermission = permission != geo.LocationPermission.denied && 
-                          permission != geo.LocationPermission.deniedForever;
-                          
-  hasBackgroundLocationPermission = permission == geo.LocationPermission.always;
-
-  // 2. Fiziksel Aktivite Kontrolü
-  hasActivityPermission = await Permission.activityRecognition.isGranted;
-
-  // 3. Pil Optimizasyonu (Kısıtlanmamış mı?)
-  // isIgnored true ise her şey yolunda (kısıtlama yok) demektir.
-  final isBatteryIgnored = await Permission.ignoreBatteryOptimizations.isGranted;
-  isBatteryOptimized = !isBatteryIgnored; 
-
-  // 4. Genel Hazır Olma Durumu
-  // Hepsi OK ise cihaz 'Ready'
-  final ready = gpsEnabled && 
-                hasBackgroundLocationPermission && 
-                hasActivityPermission && 
-                !isBatteryOptimized;
-
-  _updateReady(ready);
-}
   void _updateReady(bool value) {
     if (_isReady == value) return;
     _isReady = value;
     _readyController.add(_isReady);
   }
 
-Future<void> _handleSingleCenterGeofence({
-    required String locatorId,
-    required geo.Position pos,
-  }) async {
-    final groupId = await IdentityManager.getLocalGroupId();
-    if (groupId == null || groupId.isEmpty) return;
-    final gfDoc = await FirebaseFirestore.instance
-        .collection('groups')
-        .doc(groupId)
-        .collection('locators')
-        .doc(locatorId)
-        .get();
-
-    final gf = gfDoc.data();
-
-    final enabled = gf?['geofenceAlarmEnabled'] == true;
-    final radius = (gf?['geofenceRadius'] as num?)?.toDouble();
-    final cLat = (gf?['geofenceCenterLat'] as num?)?.toDouble();
-    final cLng = (gf?['geofenceCenterLng'] as num?)?.toDouble();
-
-    if (!enabled || radius == null || cLat == null || cLng == null) return;
-
-    final dist = geo.Geolocator.distanceBetween(
-      pos.latitude,
-      pos.longitude,
-      cLat,
-      cLng,
-    );
-
-    final inside = dist <= radius;
-
-    if (_gfInside == null) {
-      _gfInside = inside;
-      return;
-    }
-
-    if (_gfInside == true && inside == false) {
-      final locatorDoc = await FirebaseFirestore.instance
-          .collection('locators')
-          .doc(locatorId)
-          .get();
-      final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
-
-      print('GF EXIT ALERT => $dist');
-    }
-
-    if (_gfInside == false && inside == true) {
-      await AlertEngine.clear(
-        groupId: groupId,
-        locatorId: locatorId,
-        alertType: 'geofence_exit',
-      );
-
-      print('GF RE-ENTER => alert cleared');
-    }
-
-    _gfInside = inside;
+  void _startGeofenceTicker() {
+    _geoTicker?.cancel();
+    _geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
+      // Geofence logic (Arka planda sessizce çalışır)
+    });
   }
 
   Future<void> _handleSavedPlacesGeofence({
@@ -319,5 +243,22 @@ Future<void> _handleSingleCenterGeofence({
 
       print('PLACE ${transitionType.toUpperCase()} => $placeName ($dist m)');
     }
+  }
+  
+    // --- VİTES ARTIRMA (REQUESTER EKRANI AÇINCA ÇAĞRILIR) ---
+  void boostTracking() {
+    print("LynraCare Canlı takip isteği alındı. Periyot: 20sn.");
+    _isActiveRequest = true;
+    _currentIntervalSeconds = 20; 
+    _restartPresenceTimer();
+
+    // 5 dakika sonra otomatik olarak ekonomi moduna (1 saat) dön
+    _autoSleepTimer?.cancel();
+    _autoSleepTimer = Timer(const Duration(minutes: 5), () {
+      print("LynraCareZaman aşımı. Ekonomi moduna dönülüyor (3600sn).");
+      _isActiveRequest = false;
+      _currentIntervalSeconds = 20; 
+      _restartPresenceTimer();
+    });
   }
 }

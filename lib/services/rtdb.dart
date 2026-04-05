@@ -83,7 +83,7 @@ Future<void> updateStatus({
     // update() kullanarak sadece paketteki alanları günceller, 
     // mevcut diğer verileri (status gibi) bozmaz.
     await locatorRef.update(data);
-	print("LynraCareRTDB Update Success");
+	//print("LynraCareRTDB Update Success");
   } catch (e) {
     print("LynraCareRTDB Update Error: $e");
   }

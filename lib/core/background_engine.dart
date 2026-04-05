@@ -122,7 +122,7 @@ void onStart(ServiceInstance service) async {
     
   print("LynraCareBGEngine: Motor sorunsuz çalışıyor. Takip başlatıldı.");  
   
- /* final Battery _battery = Battery();
+  final Battery _battery = Battery();
   int initialLevel = 0;  
     try {
       initialLevel = await Battery().batteryLevel;
@@ -135,8 +135,8 @@ void onStart(ServiceInstance service) async {
       initialBattery: initialLevel,
     );
     // Hareket algılama mantığını başlat
-    _startMovementLogic(service, groupId, deviceId);
-   DeviceStateManager.instance.start(); */  
+    //_startMovementLogic(service, groupId, deviceId);
+   DeviceStateManager.instance.start(isWorker: true);   
 }
 
 @pragma('vm:entry-point')
