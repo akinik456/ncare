@@ -56,15 +56,36 @@ class FcmManager {
       print("LynraCareFCM SKIP => Token alınamadı, abonelik pas geçildi.");
       return;
     }
+	
+	// Firebase'e uyanması için 2 saniye süre tanı
+    await Future.delayed(const Duration(seconds: 2));
 
     if (role == 'locator') {
-      print("LynraCareFCM => Locator subscribe: locator_$myId");
-      await FirebaseMessaging.instance.subscribeToTopic('locator_$myId');
-    } else if (role == 'requester') {
-      print("LynraCareFCM => Requester subscribe: $myId");
-      await FirebaseMessaging.instance.subscribeToTopic(myId);
-    } else {
-      print("LynraCareFCM SKIP => Rol henüz seçilmemiş ($role), abonelik yapılamaz.");
-    }
+	  final topic = 'locator_$myId';
+	  print("LynraCareFCM => Locator subscribe denemesi: $topic");
+	  
+	  // Try-Catch ile sarmalıyoruz ki servis o an meşgulse uygulama patlamasın
+	  try {
+		await FirebaseMessaging.instance.subscribeToTopic(topic);
+		print("LynraCareFCM => Locator Başarıyla Abone Oldu: $topic");
+	  } catch (e) {
+		print("LynraCareFCM ERROR => Abonelik başarısız (Firebase meşgul olabilir): $e");
+		// Firebase zaten "Will retry" diyerek arkada denemeye devam eder, 
+		// ama biz burada hatayı yakalayıp log kirliliğini yönetmiş olduk.
+	  }
+
+	} else if (role == 'requester') {
+	  print("LynraCareFCM => Requester subscribe denemesi: $myId");
+	  
+	  try {
+		await FirebaseMessaging.instance.subscribeToTopic(myId);
+		print("LynraCareFCM => Requester Başarıyla Abone Oldu: $myId");
+	  } catch (e) {
+		print("LynraCareFCM ERROR => Abonelik başarısız: $e");
+	  }
+
+	} else {
+	  print("LynraCareFCM SKIP => Rol henüz seçilmemiş ($role), abonelik yapılamaz.");
+	}
   }
 }
