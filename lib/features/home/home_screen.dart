@@ -56,27 +56,30 @@ class _HomeScreenState extends State<HomeScreen> {
 void initState() {
   super.initState();
   _initEverything();
-
-  FlutterBackgroundService().on('onTrackingStatusChanged').listen((event) {
-    if (!mounted || event == null) return; 
-    setState(() {
-      _displaySteps = event['currentSteps'] ?? 0;
-      final bool isActive = event['active'] ?? false;
-      DeviceStateManager.setTrackingState(moving: isActive);
-      _movementStatus = isActive 
-          ? "Takip Aktif ($_displaySteps Adım)" 
-          : "Hareketsiz (Bekliyor: $_displaySteps/15)";
-    });
-  });
   
-  // Manager'a diyoruz ki: "Vites değişince benim şu içindeki setState'i tetikle"
   DeviceStateManager.onIntervalChanged = (newVal) {
     if (mounted) {
       setState(() {
         _displayInterval = newVal;
       });
     }
-  };
+	if (groupId != null && locatorId != null) {
+	DeviceStateManager.initSettingsListener(groupId!, locatorId!);
+	}
+  };  
+
+  FlutterBackgroundService().on('onTrackingStatusChanged').listen((event) {
+    if (!mounted || event == null) return; 
+	final bool isActive = event['active'] ?? false;
+	final int steps = event['currentSteps'] ?? 0;
+	DeviceStateManager.setTrackingState(moving: isActive);
+    setState(() {
+      _displaySteps = steps; 
+      _movementStatus = isActive 
+          ? "Takip Aktif ($_displaySteps Adım)" 
+          : "Hareketsiz (Bekliyor: $_displaySteps/15)";
+    });
+  });
 }
 
 	Future<void> _initWatchersListener() async {

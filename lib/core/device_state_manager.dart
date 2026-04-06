@@ -17,8 +17,7 @@ class DeviceStateManager {
   DeviceStateManager._();
   static final DeviceStateManager instance = DeviceStateManager._();
   static const int _placeTransitionCooldownSeconds = 120;
-  // --- DINAMIK PERIYOT DEĞİŞKENLERİ ---
-static   int currentIntervalSeconds = 3600; // Başlangıç: 1 Saat
+  static   int currentIntervalSeconds = 3600; // Başlangıç: 1 Saat
   bool _isWorkerMode = false; // Isolate kimliğini tutacak bayrak
   bool _isActiveRequest = false; 
   Timer? _presenceTimer;
@@ -43,6 +42,9 @@ static Function(int)? onIntervalChanged;
   final _readyController = StreamController<bool>.broadcast();
   final Battery _battery = Battery();
   StreamSubscription<geo.ServiceStatus>? _gpsSub;
+  
+  static bool _gpsOffAlarmEnabled = false; 
+  static StreamSubscription? _settingsSub;
 
   bool get isReady => _isReady;
 
@@ -73,6 +75,21 @@ static Function(int)? onIntervalChanged;
       _startGeofenceTicker();
     }
   }
+  
+static void initSettingsListener(String groupId, String locatorId) {
+  _settingsSub?.cancel(); // Eski varsa temizle
+  
+  _settingsSub = FirebaseFirestore.instance
+      .collection('groups').doc(groupId)
+      .collection('locators').doc(locatorId)
+      .snapshots() 
+      .listen((doc) {
+    if (doc.exists) {
+      _gpsOffAlarmEnabled = doc.data()?['gpsOffAlarmEnabled'] ?? false;
+      print("ZINK: Firestore Ayarı Güncellendi -> $_gpsOffAlarmEnabled");
+    }
+  });
+} 
   
   void _restartPresenceTimer() {
     _presenceTimer?.cancel();
@@ -127,73 +144,53 @@ static Function(int)? onIntervalChanged;
     print("LynraCare: RTDB updateStatus [${DateTime.now()}]");
   }
   
-  // --- DURUM KONTROLÜ (UI İÇİN) ---
-  Future<void> _checkState() async {
-    gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
-    final permission = await geo.Geolocator.checkPermission();
-    
-    hasLocationPermission = permission != geo.LocationPermission.denied && 
-                            permission != geo.LocationPermission.deniedForever;
-    hasBackgroundLocationPermission = permission == geo.LocationPermission.always;
-    hasActivityPermission = await Permission.activityRecognition.isGranted;
+Future<void> _checkState() async {
+  // 1. Cihaz içi kontroller (Hızlı ve Bedava)
+  gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
+  final permission = await geo.Geolocator.checkPermission();
+  
+  hasLocationPermission = permission != geo.LocationPermission.denied && permission != geo.LocationPermission.deniedForever;
+  hasBackgroundLocationPermission = permission == geo.LocationPermission.always;
+  hasActivityPermission = await Permission.activityRecognition.isGranted;
+  final isBatteryIgnored = await Permission.ignoreBatteryOptimizations.isGranted;
+  isBatteryOptimized = !isBatteryIgnored; 
 
-    final isBatteryIgnored = await Permission.ignoreBatteryOptimizations.isGranted;
-    isBatteryOptimized = !isBatteryIgnored; 
+  final ready = gpsEnabled && hasBackgroundLocationPermission && hasActivityPermission && !isBatteryOptimized;
+  _updateReady(ready);
 
-    final ready = gpsEnabled && 
-                  hasBackgroundLocationPermission && 
-                  hasActivityPermission && 
-                  !isBatteryOptimized;
+  // 2. KRİTİK EŞİK: Eğer GPS zaten AÇIKSA, Firestore'a gidip alarm ayarı sormaya GEREK YOK!
+  if (gpsEnabled) {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('gpsOffAlertSent') ?? false) {
+      await prefs.setBool('gpsOffAlertSent', false);
+    }
+    return; // ZINK: Fonksiyon burada biter, Firestore okuması YAPILMAZ.
+  }
 
-    _updateReady(ready);
-	try {
-      final prefs = await SharedPreferences.getInstance();
-      final gpsSent = prefs.getBool('gpsOffAlertSent') ?? false;
+  // 3. EĞER GPS KAPALIYSA: Zaten Stream ile aldığımız '_gpsOffAlarmEnabled' değişkenine bakıyoruz.
+  // Yine Firestore'a gitmiyoruz!
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final gpsSent = prefs.getBool('gpsOffAlertSent') ?? false;
 
-      final locatorId = await IdentityManager.getOrCreateDeviceId();
-	  final groupId = await IdentityManager.getLocalGroupId();
-		if (groupId == null || groupId.isEmpty) return;
-      final locatorDoc = await FirebaseFirestore.instance
-          .collection('locators')
-          .doc(locatorId)
-          .get();
-
-      final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
-
-      final requesterId =
-          (locatorDoc.data()?['pairedRequesterId'] ?? '').toString().trim();
-
-      if (requesterId.isEmpty) return;
-
-      final settingsDoc = await FirebaseFirestore.instance
-          .collection('groups')
-          .doc(groupId)
-          .collection('locators')
-          .doc(locatorId)
-          .get();
-
-      final gpsOffAlarmEnabled =
-          (settingsDoc.data()?['gpsOffAlarmEnabled'] ?? false) == true;
-
-      if (!gpsEnabled && gpsOffAlarmEnabled && !gpsSent) {
-          await AlertEngine.send(
-          groupId: groupId,
+    // Sadece alarm aktifse ve daha önce gönderilmediyse AlertEngine tetikle
+    if (_gpsOffAlarmEnabled && !gpsSent) {
+        final locatorId = await IdentityManager.getOrCreateDeviceId();
+        final groupId = await IdentityManager.getLocalGroupId();
+        final locatorName = await IdentityManager.getMyName();
+        
+        await AlertEngine.send(
+          groupId: groupId!,
           locatorId: locatorId,
           locatorName: locatorName,
           alertType: 'gps_off',
         );
-
         await prefs.setBool('gpsOffAlertSent', true);
-      }
-
-      if (gpsEnabled && gpsSent) {
-	  await prefs.setBool('gpsOffAlertSent', false);
-	  }      
-      
-    } catch (e) {
-      print('GPS OFF ALERT ERROR => $e');
     }
+  } catch (e) {
+    print('GPS OFF ALERT ERROR => $e');
   }
+}
   
   void _updateReady(bool value) {
     if (_isReady == value) return;

@@ -5,32 +5,6 @@ class AlertEngine {
     return '${type}_$locatorId';
   }
 
-  static Future<bool> shouldSend({
-    required String groupId,
-    required String locatorId,
-    required String alertType,
-    int cooldownMinutes = 10,
-  }) async {
-    final docId = _docId(alertType, locatorId);
-
-    final alertDoc = await FirebaseFirestore.instance
-        .collection('groups')
-        .doc(groupId)
-        .collection('locators')
-        .doc(locatorId)
-        .collection('alerts')
-        .doc(docId)
-        .get();
-
-    if (!alertDoc.exists) return true;
-
-    final ts = alertDoc.data()?['ts'] as Timestamp?;
-    if (ts == null) return true;
-
-    final diff = DateTime.now().difference(ts.toDate());
-    return diff.inMinutes >= cooldownMinutes;
-  }
-
   static Future<void> send({
     required String groupId,
     required String locatorId,

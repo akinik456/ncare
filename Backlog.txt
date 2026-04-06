@@ -11,8 +11,6 @@ gösterilmeli ya da silinmeli
 
 4 start da subscribe için takılabiliyor , sık oluyor. 
 
-5 batteryAlarmEnabled , batteryAlertThreshold Firestore da isimleri kontrol et ya english ya da türkçe
-
 6 max. device count
 
 7 s2 android 9 gps on/off görmüyor
@@ -66,3 +64,28 @@ Kod Bloğu: DeviceStateManager içinde bir _lastCallTime tutarız.
 Mantık: "Eğer son 5 dakika içinde bir Call Me uyarısı işlediysem, gelen yeni uyarıyı görmezden gel."
 
 ******************
+
+1. Get (Okuma) Yerine Listen (Snapshot) Kullan
+Eğer 10 saniyede bir get() yapıyorsan, her seferinde veri aynı olsa bile para ödersin. Bunun yerine snapshots() kullanmalısın.
+
+Neden? Firestore Snapshot dinleyicisi, veri değişmediği sürece yeni bir okuma (read) maliyeti çıkarmaz. 
+Sadece ilk bağlantıda ve veri değiştiğinde fatura keser. 10 saniyelik Timer'ı çöpe atıyoruz.
+
+2. Local Cache (Yerel Önbellek) Stratejisi
+Uygulama her açıldığında veya her sayfaya girildiğinde veri çekmek yerine, Firestore'un kendi persistence özelliğini kullan:
+Offline Data: Kullanıcı veriyi bir kez okuduğunda, Firestore bunu telefona kaydeder. 
+Sen tekrar okumak istediğinde eğer internette bir değişiklik yoksa, Firestore bunu "ücretsiz" olarak yerel bellekten getirir.
+
+3. "Field-Level" Kontrol (Vitesle Bağlayalım)
+Bizim meşhur vites (30sn / 3600sn) mantığını buraya da entegre edelim.
+Pasif Durum: Eğer kullanıcı "Hareketsiz" ve "İzlenmiyor" ise, Firestore sorgularını tamamen durdur veya periyodu 1 saate çıkar.
+Sadece Değişen Alan: Tüm dökümanı okumak yerine, sadece değişen küçük bir status alanını dinle.
+
+4. Yazma (Write) Optimizasyonu: "Batch" ve "Throttle"
+Her adımda veya her saniye Firestore'a koordinat yazarsan iflas ederiz.
+Throttle: Koordinatları 30 saniyede bir (vitese göre) toplu gönder.
+Sadece Hareket Varsa Yaz: Cihaz yerinden oynamadıysa koordinat yazmayı durdur. Son konum zaten DB'de var, neden aynısını tekrar yazasın?
+
+*****************
+2. Strateji: Service İçinde GPS Nöbeti
+bgengine (veya onStart fonksiyonun) içine şu nöbetçiyi dikiyoruz:
