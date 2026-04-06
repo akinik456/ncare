@@ -28,5 +28,13 @@ static Future<String?> getLocalGroupId() async {
     await prefs.remove('groupId');
   }
 
+	static Future<void> saveMyName(String name) async {
+	  final prefs = await SharedPreferences.getInstance();
+	  await prefs.setString('user_name', name.trim());
+	}
 
+	static Future<String> getMyName() async {
+	  final prefs = await SharedPreferences.getInstance();
+	  return prefs.getString('user_name') ?? 'User'; // Bulamazsa 'User' döner
+	}
   }

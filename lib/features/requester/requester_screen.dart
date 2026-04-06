@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/identity_manager.dart';
 import '../../core/notification_service.dart';
 import '../../core/location_helper.dart';
+
 import 'add_locator_screen.dart';
 import 'pairing_options_screen.dart';
 import 'package:intl/intl.dart';
@@ -40,6 +41,9 @@ class _RequesterScreenState extends State<RequesterScreen> with SingleTickerProv
   String? _lastAlertId;
   String? _activeCallAlertId;
   String? _callRequestLocatorId;
+  String? targetMode;
+  String? targetReqId;
+  
   bool requestAlertsEnabled=true;
   bool deviceWarningsEnabled=true;
   Timer? _presenceUiTimer;
@@ -50,7 +54,10 @@ class _RequesterScreenState extends State<RequesterScreen> with SingleTickerProv
   Timer? _reqLocationTimer;
   String? _requesterDeviceId;
   StreamSubscription? _callAlertSub;
-String? _currentRequesterName;
+  StreamSubscription? _callMeRtdbSub;
+  String? requesterName;
+  String? _currentRequesterName;
+  String? _cachedMyName;
 
   @override
   void initState() {
@@ -77,6 +84,8 @@ _pulse = Tween<double>(begin: 0.8, end: 2).animate(_pulseController);
 
   //_getMyLocation();
   _initBatteryDefaults();
+  
+  
 	
   }
   
@@ -125,20 +134,19 @@ print('myLat $_myLat , myLng $_myLng');
   setState(() {
   _groupId=gid;  
   });
-  _listenCallAlerts();
+  
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    _initCallMeLiveSync(); 
+  });
 }
 
 Future<void> _loadMyName() async {
-  final doc = await FirebaseFirestore.instance
-      .collection('requesters')
-      .doc(requesterId) // Senin Auth ID'n
-      .get();
-  
-  if (mounted) {
-    setState(() {
-      _currentRequesterName = doc.data()?['name'] ?? 'Guest';
-    });
-  }
+  final name = await IdentityManager.getMyName();
+  setState(() {
+    _cachedMyName = name;
+	_currentRequesterName=_cachedMyName;
+	requesterName=_cachedMyName;
+  });
 }
 
 String shortCode(String id) {
@@ -249,8 +257,9 @@ String formatDistance(double? distance, double acc) {
   _presenceUiTimer?.cancel();
   _pulseController.dispose();
   _reqLocationTimer?.cancel();
-   super.dispose();
-   _callAlertSub?.cancel();
+  super.dispose();
+  _callAlertSub?.cancel();
+  _callMeRtdbSub?.cancel(); 
   }   
 
 Future<void> _sendRequest() async {
@@ -393,77 +402,101 @@ String lastSeenText(Timestamp ts) {
   return "Last seen $y-$m-$d $h:$min";
 }    
 
-void _listenCallAlerts() {
+// requester_screen.dart içinde RTDB Dinleyicisi
+void _initCallMeLiveSync() {
   if (_groupId == null || _groupId!.isEmpty) return;
 
-  print("LynraCarecallme Listener Started");
+  print("LynraCare🚀 RTDB CallMe Multi-Listener Started");
 
-  _callAlertSub?.cancel();
+  // Eski aboneliği temizle
+  _callMeRtdbSub?.cancel();
 
-  _callAlertSub = FirebaseFirestore.instance
-      .collectionGroup('alerts')
-      .where('type', isEqualTo: 'call_me')
-      .where('groupId', isEqualTo: _groupId)
-      .orderBy('ts', descending: true)
-      .snapshots()
-      .listen((snapshot) async {
-    if (snapshot.docs.isEmpty) return;
+  // RTDBService üzerinden tüm grubun mevcudiyet akışını alıyoruz
+  _callMeRtdbSub = RTDBService().getGroupPresenceStream(_groupId!).listen((event) async {
+	final data = event.snapshot.value as Map?;
+    if (data == null) return;
+    // Aktif bir çağrı bulmak için locator listesini dönüyoruz
+    String? foundAlertId;
+    String? foundLocatorId;
+    String? foundDisplayName;
+    String? foundTs;
+	
 
-    final visibleDocs = snapshot.docs.where((doc) {
-      final data = doc.data();
+    data.forEach((locId, locData) {
+      if (locData is! Map) return;
+      final commands = locData['commands'] as Map?;
+      final callMe = commands?['call_me'] as Map?;
+      final String? handledBy = callMe?['handledBy']?.toString();
+	  
+      // 1. Şart: 'pending' true mu?
+      if (callMe != null && callMe['pending'] == true) {
+        targetMode = (callMe['targetMode'] ?? 'all').toString();
+        targetReqId = (callMe['requesterId'] ?? '').toString();
 
-      final targetMode = (data['targetMode'] ?? 'all').toString();
-      final targetRequesterDeviceId =
-          (data['requesterDeviceId'] ?? '').toString().trim();
+        // 2. Şart: Hedef biz miyiz? (All veya bizim ID)
+        bool isTarget = ((targetMode == 'all' && handledBy==null)|| 
+                        (targetMode == 'single' && targetReqId == _requesterDeviceId));
 
-      if (targetMode == 'all') {
-        return true;
-      }
+        if (isTarget) {
+          foundAlertId = "rtdb_${locId}_${callMe['ts']}"; // Unique ID oluşturuyoruz
+          foundLocatorId = locId.toString();
+		  // Tarih formatlama fonksiyonu
+    String formatAlertTsFromDate(DateTime date) {
+      final now = DateTime.now();
+      final sameDay = date.year == now.year && date.month == now.month && date.day == now.day;
+      final hh = date.hour.toString().padLeft(2, '0');
+      final mm = date.minute.toString().padLeft(2, '0');
 
-      if (targetMode == 'single') {
-        return _requesterDeviceId != null &&
-            targetRequesterDeviceId == _requesterDeviceId;
-      }
+      if (sameDay) return '$hh:$mm';
 
-      return false;
-    }).toList();
-
-    if (visibleDocs.isEmpty) return;
-
-    final doc = visibleDocs.first;
-
-    if (_lastAlertId == doc.id) return;
-
-    final data = doc.data();
-    final locatorId = (data['locatorId'] ?? '').toString();
-	final ts = data['ts'] as Timestamp?;
-	final formattedTs = formatAlertTs(ts);
-    String displayName = 'Locator';
-
-    if (locatorId.isNotEmpty) {
-      final locatorDoc = await FirebaseFirestore.instance
-          .collection('locators')
-          .doc(locatorId)
-          .get();
-
-      displayName =
-          (locatorDoc.data()?['name'] ?? 'Locator').toString().trim();
+      final dd = date.day.toString().padLeft(2, '0');
+      final mo = date.month.toString().padLeft(2, '0');
+      return '$dd.$mo $hh:$mm';
     }
+          
+          // Timestamp formatlama (RTDB'den gelen int ms)
+          final int? tsMs = callMe['ts'] as int?;
+          if (tsMs != null) {
+            final dt = DateTime.fromMillisecondsSinceEpoch(tsMs);
+            foundTs = formatAlertTsFromDate(dt); // Senin tarih formatlama fonksiyonun
+          }
+		  
+          // 1. Doğrudan commands/call_me içindeki locatorName'e bakıyoruz
+		foundDisplayName = callMe['locatorName']?.toString();
+		print("LynraCare 🎯 Hedef İsim: $foundDisplayName");
+        }
+		
+	  print("LynraCare Found Callme_Alert ");
+      }
+    });
 
     if (!mounted) return;
 
-    setState(() {
-      _lastAlertId = doc.id;
-      _activeCallAlertId = doc.id;
-      _callRequestFrom = displayName;
-      _callRequestLocatorId = locatorId;
-	   _callRequestTs = formattedTs;
-    });
+    if (foundAlertId != null) {
+      print("Yeni bir alert bulduk veya mevcut alert güncellendi");
+      if (_lastAlertId == foundAlertId) return;
+      setState(() {
+        _lastAlertId = foundAlertId;
+        _activeCallAlertId = foundAlertId; // DISMISS için kullanacağız
+        _callRequestFrom = foundDisplayName;
+        _callRequestLocatorId = foundLocatorId;
+        _callRequestTs = foundTs;
+		print("_callRequestFrom:$_callRequestFrom");
+      });
+    } else {
+      // Ortada aktif 'pending: true' kalmadıysa kutuyu kapat
+      if (_activeCallAlertId != null && _activeCallAlertId!.startsWith("rtdb_")) {
+        setState(() {
+          _callRequestFrom = null;
+          _activeCallAlertId = null;
+          _callRequestTs = null;
+        });
+      }
+    }
   }, onError: (e) {
-    print("LynraCareCALL_ME LISTENER ERROR => $e");
+    print("LynraCare🚀 RTDB CALL_ME ERROR => $e");
   });
 }
-
 
 
 
@@ -560,19 +593,9 @@ Future<void> _joinGroup() async {
   if (result == null || result.isEmpty) return;
 
   final requesterId = await IdentityManager.getOrCreateDeviceId();
-  
-  final requesterDoc = await FirebaseFirestore.instance
-		.collection('requesters')
-		.doc(requesterId)
-		.get();
-
-	final requesterName =
-		(requesterDoc.data()?['name'] ?? '').toString();
-		
+  final requesterName = _currentRequesterName;
   final now = FieldValue.serverTimestamp();
-
   await IdentityManager.setLocalGroupId(result);
-
   await FirebaseFirestore.instance
       .collection('groups')
       .doc(result)
@@ -591,7 +614,6 @@ Future<void> _joinGroup() async {
   setState(() {
     _groupId = result;
   });
-  _listenCallAlerts();
 }
 
 
@@ -713,9 +735,7 @@ Container(
   ),
 ),		  
   
-		  
-		  
-		  if (_callRequestFrom != null)
+if (_callRequestFrom != null)
   Container(
     margin: const EdgeInsets.only(bottom: 12),
     padding: const EdgeInsets.all(14),
@@ -759,14 +779,7 @@ onPressed: () async {
   final alertId = _activeCallAlertId;
   final locatorId = _callRequestLocatorId;
   final groupId = _groupId;
-
-  setState(() {
-    _callRequestFrom = null;
-    _callRequestLocatorId = null;
-    _activeCallAlertId = null;
-	_callRequestTs = null;
-  });
-
+print("_activeCallAlertId:$_activeCallAlertId,_callRequestLocatorId:$_callRequestLocatorId,_groupId:$_groupId");
    if (groupId == null || groupId.isEmpty) return;
   if (locatorId == null || locatorId.isEmpty) return;
   if (alertId == null || alertId.isEmpty) return;
@@ -783,13 +796,37 @@ onPressed: () async {
 } catch (e) {
   print('CALL_ME DISMISS DELETE ERROR => $e');
 }
-},
 
+final requesterDoc = await FirebaseFirestore.instance
+.collection('requesters')
+.doc(requesterId)
+.get();
+final requesterName = _currentRequesterName;
+
+// 1. RTDB'ye "Tamam, ben ilgileniyorum / kapattım" de
+  await RTDBService().updateCallRequest(
+    groupId: _groupId!,
+    locatorId: _callRequestLocatorId!,
+    isPending: false, 
+    handlerName: requesterName, 
+    targetMode: targetMode, // Single mı All mı?
+  );
+// Kendi ekranından kutuyu hemen kaldır
+  setState(() {
+    _callRequestFrom = null;
+    _callRequestLocatorId = null;
+    _activeCallAlertId = null;
+_callRequestTs = null;
+  });
+},
           child: const Text('DISMISS'),
         ),
       ],
     ),
-  ),
+  ),		  
+
+  
+  
 if (_groupId == null || _groupId!.isEmpty) ...[
   const SizedBox(height: 8),
   SizedBox(

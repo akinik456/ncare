@@ -57,7 +57,10 @@ class _NameScreenState extends State<NameScreen> {
     setState(() => saving = true);
 
     final deviceId = await IdentityManager.getOrCreateDeviceId();
-    final now = FieldValue.serverTimestamp();
+    
+	await IdentityManager.saveMyName(name);
+	
+	final now = FieldValue.serverTimestamp();
 
     if (role == "requester" && _isCreatingGroup) {
       await FcmManager.prepareApp();

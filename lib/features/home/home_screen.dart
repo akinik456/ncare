@@ -15,6 +15,8 @@ import '../../core/device_state_manager.dart';
 import '../../core/identity_manager.dart';
 import '../../core/locator_settings_reader.dart';
 import '../../core/utils.dart';
+import '../../services/rtdb.dart';
+
 import '../setup/setup_screen.dart';
 import '../../core/background_engine.dart';
 
@@ -42,8 +44,9 @@ class _HomeScreenState extends State<HomeScreen> {
   String? deviceId;
   String _movementStatus = "Hareketsiz"; // Bunu ekle
   int _displaySteps = 0;
-
-
+  String? _cachedMyName;
+  
+  
 @override
 void initState() {
   super.initState();
@@ -102,7 +105,6 @@ void initState() {
 
   Future<void> _loadRequesterName() async {
     final locatorId = await IdentityManager.getOrCreateDeviceId();
-
     final doc = await FirebaseFirestore.instance
         .collection('locators')
         .doc(locatorId)
@@ -119,15 +121,11 @@ void initState() {
   }
 
   Future<void> _loadLocatorName() async {
-    final locatorId = await IdentityManager.getOrCreateDeviceId();
-    final doc = await FirebaseFirestore.instance
-        .collection('locators')
-        .doc(locatorId)
-        .get();
-    if (!mounted) return;
-    setState(() {
-      locatorName = doc.data()?['name'] ?? 'Locator';
-    });
+    final name = await IdentityManager.getMyName();
+  setState(() {
+	_cachedMyName = name;
+	locatorName = name;
+  });
   }
 
   Future<void> _checkPairing() async {
@@ -171,8 +169,10 @@ Future<void> _sendCallMeRequest({
       .doc(locatorId)
       .get();
       
-  final String locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
+  final String locatorName = _cachedMyName ?? 'Locator';// (locatorDoc.data()?['name'] ?? 'Locator').toString();
   final String groupId = (locatorDoc.data()?['groupId'] ?? '').toString().trim();
+   print("LynraCare locatorName:$locatorName");
+  
   
   if (groupId.isEmpty) return;
 
@@ -202,7 +202,21 @@ Future<void> _sendCallMeRequest({
   // --- RTDB KATMANI (GELECEK ADIMIN TEMELİ) ---
   // Buraya birazdan RTDB yazma kodunu da ekleyeceğiz ki "Noter" kaydı tutulsun.
   // --------------------------------------------
-
+	try{
+	await RTDBService().updateCallRequest(
+	  groupId: groupId,
+	  locatorId: locatorId,
+	  locatorName: locatorName, 
+	  isPending: true,
+	  targetMode: isAll ? 'all' : 'single',
+	  requesterId: requesterId,
+	  requesterName: requesterName,
+	);
+	print("LynraCare: RTDB Call Request mühürlendi!");
+    } catch (e) {
+	print("LynraCare: RTDB Yazma Hatası: $e");
+    }
+	  
   if (!mounted) return;
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(

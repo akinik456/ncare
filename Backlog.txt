@@ -35,7 +35,7 @@ Google Play politikaları ve iyi bir kullanıcı deneyimi için, kullanıcının
 14 sms eklenecek
 
 15 manipülasyon 
-
+***********************
 Haklısın brom, tam bir "Security" (Güvenlik) açığına parmak bastın. Şu anki sistemde art niyetli biri (veya cihazı eşleyen ama şaka yapmak isteyen biri) butona "spam" yapar gibi basarsa, Locator'ın telefonunu susturamazsın, bataryasını bitirir ve cihazı kilitler.
 
 Mühendislikte buna "Rate Limiting" (Hız Sınırlandırma) diyoruz. Sistemi bu tarz manipülasyonlara karşı "zırhlı" hale getirmek için şu 3 savunma hattını kurmalıyız:
@@ -60,3 +60,8 @@ En güvenli yer burasıdır. Locator gelen her alert için ayağa kalkmamalı.
 Kod Bloğu: DeviceStateManager içinde bir _lastCallTime tutarız.
 
 Mantık: "Eğer son 5 dakika içinde bir Call Me uyarısı işlediysem, gelen yeni uyarıyı görmezden gel."
+
+******************
+16 master a bir işaret
+
+17 req loc list
