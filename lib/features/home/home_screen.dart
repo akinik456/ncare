@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:restart_app/restart_app.dart';
-
+import 'package:firebase_database/firebase_database.dart';
 import '../../core/alert_engine.dart';
 import '../../core/device_state_manager.dart';
 import '../../core/identity_manager.dart';
@@ -46,6 +46,12 @@ class _HomeScreenState extends State<HomeScreen> {
   int _displaySteps = 0;
   String? _cachedMyName;
   
+  DatabaseReference? _watchersRef;
+  StreamSubscription<DatabaseEvent>? _watchersSubscription;
+  bool _isBeingWatched = false;
+  String _watcherName = "";
+  
+  
   
 @override
 void initState() {
@@ -65,8 +71,50 @@ void initState() {
           : "Hareketsiz (Bekliyor: $_displaySteps/15)";
     });
   });
+  
+  
+  
 }
-	
+
+	Future<void> _initWatchersListener() async {
+  _watchersRef = FirebaseDatabase.instance
+    .ref("presence/groups/${groupId}/active_watchers/${locatorId}");
+
+_watchersSubscription = _watchersRef?.onValue.listen((event) {
+  // 1. Veriyi çek ve Map'e çevir
+  final data = event.snapshot.value;
+  
+  if (data != null && data is Map) {
+	setState(() {
+		  _isBeingWatched = true;
+		  
+		  // Tüm isimleri bir listeye toplayalım
+		  List<String> nameList = [];
+		  data.values.forEach((v) {
+			if (v is Map && v["name"] != null) {
+			  nameList.add(v["name"].toString());
+			}
+		  });
+
+		  // İsimleri virgülle birleştir (Örn: "r23, Ahmet, Ayşe")
+		  if (nameList.length <= 2) {
+			_watcherName = nameList.join(", ");
+		  } else {
+			// Eğer 2'den fazlaysa: "r23, Ahmet +1 kişi" gibi şık göster
+			_watcherName = "${nameList[0]}, ${nameList[1]} +${nameList.length - 2} kişi";
+		  }
+		});
+  } else {
+    // 3. Veri yoksa veya boşsa durumu sıfırla
+    setState(() {
+      _isBeingWatched = false;
+      _watcherName = "";
+    });
+  }
+});
+
+
+}	
 	Future<void> _initEverything() async {
     await _initLocatorId();
     await _loadLocatorName();
@@ -74,6 +122,13 @@ void initState() {
     groupId = await IdentityManager.getLocalGroupId(); 
     deviceId = await IdentityManager.getOrCreateDeviceId();
     
+	
+	if (groupId != null && deviceId != null) {
+    setState(() {
+      
+    });
+	_initWatchersListener();
+}
 
     _startBatteryMonitor();
     
@@ -85,6 +140,7 @@ void initState() {
   @override
   void dispose() {
     _batteryTimer?.cancel();
+	_watchersSubscription?.cancel();
     super.dispose();
   }
 
@@ -583,6 +639,8 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
         body: Center(child: CircularProgressIndicator()),
       );
     }
+	
+
 
     final theme = Theme.of(context);
     final currentPairCode = pairCode ?? AppUtils.generatePairCode(locatorId!);
@@ -608,6 +666,7 @@ return Scaffold(
       ),
     ),
   ),
+
   body: SafeArea(
     child: Column(
       children: [
@@ -623,7 +682,28 @@ return Scaffold(
             ),
           ),
         ),
-
+if (_isBeingWatched)
+  Padding(
+    padding: const EdgeInsets.only(top: 8.0),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.visibility, color: Colors.greenAccent, size: 18),
+        const SizedBox(width: 6),
+        Flexible( // <--- İsim çok uzunsa ekranın dışına taşmasın diye
+          child: Text(
+            _watcherName,
+            style: const TextStyle(
+              color: Colors.greenAccent, 
+              fontWeight: FontWeight.bold,
+              fontSize: 12,
+            ),
+            overflow: TextOverflow.ellipsis, // Taşarsa "..." yapar
+          ),
+        ),
+      ],
+    ),
+  ),
         const SizedBox(height: 6),
 // --- GÜNCELLENMİŞ TAKİP VE ADIM DURUMU ---
 Container(
@@ -673,6 +753,8 @@ Container(
     ],
   ),
 ),
+
+
       Expanded(
   child: Center(
     child: SingleChildScrollView(

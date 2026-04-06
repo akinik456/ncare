@@ -65,3 +65,7 @@ Mantık: "Eğer son 5 dakika içinde bir Call Me uyarısı işlediysem, gelen ye
 16 master a bir işaret
 
 17 req loc list
+
+18 add locator ekranından geri dönüş yok
+
+19 firestore,RTDB erişim sayısı

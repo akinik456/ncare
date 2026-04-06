@@ -961,11 +961,19 @@ if (_groupId == null || _groupId!.isEmpty) ...[
 
       return entry['active'] == true;
     }).toList();
-	if (docs.length == 1 && _selectedLocatorId != docs.first.id) {
+  if (docs.length == 1 && _selectedLocatorId != docs.first.id) {
   WidgetsBinding.instance.addPostFrameCallback((_) {
     if (!mounted) return;
     setState(() {
       _selectedLocatorId = docs.first.id;
+	  // Seçildiğinde RTDB'ye "İzliyorum" mührünü bas (İstediğin yeni mantık)
+        RTDBService().setWatchingStatus(
+          groupId: _groupId!,
+          locatorId: _selectedLocatorId!,
+          requesterId: requesterId!,
+          requesterName: _currentRequesterName ?? "Requester",
+          isWatching: true,
+        );
     });
   });
 }
@@ -988,12 +996,22 @@ return Wrap(
   runSpacing: 8,
   children: docs.map((doc) {
     final deviceData = doc.data();
-    final locatorId = doc.id;
+    final locatorId  = doc.id;
     final name = (deviceData['name'] ?? deviceData['deviceId'] ?? locatorId).toString();
     final selected = locatorId == _selectedLocatorId;
-
     return GestureDetector(
       onTap: () {
+		if(_selectedLocatorId!=null)
+		{
+// Seçildiğinde RTDB'ye "İzliyorum" mührünü bas (İstediğin yeni mantık)
+        RTDBService().setWatchingStatus(
+          groupId: _groupId!,
+          locatorId: _selectedLocatorId!,
+          requesterId: requesterId!,
+          requesterName: _currentRequesterName ?? "Requester",
+          isWatching: false,
+        );
+		}
         setState(() {
           _selectedLocatorId = locatorId;
         });
