@@ -159,13 +159,14 @@ void _startMovementLogic(ServiceInstance service, String groupId, String deviceI
     // UI'a her adımda veriyi gönder (Rakamlar canlı artsın)
     service.invoke('onTrackingStatusChanged', {
       "active": _isTrackingActive,
-      "currentSteps": currentSessionSteps
+      "currentSteps": currentSessionSteps,
+	  "currentIntervalSeconds": DeviceStateManager.currentIntervalSeconds,
     });
 
     if (currentSessionSteps >= 15 && !_isTrackingActive) {
       _isTrackingActive = true;
       // DOĞRU ÇAĞRI: Parametre ismiyle (active:) çağırıyoruz
-      DeviceStateManager.instance.boostTracking(active: true, customPeriod: 30);
+      DeviceStateManager.setTrackingState(moving: true);
       print("LynraCare: 15 Adım aşıldı! Sistem 'Takip' modunda.");
     }
 
@@ -175,11 +176,12 @@ void _startMovementLogic(ServiceInstance service, String groupId, String deviceI
       _isTrackingActive = false;
       _initialSteps = null;
       
-      DeviceStateManager.instance.boostTracking(active: false);
+      DeviceStateManager.setTrackingState(moving: false);
       
       service.invoke('onTrackingStatusChanged', {
         "active": false,
-        "currentSteps": 0
+        "currentSteps": 0,
+		"currentIntervalSeconds": DeviceStateManager.currentIntervalSeconds,
       });
     });
   }, onError: (e) => print("LynraCare: Pedometer Error: $e"));

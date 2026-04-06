@@ -1,7 +1,6 @@
 1 Marka & isim
 NCare geçici.
 Alternatifler konuşulacak.
-
  App icon
 Play Store için gerekli.
 
@@ -10,32 +9,37 @@ Play Store için gerekli.
 3 her locator ün kendi son adresi olmalı , loc değişince ya kendi son adresi
 gösterilmeli ya da silinmeli
 
-6 start da subscribe için takılabiliyor , sık oluyor. 
+4 start da subscribe için takılabiliyor , sık oluyor. 
 
-7 batteryAlarmEnabled , batteryAlertThreshold Firestore da isimleri kontrol et ya english ya da türkçe
+5 batteryAlarmEnabled , batteryAlertThreshold Firestore da isimleri kontrol et ya english ya da türkçe
 
-8 max. device count
+6 max. device count
 
-9 s2 android 9 gps on/off görmüyor
+7 s2 android 9 gps on/off görmüyor
 
-10 req loc silme
+8 req loc silme
 
-11 status da lastseen çok eski ise batery ve konum anlamsız
+9 status da lastseen çok eski ise batery ve konum anlamsız
 
-http://127.0.0.1:64696/zvDmK48QK94=/devtools/?uri=ws://127.0.0.1:64696/zvDmK48QK94=/ws
-E/FirebaseMessaging(26069): Topic operation failed: SERVICE_NOT_AVAILABLE. Will retry Topic operation.
+10 RoleManager.setRole  çok fazla 
 
-RoleManager.setRole  çok fazla 
+11 sms eklenecek
 
-12. Kullanıcı Kontrolü (Zorunlu Gereksinim)
+12 manipülasyon 
+
+13 master a bir işaret
+
+14 req loc list
+
+15 add locator ekranından geri dönüş yok
+
+16 firestore,RTDB erişim sayısı
+
+***********************
+
+Kullanıcı Kontrolü (Zorunlu Gereksinim)
 Google Play politikaları ve iyi bir kullanıcı deneyimi için, kullanıcının bu takibi istediği zaman (mesela ayarlardan bir butona basarak) durdurabilmesi gerekir. Eğer o dinleyiciyi koymazsan, kullanıcı uygulamadan "Çıkış Yap" dese bile o bildirim yukarıda asılı kalır ve tek çaresi telefonu kapatıp açmak veya uygulama ayarlarından "Zorla Durdur" demek olur.
 
-13 call me ve alerst rtdb ye taşınmalı mı?
-
-14 sms eklenecek
-
-15 manipülasyon 
-***********************
 Haklısın brom, tam bir "Security" (Güvenlik) açığına parmak bastın. Şu anki sistemde art niyetli biri (veya cihazı eşleyen ama şaka yapmak isteyen biri) butona "spam" yapar gibi basarsa, Locator'ın telefonunu susturamazsın, bataryasını bitirir ve cihazı kilitler.
 
 Mühendislikte buna "Rate Limiting" (Hız Sınırlandırma) diyoruz. Sistemi bu tarz manipülasyonlara karşı "zırhlı" hale getirmek için şu 3 savunma hattını kurmalıyız:
@@ -62,10 +66,3 @@ Kod Bloğu: DeviceStateManager içinde bir _lastCallTime tutarız.
 Mantık: "Eğer son 5 dakika içinde bir Call Me uyarısı işlediysem, gelen yeni uyarıyı görmezden gel."
 
 ******************
-16 master a bir işaret
-
-17 req loc list
-
-18 add locator ekranından geri dönüş yok
-
-19 firestore,RTDB erişim sayısı

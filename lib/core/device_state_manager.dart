@@ -18,7 +18,7 @@ class DeviceStateManager {
   static final DeviceStateManager instance = DeviceStateManager._();
   static const int _placeTransitionCooldownSeconds = 120;
   // --- DINAMIK PERIYOT DEĞİŞKENLERİ ---
-  int _currentIntervalSeconds = 3600; // Başlangıç: 1 Saat
+static   int currentIntervalSeconds = 3600; // Başlangıç: 1 Saat
   bool _isWorkerMode = false; // Isolate kimliğini tutacak bayrak
   bool _isActiveRequest = false; 
   Timer? _presenceTimer;
@@ -26,12 +26,17 @@ class DeviceStateManager {
   Timer? _ticker;
   Timer? _geoTicker;
   
+  static bool _isMoving = false;    // Hareket kilidi
+  static bool _isWatched = false;   // İzleyici kilidi
+  static Timer? _cooldownTimer;
+
+  
   bool gpsEnabled = false;
   bool hasLocationPermission = false;
   bool hasBackgroundLocationPermission = false;
   bool hasActivityPermission = false; 
   bool isBatteryOptimized = false;     
-  
+static Function(int)? onIntervalChanged;  
   String? pairCode;
   bool? _gfInside;
   bool _isReady = false;
@@ -72,10 +77,11 @@ class DeviceStateManager {
   void _restartPresenceTimer() {
     _presenceTimer?.cancel();
     _presenceTimer = Timer.periodic(
-      Duration(seconds: _currentIntervalSeconds),
+      Duration(seconds: currentIntervalSeconds),
       (_) => updatePresence(),
     );
   }
+  
 
   // --- RTDB GÜNCELLEME ---  
   Future<void> updatePresence() async {
@@ -293,23 +299,29 @@ class DeviceStateManager {
     }
   }
   
- void boostTracking({required bool active, int customPeriod = 30}) {
-  _autoSleepTimer?.cancel(); 
+  static void setTrackingState({bool? moving, bool? watched}) {
+    // Sadece gelen bilgiyi güncelle, gelmeyene dokunma
+    if (moving != null) _isMoving = moving;
+    if (watched != null) _isWatched = watched;
 
-  if (active) {
-    print("LynraCare: VİTES YÜKSELTİLDİ. Periyot: ${customPeriod}sn.");
-    _currentIntervalSeconds = customPeriod; 
-    _restartPresenceTimer();
-    updatePresence(); 
+    // ANA MANTIK: İkisinden biri bile true ise vites 30sn olmalı
+    bool shouldBeFast = _isMoving || _isWatched;
 
-    _autoSleepTimer = Timer(const Duration(minutes: 5), () {
-      print("LynraCare: Zaman aşımı. Ekonomi moduna geçiliyor.");
-      boostTracking(active: false); // Kendi kendini kapatır
-    });
-  } else {
-    print("LynraCare: EKONOMİ MODU. Periyot: 3600sn (1 Saat).");
-    _currentIntervalSeconds = 3600; 
-    _restartPresenceTimer();
+    if (shouldBeFast) {
+      _cooldownTimer?.cancel(); // Uyku sayacını durdur
+      currentIntervalSeconds = 30;
+	  onIntervalChanged?.call(currentIntervalSeconds);
+      print("Vites: 30s (Durum -> Hareket: $_isMoving, İzleyici: $_isWatched)");
+    } else {
+      // İkisi de false ise soğuma başlasın
+      if (_cooldownTimer?.isActive ?? false) return;
+
+      print("Aktiflik bitti, 5 dkk geri sayım...");
+      _cooldownTimer = Timer(const Duration(minutes: 2), () {
+        currentIntervalSeconds = 3600;
+		onIntervalChanged?.call(currentIntervalSeconds);
+        print("Vites: 3600s (Sessizlik sağlandı)");
+      });
+    }
   }
-}
 }

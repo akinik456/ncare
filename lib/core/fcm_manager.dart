@@ -58,7 +58,7 @@ class FcmManager {
     }
 	
 	// Firebase'e uyanması için 2 saniye süre tanı
-    await Future.delayed(const Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 5));
 
     if (role == 'locator') {
 	  final topic = 'locator_$myId';

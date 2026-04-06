@@ -50,8 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription<DatabaseEvent>? _watchersSubscription;
   bool _isBeingWatched = false;
   String _watcherName = "";
-  
-  
+  int _displayInterval = 3600;
   
 @override
 void initState() {
@@ -59,21 +58,25 @@ void initState() {
   _initEverything();
 
   FlutterBackgroundService().on('onTrackingStatusChanged').listen((event) {
-    // DOĞRU MANTIK: mounted değilse (sayfa kapalıysa) setState yapma
-    if (!mounted) return; 
-
+    if (!mounted || event == null) return; 
     setState(() {
-      _displaySteps = event?['currentSteps'] ?? 0;
-      final bool isActive = event?['active'] ?? false;
-      
+      _displaySteps = event['currentSteps'] ?? 0;
+      final bool isActive = event['active'] ?? false;
+      DeviceStateManager.setTrackingState(moving: isActive);
       _movementStatus = isActive 
           ? "Takip Aktif ($_displaySteps Adım)" 
           : "Hareketsiz (Bekliyor: $_displaySteps/15)";
     });
   });
   
-  
-  
+  // Manager'a diyoruz ki: "Vites değişince benim şu içindeki setState'i tetikle"
+  DeviceStateManager.onIntervalChanged = (newVal) {
+    if (mounted) {
+      setState(() {
+        _displayInterval = newVal;
+      });
+    }
+  };
 }
 
 	Future<void> _initWatchersListener() async {
@@ -104,16 +107,19 @@ _watchersSubscription = _watchersRef?.onValue.listen((event) {
 			_watcherName = "${nameList[0]}, ${nameList[1]} +${nameList.length - 2} kişi";
 		  }
 		});
+  DeviceStateManager.setTrackingState(watched: true);
   } else {
     // 3. Veri yoksa veya boşsa durumu sıfırla
     setState(() {
       _isBeingWatched = false;
       _watcherName = "";
     });
+  // ZIRHLI GÜNCELLEME: İzleyici artık yok (false)
+  // Bu, vitesi hemen 1 saate çekmez, sadece "izleyici bitti" der.
+  // Eğer o sırada hareket (moving) varsa vites 30sn'de kalmaya devam eder.
+  DeviceStateManager.setTrackingState(watched: false);
   }
 });
-
-
 }	
 	Future<void> _initEverything() async {
     await _initLocatorId();
@@ -129,14 +135,11 @@ _watchersSubscription = _watchersRef?.onValue.listen((event) {
     });
 	_initWatchersListener();
 }
-
     _startBatteryMonitor();
-    
     // UI'ı güncellemek gerekirse
     if (mounted) setState(() {});
   }    
-
-
+  
   @override
   void dispose() {
     _batteryTimer?.cancel();
@@ -704,7 +707,25 @@ if (_isBeingWatched)
       ],
     ),
   ),
-        const SizedBox(height: 6),
+ 
+Container(
+  padding: const EdgeInsets.all(4),
+  decoration: BoxDecoration(
+    color: Colors.black54,
+    borderRadius: BorderRadius.circular(4),
+  ),
+  child: Text(
+    "Vites: ${_displayInterval}s",
+    style: const TextStyle(
+      color: Colors.yellowAccent, 
+      fontSize: 10, 
+      fontWeight: FontWeight.bold
+    ),
+  ),
+),
+ 
+  
+const SizedBox(height: 6),
 // --- GÜNCELLENMİŞ TAKİP VE ADIM DURUMU ---
 Container(
   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -761,7 +782,6 @@ Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
-        // HATA BURADAYDI: builder'dan önce StreamBuilder eklemelisin
         child: StreamBuilder<bool>(
           stream: DeviceStateManager.instance.readyStream,
 		  initialData: DeviceStateManager.instance.isReady,
