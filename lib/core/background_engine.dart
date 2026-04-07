@@ -136,6 +136,7 @@ void onStart(ServiceInstance service) async {
     );
     // Hareket algılama mantığını başlat
    _startMovementLogic(service, groupId, deviceId);
+   DeviceStateManager.initSettingsListener(groupId, deviceId);
    DeviceStateManager.instance.start(isWorker: true);   
 }
 

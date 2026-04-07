@@ -65,7 +65,7 @@ static bool _isMovingByAccel = false;
 static const double _accelThreshold = 1.5;
 
 static DateTime? _lastMovementTime;
-static const Duration _movementExpiry = Duration(minutes: 1); // 3 dakika tolerans
+static const Duration _movementExpiry = Duration(minutes: 5); // 3 dakika tolerans
 
   bool get isReady => _isReady;
 
@@ -99,7 +99,8 @@ static const Duration _movementExpiry = Duration(minutes: 1); // 3 dakika tolera
   }
   
 static void initSettingsListener(String groupId, String locatorId) {
-  _settingsSub?.cancel(); // Eski varsa temizle
+  // ZIRH: Eğer zaten dinliyorsak, ikinciye gerek yok!
+  if (_settingsSub != null) return;
   _placesSub?.cancel(); // Places için yeni abonelik
   
   _settingsSub = FirebaseFirestore.instance
@@ -274,7 +275,8 @@ void initAccelerometer() {
   _geoTicker?.cancel();
   _geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
     // 1. ANA ŞALTER: Global Geofence kapalıysa zaten uyu.
-    if (!_gfEnabled) return; 
+    print("ZINK _startGeofenceTicker _gfEnabled:$_gfEnabled");
+	if (!_gfEnabled) return; 
 
     // 2. İVME ZIRHI: Hareket yoksa (veya 3 dk'lık tolerans dolduysa) GPS'e dokunma!
     // Bu satır pil ömrünü 3-4 katına çıkaracak olan kritik vuruş.
@@ -304,7 +306,7 @@ void initAccelerometer() {
 
 // 1. ASIL İŞİ YAPAN MOTOR (FONKSİYON)
 Future<void> _performGeofenceCheck() async {
-print("ZINK _gfEnabled:$_gfEnabled");
+print("ZINK _performGeofenceCheck _gfEnabled:$_gfEnabled");
   if (!_gfEnabled) return;
   
   try {
@@ -316,7 +318,7 @@ print("ZINK _gfEnabled:$_gfEnabled");
 
     final locatorId = await IdentityManager.getOrCreateDeviceId();
     await _handleSavedPlacesGeofence(locatorId: locatorId, pos: pos);
-	print(" ZINK _handleSavedPlacesGeofence");
+	print(" ZINK _handleSavedPlacesGeofence call");
   } catch (e) {
     print('ZINK GF Error: $e');
   }
@@ -343,6 +345,7 @@ Future<void> _handleSavedPlacesGeofence({
   required geo.Position pos,
 }) async {
   // 1. Erken Çıkış & Temel Veriler
+	print(" ZINK _handleSavedPlacesGeofence fonk");
   if (_cachedPlaces.isEmpty) return;
   
   final groupId = await IdentityManager.getLocalGroupId();
