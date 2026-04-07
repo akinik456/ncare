@@ -24,17 +24,12 @@ class _NameScreenState extends State<NameScreen> {
   bool saving = false;
   String? role;
   bool _isCreatingGroup = false;
-  final focusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _loadRole();
     _loadCreateGroupFlag();
-	// Sayfa render edildikten hemen sonra focus ister
-  Future.delayed(Duration.zero, () {
-    if (mounted) focusNode.requestFocus();
-  });
   }
 
   Future<void> _loadCreateGroupFlag() async {
@@ -155,7 +150,7 @@ class _NameScreenState extends State<NameScreen> {
     }
   }
 
-@override
+  @override
   Widget build(BuildContext context) {
     final isRequester = role == "requester";
 
@@ -169,19 +164,13 @@ class _NameScreenState extends State<NameScreen> {
     final hintText = isRequester ? 'Enter requester name' : 'Enter locator name';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF020617), // En alt katman rengi [cite: 2]
+      backgroundColor: const Color(0xFF020617),
       body: Container(
-        width: double.infinity,
-        height: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF0F172A), 
-              Color(0xFF020617),
-            ],
-            stops: [0.0, 0.85],
+            colors: [Color(0xFF020617), Color(0xFF0F172A)],
           ),
         ),
         child: SafeArea(
@@ -193,7 +182,7 @@ class _NameScreenState extends State<NameScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Header Section [cite: 2]
+                      // Header Section (LocatorPermissionScreen Header Stili)
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -229,7 +218,7 @@ class _NameScreenState extends State<NameScreen> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Input Section [cite: 2]
+                      // Input Section (Permission Item kart stiliyle harmanlandı)
                       Text(
                         "IDENTIFICATION",
                         style: TextStyle(
@@ -263,8 +252,6 @@ class _NameScreenState extends State<NameScreen> {
                             const SizedBox(height: 16),
                             TextField(
                               controller: controller,
-							  focusNode: focusNode, // Node'u bağladık
-							  autofocus: true,      // İlk açılışta otomatik focus atar
                               textInputAction: TextInputAction.done,
                               onSubmitted: (_) => saving ? null : _save(),
                               style: const TextStyle(
@@ -285,7 +272,9 @@ class _NameScreenState extends State<NameScreen> {
                                   vertical: 16,
                                 ),
                                 prefixIcon: Icon(
-                                  isRequester ? Icons.badge_rounded : Icons.person_pin_circle_rounded,
+                                  isRequester
+                                      ? Icons.badge_rounded
+                                      : Icons.person_pin_circle_rounded,
                                   color: const Color(0xFF14B8A6),
                                 ),
                                 border: OutlineInputBorder(
@@ -316,57 +305,38 @@ class _NameScreenState extends State<NameScreen> {
                 ),
               ),
               
-              // Bottom Bar (Dış Işımalı Buton Bölümü) [cite: 2]
+              // Bottom Bar (LocatorPermissionScreen Bottom Bar Stili)
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.transparent, 
+                  color: const Color(0xFF020617),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 40,
-                      offset: const Offset(0, -10),
-                    )
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 40,
+                        offset: const Offset(0, -10))
                   ],
                 ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF14B8A6).withOpacity(0.35),
-                        blurRadius: 25,
-                        spreadRadius: 1,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: FilledButton(
-                    onPressed: saving ? null : _save,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF14B8A6),
-                      disabledBackgroundColor: const Color(0xFF1E293B),
-                      minimumSize: const Size(double.infinity, 64),
-                      shadowColor: Colors.transparent,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
+                child: FilledButton(
+                  onPressed: saving ? null : _save,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF14B8A6),
+                    disabledBackgroundColor: const Color(0xFF1E293B),
+                    minimumSize: const Size(double.infinity, 64),
+                    shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20)),
-                    ),
-                    child: saving
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
-                        : const Text(
-                            'CONTINUE',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.5,
-                              color: Colors.white,
-                            ),
-                          ),
                   ),
+                  child: saving
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          'CONTINUE',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
             ],

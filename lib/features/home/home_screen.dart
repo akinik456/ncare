@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-
+import 'dart:ui';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -13,7 +13,6 @@ import 'package:firebase_database/firebase_database.dart';
 import '../../core/alert_engine.dart';
 import '../../core/device_state_manager.dart';
 import '../../core/identity_manager.dart';
-import '../../core/locator_settings_reader.dart';
 import '../../core/utils.dart';
 import '../../services/rtdb.dart';
 
@@ -658,9 +657,9 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
     });
 
 return Scaffold(
-  backgroundColor: const Color(0xFFF1F5F9),
+  backgroundColor: const Color(0xFF020617),
   appBar: AppBar(
-    backgroundColor: const Color(0xFFF1F5F9),
+    backgroundColor: const Color(0xFF020617),
     surfaceTintColor: Colors.transparent,
     elevation: 0,
     centerTitle: true,
@@ -668,7 +667,7 @@ return Scaffold(
       'LYNRA Care',
       style: TextStyle(
         fontWeight: FontWeight.w800,
-        color: Color(0xFF0F172A),
+        color: Color(0xFF334155),
       ),
     ),
   ),
@@ -779,428 +778,279 @@ Container(
 ),
 
 
+Expanded(
+  child: Column( // Ana taşıyıcıyı Column yaptık ki butonu alta itebilelim
+    children: [
+      // ÜST KISIM: Kaydırılabilir Kartlar Bölümü
       Expanded(
-  child: Center(
-    child: SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: StreamBuilder<bool>(
-          stream: DeviceStateManager.instance.readyStream,
-		  initialData: DeviceStateManager.instance.isReady,
-          
-          builder: (context, snapshot) {
-  final ready = snapshot.data ?? false;
-  
-  // Manager'dan güncel durumları çekiyoruz
-  final gpsEn = DeviceStateManager.instance.gpsEnabled;
-  print("LynraCareizin ekranından gelindi gpsenabled:$gpsEn");
-  final hasBgLoc = DeviceStateManager.instance.hasBackgroundLocationPermission;
-  final hasActivity = DeviceStateManager.instance.hasActivityPermission;
-  final batteryOptimized = DeviceStateManager.instance.isBatteryOptimized;
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 80, 20, 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: StreamBuilder<bool>(
+              stream: DeviceStateManager.instance.readyStream,
+              initialData: DeviceStateManager.instance.isReady,
+              builder: (context, snapshot) {
+                final ready = snapshot.data ?? false;
+                final gpsEn = DeviceStateManager.instance.gpsEnabled;
+                
+                String statusTitle = ready ? 'Locator Device Ready' : (!gpsEn ? 'Location Service Off' : 'Permissions Required');
 
-  // ÖNCELİK SIRASINA GÖRE MESAJ BELİRLEME
-  String statusTitle;
-  String statusMessage;
-  IconData statusIcon = Icons.warning_amber_rounded;
-
-  if (ready) {
-    statusTitle = 'Locator Device Ready';
-    statusMessage = 'This device is ready to receive location requests.';
-    statusIcon = Icons.check_circle_rounded;
-  } else if (!gpsEn) {
-    statusTitle = 'Location Service Off';
-    statusMessage = 'Please turn on GPS/Location services in system settings.';
-  } else if (!hasBgLoc) {
-    statusTitle = 'Background Location Required';
-    statusMessage = 'Set location access to "Allow all the time" to work in background.';
-  } else if (!hasActivity) {
-    statusTitle = 'Activity Access Required';
-    statusMessage = 'Physical activity permission is needed for smart tracking.';
-  } else if (batteryOptimized) {
-    statusTitle = 'Battery Optimization Active';
-    statusMessage = 'Set battery to "Unrestricted" to prevent tracking gaps.';
-  } else {
-    statusTitle = 'Permissions Required';
-    statusMessage = 'Grant necessary permissions to continue tracking.';
-  }
-
-  return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: ready
-                  ? const [
-                      Color(0xFF0F766E),
-                      Color(0xFF0D9488),
-                      Color(0xFF14B8A6),
-                    ]
-                  : const [
-                      Color(0xFFB45309),
-                      Color(0xFFD97706),
-                      Color(0xFFF59E0B),
-                    ],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: ready
-                    ? const Color(0x220F766E)
-                    : const Color(0x22B45309),
-                blurRadius: 28,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                return Column(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 46,
-                          height: 46,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.16),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Icon(
-                            ready
-                                ? Icons.verified_rounded
-                                : Icons.warning_amber_rounded,
-                            color: Colors.white,
-                            size: 24,
-                          ),
+                    // --- ANA DURUM KARTI (GLASSMORPHISM) ---
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF020617).withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: (ready ? const Color(0xFF14B8A6) : const Color(0xFFB45309)).withOpacity(0.15),
+                          width: 1.5,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            statusTitle,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                            ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (ready ? const Color(0xFF14B8A6) : const Color(0xFFD97706)).withOpacity(0.2),
+                            blurRadius: 30,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 8),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      statusMessage,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.94),
-                        height: 1.45,
+                        ],
                       ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    const Text(
-                      'Remote Pairing Code',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    SelectableText(
-                      currentPairCode,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 8,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SelectableText(
-                      locatorId!,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 14),
-              Column(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => Dialog(
-                          backgroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(28),
-                          ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(28),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                           child: Padding(
                             padding: const EdgeInsets.all(20),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
+                            child: Row(
                               children: [
-                                const Text(
-                                  'Locator QR',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF0F172A),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            ready ? Icons.verified_user_rounded : Icons.gpp_maybe_rounded,
+                                            color: ready ? const Color(0xFF5EEAD4) : const Color(0xFFF59E0B),
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            statusTitle,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: -0.5,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 16),
+                                      const Text(
+                                        'PAIRING CODE',
+                                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 2),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        currentPairCode,
+                                        style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: 6),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      const Text(
+                                        'LOCATOR ID',
+                                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1.5),
+                                      ),
+                                      SelectableText(
+                                        locatorId ?? 'N/A',
+                                        style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500, fontFamily: 'monospace'),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(height: 16),
-                                QrImageView(
-                                  data: qrData,
-                                  version: QrVersions.auto,
-                                  size: 260,
-                                ),
-                                const SizedBox(height: 12),
-                                const Text(
-                                  'Scan this code on requester device',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Color(0xFF475569),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 18),
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 14,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF8FAFC),
-                                    borderRadius: BorderRadius.circular(18),
-                                    border: Border.all(
-                                      color: const Color(0xFFE2E8F0),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: QrImageView(
-                        data: qrData,
-                        version: QrVersions.auto,
-                        size: 120,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: 120,
-                    child: Text(
-                      'Tap to enlarge',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.95),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-					  
-                      const SizedBox(height: 14),
-                      const SizedBox(height: 14),
-                      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                        stream: FirebaseFirestore.instance
-                            .collection('locators')
-                            .doc(locatorId)
-                            .snapshots(),
-                        builder: (context, snapshot) {
-                          final data = snapshot.data?.data();
-                          final requesterName =
-                              (data?['pairedRequesterName'] ?? '').toString().trim();
-
-                          final paired = requesterName.isNotEmpty;
-						  
-						  final pairedRequesters =
-    data?['pairedRequesters'] as Map<String, dynamic>?;
-
-final pairedNames = pairedRequesters == null
-    ? <String>[]
-    : pairedRequesters.values
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .where((e) => e['active'] == true)
-        .map((e) => (e['name'] ?? 'Requester').toString())
-        .toList();
-						  
-                          final hasPendingPair =
-                              (data?['pendingPairRequesterId'] ?? '')
-                                  .toString()
-                                  .trim()
-                                  .isNotEmpty;
-
-                          return Column(
-                            children: [
-                              if (hasPendingPair) ...[
-                                _buildPendingPairCard(theme, data),
-                                const SizedBox(height: 12),
-                              ],
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                                ),
-                                child: Row(
+                                // QR Bölümü
+                                Column(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(
-                                      paired
-                                          ? Icons.check_circle_rounded
-                                          : Icons.link_off_rounded,
-                                      color: paired
-                                          ? const Color(0xFF16A34A)
-                                          : const Color(0xFFDC2626),
+                                    GestureDetector(
+                                      onTap: () => _showLargeQr(context, qrData),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.95),
+                                          borderRadius: BorderRadius.circular(20),
+                                        ),
+                                        child: QrImageView(
+                                          data: qrData,
+                                          size: 90,
+                                          version: QrVersions.auto,
+                                          padding: const EdgeInsets.all(0),
+                                          eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Colors.black),
+                                        ),
+                                      ),
                                     ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-  child: Text(
-    pairedNames.isNotEmpty
-        ? 'Paired with ${pairedNames.join(', ')}'
-        : 'Not paired yet',
-    style: Theme.of(context)
-        .textTheme
-        .bodyMedium
-        ?.copyWith(
-          fontWeight: FontWeight.w700,
-          color: const Color(0xFF0F172A),
-        ),
-  ),
-),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Tap to enlarge',
+                                      style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 10, fontWeight: FontWeight.w600),
+                                    ),
                                   ],
                                 ),
-                              ),
-                              const SizedBox(height: 12),
-                              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-  stream: FirebaseFirestore.instance
-      .collection('locators')
-      .doc(locatorId)
-      .snapshots(),
-  builder: (context, snapshot) {
-    final data = snapshot.data?.data();
-    final paired = data?['pairedRequesters']
-        as Map<String, dynamic>?;
-
-    if (paired == null) return const SizedBox();
-
-    final activeRequesters = paired.entries
-        .where((e) => e.value['active'] == true)
-        .toList();
-
-    if (activeRequesters.isEmpty) {
-      return const SizedBox();
-    }
-
-    return Column(
-      children: [
-        ...activeRequesters.map((e) {
-          final requesterId = e.key;
-          final name =
-              (e.value['name'] ?? 'Requester').toString();
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: FilledButton.icon(
-              onPressed: () =>
-                  _sendCallMeRequest(
-				  requesterId: requesterId, 
-				  requesterName: name
-				),
-              icon: const Icon(Icons.call),
-              label: Text('Ask $name to call me'),
-            ),
-          );
-        }),
-
-        if (activeRequesters.length > 1)
-          FilledButton.icon(
-            onPressed: ()=> _sendCallMeRequest(), // Parametre yoksa otomatik "all" moduna geçer
-            icon: const Icon(Icons.campaign),
-            label: const Text('Ask everyone to call me'),
-          ),
-      ],
-    );
-  },
-),
-							  
-                            ],
-                          );
-                        },
-                      ),
-					  
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: () {
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const SetupScreen(),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.settings_rounded),
-                            label: const Text('Open setup'),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xFF0F172A),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 15),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
-                              ),
+                              ],
                             ),
                           ),
                         ),
                       ),
-                    ],
-                  );
-                },
-              ),
-			  
+                    ),
+                    const SizedBox(height: 20),
+                    // --- EŞLEŞME DURUM KARTI ---
+                    StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseFirestore.instance.collection('locators').doc(locatorId).snapshots(),
+                      builder: (context, snapshot) {
+                        final data = snapshot.data?.data();
+                        final pairedRequesters = data?['pairedRequesters'] as Map<String, dynamic>?;
+                        final pairedNames = pairedRequesters?.values
+                            .map((e) => Map<String, dynamic>.from(e as Map))
+                            .where((e) => e['active'] == true)
+                            .map((e) => (e['name'] ?? 'Requester').toString())
+                            .toList() ?? [];
+
+                        return Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1E293B).withOpacity(0.4),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: const Color(0xFF334155)),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                pairedNames.isNotEmpty ? Icons.verified_user_rounded : Icons.link_off_rounded,
+                                color: pairedNames.isNotEmpty ? const Color(0xFF14B8A6) : const Color(0xFF64748B),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  pairedNames.isNotEmpty ? 'Paired with ${pairedNames.join(', ')}' : 'Not paired yet',
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),
       ),
+      // ALT KISIM: EKRANIN EN ALTINA SABİTLENEN BUTON
+      Padding(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(color: const Color(0xFF14B8A6).withOpacity(0.3), blurRadius: 20, spreadRadius: 2),
+            ],
+          ),
+          child: FilledButton.icon(
+            onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const SetupScreen())),
+            icon: const Icon(Icons.settings_rounded),
+            label: const Text(
+  'OPEN SETUP', 
+  style: TextStyle(
+    fontSize: 20, // Buraya 16 ekleyebilirsin
+    fontWeight: FontWeight.w900, 
+    letterSpacing: 1.5
+  )
+  ),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF14B8A6),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+          ),
+        ),
+      ),
+    ],
+  ),
+),
+
 	  ],
 	  ),
 	  ),
     );
   }
+void _showLargeQr(BuildContext context, String qrData) {
+  showDialog(
+    context: context,
+    builder: (_) => Dialog(
+      backgroundColor: const Color(0xFF0F172A), // Koyu arka plan
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: const BorderSide(color: Color(0xFF334155), width: 1),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Locator QR',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+                letterSpacing: 1,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: QrImageView(
+                data: qrData,
+                version: QrVersions.auto,
+                size: 260,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Scan this code on requester device',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF94A3B8),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'CLOSE',
+                style: TextStyle(
+                  color: Color(0xFF14B8A6),
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}  
+  
 }

@@ -462,9 +462,9 @@ void _showXiaomiGuide() {
             : Text(
         _allPermissionsGranted ? 'CONTINUE' : 'GRANT REQUIRED PERMISSIONS',
         style: TextStyle(
-          fontSize: 16, 
+          fontSize: 20, 
           fontWeight: FontWeight.w900, 
-          letterSpacing: 1,
+          letterSpacing: 1.5,
           // İzinler eksikse yazıyı tamamen kaybetmek yerine 
           // beyazın %30-40 şeffaf haliyle gösteriyoruz ki okunsun
           color: _allPermissionsGranted 

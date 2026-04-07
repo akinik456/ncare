@@ -11,7 +11,7 @@ class FcmManager {
 
   /// Uygulamanın ağır toplarını (Firebase, Auth, Subs) uyandıran ana şalter.
   /// Main, HomeScreen veya RequesterScreen'den güvenle çağrılabilir.
-  static Future<void> prepareApp() async {
+static Future<void> prepareApp() async {
     // Eğer zaten bir yerden çağrıldıysa, tekrar kuruluma girme, hemen dön.
     if (_isInitialized) {
       print("LynraCareSYSTEM: FCM Şalter zaten açık, tekrar kuruluma gerek yok.");
@@ -40,11 +40,13 @@ class FcmManager {
   }
 
   /// Rol ve ID bazlı abonelik işlemlerini yöneten metot.
-  static Future<void> ensureSubscriptions() async {
+static Future<void> ensureSubscriptions() async {
     final role = await RoleManager.getRole();
     final myId = await IdentityManager.getOrCreateDeviceId();
     
-    // FirebaseMessaging instance'ı burada güvenle çağrılabilir
+	// Firebase'e uyanması için 2 saniye süre tanı
+    await Future.delayed(const Duration(seconds: 5));    
+	// FirebaseMessaging instance'ı burada güvenle çağrılabilir
     // Çünkü prepareApp içinde Firebase.initializeApp çalıştı.
     final token = await FirebaseMessaging.instance.getToken();
 
@@ -56,22 +58,22 @@ class FcmManager {
       print("LynraCareFCM SKIP => Token alınamadı, abonelik pas geçildi.");
       return;
     }
-	
-	// Firebase'e uyanması için 2 saniye süre tanı
-    await Future.delayed(const Duration(seconds: 5));
 
     if (role == 'locator') {
 	  final topic = 'locator_$myId';
 	  print("LynraCareFCM => Locator subscribe denemesi: $topic");
 	  
-	  // Try-Catch ile sarmalıyoruz ki servis o an meşgulse uygulama patlamasın
-	  try {
-		await FirebaseMessaging.instance.subscribeToTopic(topic);
-		print("LynraCareFCM => Locator Başarıyla Abone Oldu: $topic");
-	  } catch (e) {
-		print("LynraCareFCM ERROR => Abonelik başarısız (Firebase meşgul olabilir): $e");
-		// Firebase zaten "Will retry" diyerek arkada denemeye devam eder, 
-		// ama biz burada hatayı yakalayıp log kirliliğini yönetmiş olduk.
+	  for (int i = 0; i < 3; i++) {
+		  // Try-Catch ile sarmalıyoruz ki servis o an meşgulse uygulama patlamasın
+		  try {
+			await FirebaseMessaging.instance.subscribeToTopic(topic);
+			print("LynraCareFCM => Locator Başarıyla Abone Oldu: $topic");
+			break;
+		  } catch (e) {
+			print("LynraCareFCM ERROR => Abonelik başarısız (Firebase meşgul olabilir): $e");
+			// Firebase zaten "Will retry" diyerek arkada denemeye devam eder, 
+			// ama biz burada hatayı yakalayıp log kirliliğini yönetmiş olduk.
+		  }
 	  }
 
 	} else if (role == 'requester') {

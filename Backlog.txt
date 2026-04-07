@@ -89,3 +89,5 @@ Sadece Hareket Varsa Yaz: Cihaz yerinden oynamadıysa koordinat yazmayı durdur.
 *****************
 2. Strateji: Service İçinde GPS Nöbeti
 bgengine (veya onStart fonksiyonun) içine şu nöbetçiyi dikiyoruz:
+
+geofence ?? FS optimizasyon ile birlikte
