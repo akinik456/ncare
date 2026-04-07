@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:battery_plus/battery_plus.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:firebase_database/firebase_database.dart';
@@ -42,9 +43,29 @@ static Function(int)? onIntervalChanged;
   final _readyController = StreamController<bool>.broadcast();
   final Battery _battery = Battery();
   StreamSubscription<geo.ServiceStatus>? _gpsSub;
-  
+  static bool _gfEnabled = false;
+// Places (Çoklu Mekanlar)
+// Key: placeId, Value: Mekan Bilgileri
+static Map<String, Map<String, dynamic>> _cachedPlaces = {};
+
   static bool _gpsOffAlarmEnabled = false; 
   static StreamSubscription? _settingsSub;
+  
+static StreamSubscription<QuerySnapshot>? _placesSub;  
+  
+  // Abonelik yönetimi
+StreamSubscription<UserAccelerometerEvent>? _accelSub;
+
+// Hareket durumu
+static bool _isMovingByAccel = false;
+
+// Hassasiyet eşiği: 
+// 0.2-0.5 arası çok hassas (masa titremesi)
+// 1.0-2.0 arası gerçek hareket (yürüme/araç sarsıntısı)
+static const double _accelThreshold = 1.5;
+
+static DateTime? _lastMovementTime;
+static const Duration _movementExpiry = Duration(minutes: 1); // 3 dakika tolerans
 
   bool get isReady => _isReady;
 
@@ -65,6 +86,7 @@ static Function(int)? onIntervalChanged;
     _checkState();
 	 _gpsSub?.cancel();
     _gpsSub = geo.Geolocator.getServiceStatusStream().listen((_) => _checkState());
+	initAccelerometer();
 	
 	// UI tarafı 10 saniyede bir, BG tarafı 30 saniyede bir check etsin (Gereksiz yük olmasın)
     _ticker = Timer.periodic(Duration(seconds: isWorker ? 30 : 10), (_) => _checkState());
@@ -89,8 +111,9 @@ static void initSettingsListener(String groupId, String locatorId) {
 	  final data = doc.data();
       _gpsOffAlarmEnabled = doc.data()?['gpsOffAlarmEnabled'] ?? false;
 
-		/ Geofence Ana Ayarlar
+		// Geofence Ana Ayarlar
       _gfEnabled = data?['geofenceAlarmEnabled'] ?? false;
+	  print("ZINK initSettingsListener _gfEnabled:$_gfEnabled");
 
     }
   });
@@ -219,15 +242,49 @@ Future<void> _checkState() async {
     _isReady = value;
     _readyController.add(_isReady);
   }
+  
+void initAccelerometer() {
+  _accelSub?.cancel();
+  
+  _accelSub = userAccelerometerEvents.listen((UserAccelerometerEvent event) {
+    final double power = (event.x * event.x) + (event.y * event.y) + (event.z * event.z);
+
+    if (power > _accelThreshold) {
+      // Hareket algılandığı an zaman damgasını güncelle
+      _lastMovementTime = DateTime.now();
+      onMovementDetected();
+    } else {
+      // Eğer güç eşiğin altındaysa, hemen 'false' yapma!
+      // Son hareketin üzerinden 3 dakika geçti mi diye bak.
+      if (_lastMovementTime != null) {
+        final silenceDuration = DateTime.now().difference(_lastMovementTime!);
+        
+        if (silenceDuration > _movementExpiry) {
+          if (_isMovingByAccel) {
+            _isMovingByAccel = false;
+            print("ZINK: 3 dakikadır hareket yok. Cihaz uykuda.");
+          }
+        }
+      }
+    }
+  });
+}
 
   void _startGeofenceTicker() {
   _geoTicker?.cancel();
   _geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
-    // 1. Önce "Ana Şalter" kontrolü (Global Geofence açık mı?)
+    // 1. ANA ŞALTER: Global Geofence kapalıysa zaten uyu.
     if (!_gfEnabled) return; 
 
+    // 2. İVME ZIRHI: Hareket yoksa (veya 3 dk'lık tolerans dolduysa) GPS'e dokunma!
+    // Bu satır pil ömrünü 3-4 katına çıkaracak olan kritik vuruş.
+    if (!_isMovingByAccel) {
+      print("ZINK: Hareket yok (Pedometer & Accel sessiz). GPS uykuda.");
+      return;
+    }
+
     try {
-      // 2. Güncel konumu al (Zırhlı servisinden)
+      // 3. HAREKET VARSA: Artık High Accuracy GPS açmaya değer.
       final pos = await LocationService.getCurrentLocationSafe(
         accuracy: geo.LocationAccuracy.high,
         timeLimit: const Duration(seconds: 15),
@@ -235,7 +292,7 @@ Future<void> _checkState() async {
       
       if (pos == null) return;
 
-      // 3. Mevcut mekanları kontrol et (Hafızadan)
+      // 4. MEKAN KONTROLÜ: Hafızadaki cachedPlaces üzerinden akıyoruz.
       final locatorId = await IdentityManager.getOrCreateDeviceId();
       await _handleSavedPlacesGeofence(locatorId: locatorId, pos: pos);
       
@@ -243,6 +300,42 @@ Future<void> _checkState() async {
       print('ZINK GF Error: $e');
     }
   });
+}
+
+// 1. ASIL İŞİ YAPAN MOTOR (FONKSİYON)
+Future<void> _performGeofenceCheck() async {
+print("ZINK _gfEnabled:$_gfEnabled");
+  if (!_gfEnabled) return;
+  
+  try {
+    final pos = await LocationService.getCurrentLocationSafe(
+      accuracy: geo.LocationAccuracy.high,
+      timeLimit: const Duration(seconds: 15),
+    );
+    if (pos == null) return;
+
+    final locatorId = await IdentityManager.getOrCreateDeviceId();
+    await _handleSavedPlacesGeofence(locatorId: locatorId, pos: pos);
+	print(" ZINK _handleSavedPlacesGeofence");
+  } catch (e) {
+    print('ZINK GF Error: $e');
+  }
+}
+
+// 2. İVMEÖLÇER İÇİNDEKİ TETİKLEYİCİ
+// (initAccelerometer içinde hareket algılandığında burası çalışacak)
+void onMovementDetected() {
+  if (!_isMovingByAccel) {
+    _isMovingByAccel = true;
+    print("ZINK: Hareket başladı! Motorlar ısınıyor...");
+    
+    // ANINDA UYANIŞ: 60 saniye beklemeden ilk kontrolü çak!
+    _performGeofenceCheck();
+    
+    // RUTİNİ BAŞLAT: Timer'ı şimdi ateşle!
+    _startGeofenceTicker();
+  }
+  _lastMovementTime = DateTime.now(); // Zaman damgasını tazele
 }
 
 Future<void> _handleSavedPlacesGeofence({

@@ -51,27 +51,27 @@ class _HomeScreenState extends State<HomeScreen> {
   String _watcherName = "";
   int _displayInterval = 3600;
   
-  // Single Center (Hızlı Ayar)
-static bool _gfEnabled = false;
-static double? _cLat, _cLng, _radius;
-
-// Places (Çoklu Mekanlar)
-// Key: placeId, Value: Mekan Bilgileri
-static Map<String, Map<String, dynamic>> _cachedPlaces = {};
-  
+ 
 @override
 void initState() {
   super.initState();
-  _initEverything();
+  _initEverything().then((_) {
+  print("ZINK home SUCCESS -> groupId:$groupId, locatorId:$locatorId");
   
+  // 1. AYARLARI DİNLE (BAĞIMSIZ): 
+  // Periyot değişiminden bağımsız, uygulama açılır açılmaz ayarları çekmeye başla.
+  print("ZINK home groupId:$groupId,locatorId:$locatorId");
+  if (groupId != null && locatorId != null) {
+    DeviceStateManager.initSettingsListener(groupId!, locatorId!);
+  }
+  }).catchError((e) {
+    print("ZINK ERROR: _initEverything patladı -> $e");
+  });
   DeviceStateManager.onIntervalChanged = (newVal) {
     if (mounted) {
       setState(() {
         _displayInterval = newVal;
       });
-    }
-	if (groupId != null && locatorId != null) {
-	DeviceStateManager.initSettingsListener(groupId!, locatorId!);
 	}
   };  
 
@@ -138,6 +138,7 @@ _watchersSubscription = _watchersRef?.onValue.listen((event) {
     groupId = await IdentityManager.getLocalGroupId(); 
     deviceId = await IdentityManager.getOrCreateDeviceId();
     
+	print("ZINK _initEverything groupId:$groupId,locatorId:$locatorId");
 	
 	if (groupId != null && deviceId != null) {
     setState(() {
