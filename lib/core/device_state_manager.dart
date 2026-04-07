@@ -78,6 +78,7 @@ static Function(int)? onIntervalChanged;
   
 static void initSettingsListener(String groupId, String locatorId) {
   _settingsSub?.cancel(); // Eski varsa temizle
+  _placesSub?.cancel(); // Places için yeni abonelik
   
   _settingsSub = FirebaseFirestore.instance
       .collection('groups').doc(groupId)
@@ -85,10 +86,31 @@ static void initSettingsListener(String groupId, String locatorId) {
       .snapshots() 
       .listen((doc) {
     if (doc.exists) {
+	  final data = doc.data();
       _gpsOffAlarmEnabled = doc.data()?['gpsOffAlarmEnabled'] ?? false;
-      print("ZINK: Firestore Ayarı Güncellendi -> $_gpsOffAlarmEnabled");
+
+		/ Geofence Ana Ayarlar
+      _gfEnabled = data?['geofenceAlarmEnabled'] ?? false;
+
     }
   });
+  
+  // 2. PLACES (Çoklu Mekanlar)
+  _placesSub = FirebaseFirestore.instance
+      .collection('groups').doc(groupId)
+      .collection('locators').doc(locatorId)
+      .collection('places')
+      .where('enabled', isEqualTo: true)
+      .snapshots()
+      .listen((snap) {
+    _cachedPlaces = {
+      for (var doc in snap.docs) doc.id: {
+        ...doc.data(),
+        'id': doc.id, // ID'yi içinde tutalım ki lazım olursa kullanalım
+      }
+    };
+  });
+  
 } 
   
   void _restartPresenceTimer() {
@@ -199,102 +221,123 @@ Future<void> _checkState() async {
   }
 
   void _startGeofenceTicker() {
-    _geoTicker?.cancel();
-    _geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
-      // Geofence logic (Arka planda sessizce çalışır)
-    });
-  }
+  _geoTicker?.cancel();
+  _geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
+    // 1. Önce "Ana Şalter" kontrolü (Global Geofence açık mı?)
+    if (!_gfEnabled) return; 
 
-  Future<void> _handleSavedPlacesGeofence({
-    required String locatorId,
-    required geo.Position pos,
-  }) async {
-    final groupId = await IdentityManager.getLocalGroupId();
-    if (groupId == null || groupId.isEmpty) return;
-    final locatorDoc = await FirebaseFirestore.instance
-        .collection('locators')
-        .doc(locatorId)
-        .get();
-
-    final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
-
-    final placesSnap = await FirebaseFirestore.instance
-        .collection('groups')
-        .doc(groupId)
-        .collection('locators')
-        .doc(locatorId)
-        .collection('places')
-        .where('enabled', isEqualTo: true)
-        .get();
-
-    for (final placeDoc in placesSnap.docs) {
-      final data = placeDoc.data();
-
-      final lat = (data['lat'] as num?)?.toDouble();
-      final lng = (data['lng'] as num?)?.toDouble();
-      final radiusMeters = (data['radiusMeters'] as num?)?.toDouble() ?? 180.0;
-      final placeName = (data['name'] ?? 'Place').toString();
-      final lastState = (data['lastState'] ?? 'unknown').toString();
-      final lastTransitionAt = data['lastTransitionAt'] as Timestamp?;
-
-      if (lat == null || lng == null) continue;
-
-      final dist = geo.Geolocator.distanceBetween(
-        pos.latitude,
-        pos.longitude,
-        lat,
-        lng,
+    try {
+      // 2. Güncel konumu al (Zırhlı servisinden)
+      final pos = await LocationService.getCurrentLocationSafe(
+        accuracy: geo.LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 15),
       );
-      final groupId = await IdentityManager.getLocalGroupId();
-      if (groupId == null || groupId.isEmpty) return;
+      
+      if (pos == null) return;
 
-      final newState = dist <= radiusMeters ? 'inside' : 'outside';
+      // 3. Mevcut mekanları kontrol et (Hafızadan)
+      final locatorId = await IdentityManager.getOrCreateDeviceId();
+      await _handleSavedPlacesGeofence(locatorId: locatorId, pos: pos);
+      
+    } catch (e) {
+      print('ZINK GF Error: $e');
+    }
+  });
+}
 
-      if (lastState == 'unknown' || lastState.isEmpty) {
-        await placeDoc.reference.set({
+Future<void> _handleSavedPlacesGeofence({
+  required String locatorId,
+  required geo.Position pos,
+}) async {
+  // 1. Erken Çıkış & Temel Veriler
+  if (_cachedPlaces.isEmpty) return;
+  
+  final groupId = await IdentityManager.getLocalGroupId();
+  if (groupId == null || groupId.isEmpty) return;
+
+  // Locator ismini her mekan için tekrar sormayalım, bir kez çekelim
+  final locatorDoc = await FirebaseFirestore.instance
+      .collection('locators')
+      .doc(locatorId)
+      .get();
+  final locatorName = (locatorDoc.data()?['name'] ?? 'Locator').toString();
+
+  // 2. Hafızadaki (RAM) Mekanlar Üzerinde Döngü
+  for (final place in _cachedPlaces.values) {
+    final placeId = place['id'];
+    final lat = (place['lat'] as num?)?.toDouble();
+    final lng = (place['lng'] as num?)?.toDouble();
+    final placeName = (place['name'] ?? 'Place').toString();
+    final lastState = (place['lastState'] ?? 'unknown').toString();
+    final lastTransitionAt = place['lastTransitionAt'] as Timestamp?;
+    
+    // Radius artık sabit 180m demiştik
+    const double radiusMeters = 180.0;
+
+    if (lat == null || lng == null) continue;
+
+    // 3. Mesafe Hesaplama
+    final dist = geo.Geolocator.distanceBetween(
+      pos.latitude, pos.longitude, lat, lng,
+    );
+
+    final newState = dist <= radiusMeters ? 'inside' : 'outside';
+
+    // 4. İlk Tanımlama (Unknown Durumu)
+    if (lastState == 'unknown' || lastState.isEmpty) {
+      await FirebaseFirestore.instance
+          .collection('groups').doc(groupId)
+          .collection('locators').doc(locatorId)
+          .collection('places').doc(placeId)
+          .set({
+            'lastState': newState,
+            'lastTransitionAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+      continue;
+    }
+
+    // Durum değişmediyse diğer mekana geç
+    if (lastState == newState) continue;
+
+    // 5. Cooldown (Soğuma Süresi) Kontrolü
+    final now = DateTime.now();
+    final canTransition = lastTransitionAt == null ||
+        now.difference(lastTransitionAt.toDate()).inSeconds >= _placeTransitionCooldownSeconds;
+
+    if (!canTransition) continue;
+
+    // 6. Transition (Geçiş) Operasyonu
+    final transitionType = (lastState == 'outside' && newState == 'inside') ? 'arrive' : 'left';
+    final currentAlertType = 'place_${transitionType}_$placeId';
+
+    // Bildirimi Çak!
+    await AlertEngine.send(
+      groupId: groupId,
+      locatorId: locatorId,
+      locatorName: locatorName,
+      alertType: currentAlertType,
+      extra: {
+        'subtype': transitionType,
+        'placeId': placeId,
+        'placeName': placeName,
+        'distance': dist,
+        'radiusMeters': radiusMeters,
+      },
+    );
+
+    // 7. Firestore'u Güncelle (Hafıza zaten listener sayesinde güncellenecek)
+    await FirebaseFirestore.instance
+        .collection('groups').doc(groupId)
+        .collection('locators').doc(locatorId)
+        .collection('places').doc(placeId)
+        .set({
           'lastState': newState,
           'lastTransitionAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-        continue;
-      }
 
-      if (lastState == newState) continue;
-
-      final now = DateTime.now();
-      final canTransition =
-          lastTransitionAt == null ||
-          now.difference(lastTransitionAt.toDate()).inSeconds >=
-              _placeTransitionCooldownSeconds;
-
-      if (!canTransition) continue;
-
-      final transitionType = lastState == 'outside' && newState == 'inside'
-          ? 'arrive'
-          : 'left';
-      final currentAlertType = 'place_${transitionType}_${placeDoc.id}';
-
-      await AlertEngine.send(
-        groupId: groupId,
-        locatorId: locatorId,
-        locatorName: locatorName,
-        alertType: currentAlertType,
-        extra: {
-          'subtype': transitionType,
-          'placeId': placeDoc.id,
-          'placeName': placeName,
-          'distance': dist,
-          'radiusMeters': radiusMeters,
-        },
-      );
-
-      await placeDoc.reference.set({
-        'lastState': newState,
-        'lastTransitionAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-
-      print('PLACE ${transitionType.toUpperCase()} => $placeName ($dist m)');
-    }
+    print('ZINK: PLACE ${transitionType.toUpperCase()} => $placeName ($dist m)');
   }
+}  
   
   static void setTrackingState({bool? moving, bool? watched}) {
     // Sadece gelen bilgiyi güncelle, gelmeyene dokunma
