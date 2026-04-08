@@ -37,4 +37,14 @@ static Future<String?> getLocalGroupId() async {
 	  final prefs = await SharedPreferences.getInstance();
 	  return prefs.getString('user_name') ?? 'User'; // Bulamazsa 'User' döner
 	}
+	
+	static Future<void> saveIsMaster(bool isMaster) async {
+	  final prefs = await SharedPreferences.getInstance();
+	  await prefs.setBool('is_master', isMaster);
+	}
+
+	static Future<bool> getIsMaster() async {
+	  final prefs = await SharedPreferences.getInstance();
+	  return prefs.getBool('is_master') ?? false; // Bulamazsa 'false' döner (Güvenli mod)
+	}
   }

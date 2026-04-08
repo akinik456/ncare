@@ -19,8 +19,6 @@ gösterilmeli ya da silinmeli
 
 9 status da lastseen çok eski ise batery ve konum anlamsız
 
-10 RoleManager.setRole  çok fazla 
-
 11 sms eklenecek
 
 12 manipülasyon 

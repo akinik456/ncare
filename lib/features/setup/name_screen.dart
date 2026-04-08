@@ -57,6 +57,7 @@ class _NameScreenState extends State<NameScreen> {
 
   Future<void> _save() async {
     final name = controller.text.trim();
+	bool isMaster=false;
     if (name.isEmpty) return;
 
     setState(() => saving = true);
@@ -72,6 +73,7 @@ class _NameScreenState extends State<NameScreen> {
 
       final groupId = const Uuid().v4();
       final authId = AuthService.currentAuthId;
+	  isMaster=true;
       
       await IdentityManager.setLocalGroupId(groupId);
       await FirebaseFirestore.instance.collection('groups').doc(groupId).set({
@@ -109,7 +111,7 @@ class _NameScreenState extends State<NameScreen> {
         'active': true,
         'isMaster': true,
       });
-
+	  await IdentityManager.saveIsMaster(isMaster);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('isCreatingGroup', false);
       if (!mounted) return;
@@ -118,6 +120,8 @@ class _NameScreenState extends State<NameScreen> {
         MaterialPageRoute(builder: (_) => const RequesterPermissionScreen()),
       );
     } else if (role == "requester") {
+	isMaster=false;
+	await IdentityManager.saveIsMaster(isMaster);
       await FcmManager.prepareApp();
       await FirebaseFirestore.instance.collection('requesters').doc(deviceId).set({
         'authId': AuthService.currentAuthId,
@@ -138,6 +142,8 @@ class _NameScreenState extends State<NameScreen> {
         MaterialPageRoute(builder: (_) => const RequesterPermissionScreen()),
       );
     } else {
+	isMaster=false;
+	await IdentityManager.saveIsMaster(isMaster);
       await FcmManager.prepareApp();
       await FirebaseFirestore.instance.collection('locators').doc(deviceId).set({
         'authId': AuthService.currentAuthId,

@@ -58,7 +58,10 @@ class _RequesterScreenState extends State<RequesterScreen> with SingleTickerProv
   String? requesterName;
   String? _currentRequesterName;
   String? _cachedMyName;
-
+  bool isMaster=false;
+  
+  
+	
   @override
   void initState() {
     super.initState();
@@ -130,14 +133,15 @@ print('myLat $_myLat , myLng $_myLng');
   Future<void> _loadGroupId() async {
   final prefs = await SharedPreferences.getInstance();
   final gid = prefs.getString('groupId');
+	isMaster =await IdentityManager.getIsMaster();
 
   setState(() {
   _groupId=gid;  
-  });
-  
+	});
   WidgetsBinding.instance.addPostFrameCallback((_) {
     _initCallMeLiveSync(); 
-  });
+	});
+ 
 }
 
 Future<void> _loadMyName() async {
@@ -146,6 +150,7 @@ Future<void> _loadMyName() async {
     _cachedMyName = name;
 	_currentRequesterName=_cachedMyName;
 	requesterName=_cachedMyName;
+
   });
 }
 
@@ -632,41 +637,77 @@ Future<void> _joinGroup() async {
     final theme = Theme.of(context);
     final visibleRequestId = _lastRequestId;
     final pendingRequestId = _pendingRequestId;
+	
 
+		
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: const Color(0xFFF1F5F9),
-        surfaceTintColor: Colors.transparent,
-        titleSpacing: 20,
-        title: const Text(
-          'LynraCare',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF0F172A),
-          ),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: FilledButton.tonalIcon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const AddLocatorScreen()),
-                );
-              },
-              icon: const Icon(Icons.person_add_alt_1_rounded),
-              label: const Text('Add locator'),
-              style: FilledButton.styleFrom(
-                foregroundColor: const Color(0xFF0F172A),
-                backgroundColor: Colors.white,
+appBar: AppBar(
+  elevation: 0,
+  backgroundColor: const Color(0xFFF1F5F9),
+  surfaceTintColor: Colors.transparent,
+  titleSpacing: 20,
+  title: Row(
+  children: [
+    const Text(
+      'LynraCare',
+      style: TextStyle(
+        fontWeight: FontWeight.w800,
+        color: Color(0xFF0F172A),
+      ),
+    ),
+    const SizedBox(width: 8),
+    // İsim ve İkon Kısmı
+    Flexible(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              _cachedMyName!,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF64748B),
               ),
             ),
           ),
+          // --- MASTER İKONU BURADA ---
+          if (isMaster) ...[
+            const SizedBox(width: 4),
+            const Icon(
+              Icons.verified_rounded, // Şık bir onay ikonu veya 'crown' (tac)
+              size: 16,
+              color: Color(0xFF6366F1), // Senin o Indigo/Mor rengin
+            ),
+          ],
         ],
       ),
+    ),
+  ],
+),
+  actions: [
+    Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: FilledButton.tonalIcon(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AddLocatorScreen()),
+          );
+        },
+        icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+        label: const Text('Add locator', style: TextStyle(fontSize: 13)),
+        style: FilledButton.styleFrom(
+          foregroundColor: const Color(0xFF0F172A),
+          backgroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 12), // Butonu biraz daralttık
+        ),
+      ),
+    ),
+  ],
+),
       body: SafeArea(
         child: ListView(
 		padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),

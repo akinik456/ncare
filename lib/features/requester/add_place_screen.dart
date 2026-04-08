@@ -123,9 +123,8 @@ setState(() {
   }
 
   bool get _isFresh {
-  return true;
     if (_locationAt == null) return false;
-    return DateTime.now().difference(_locationAt!).inSeconds <= 6000;//60;
+    return DateTime.now().difference(_locationAt!).inSeconds <= 60;
   }
 
   String get _ageText {
