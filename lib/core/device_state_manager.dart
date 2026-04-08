@@ -18,7 +18,7 @@ class DeviceStateManager {
   DeviceStateManager._();
   static final DeviceStateManager instance = DeviceStateManager._();
   static const int _placeTransitionCooldownSeconds = 120;
-  static   int currentIntervalSeconds = 3600; // Başlangıç: 1 Saat
+  static   int currentIntervalSeconds = 30;//3600; // Başlangıç: 1 Saat
   bool _isWorkerMode = false; // Isolate kimliğini tutacak bayrak
   bool _isActiveRequest = false; 
   Timer? _presenceTimer;
@@ -84,7 +84,7 @@ static const Duration _movementExpiry = Duration(minutes: 5); // 3 dakika tolera
     
 	// 1. ORTAK GÖREV: Durum Kontrolleri (Her iki tarafta da çalışır)
     _checkState();
-	 _gpsSub?.cancel();
+	_gpsSub?.cancel();
     _gpsSub = geo.Geolocator.getServiceStatusStream().listen((_) => _checkState());
 	initAccelerometer();
 	
@@ -138,6 +138,7 @@ static void initSettingsListener(String groupId, String locatorId) {
 } 
   
   void _restartPresenceTimer() {
+  print("LynraCare PresenceTimer started");
     _presenceTimer?.cancel();
     _presenceTimer = Timer.periodic(
       Duration(seconds: currentIntervalSeconds),
@@ -151,6 +152,7 @@ static void initSettingsListener(String groupId, String locatorId) {
   print("LynraCare updatePresence started");
   final locatorId = await IdentityManager.getOrCreateDeviceId();
   final groupId = await IdentityManager.getLocalGroupId(); // Grup ID'sini al
+  print("LynraCare updatePresence started groupId:$groupId");
   
   if (groupId == null) return;
   
@@ -445,7 +447,7 @@ Future<void> _handleSavedPlacesGeofence({
 
     if (shouldBeFast) {
       _cooldownTimer?.cancel(); // Uyku sayacını durdur
-      currentIntervalSeconds = 30;
+      currentIntervalSeconds = 10;
 	  onIntervalChanged?.call(currentIntervalSeconds);
       print("Vites: 30s (Durum -> Hareket: $_isMoving, İzleyici: $_isWatched)");
     } else {
@@ -454,7 +456,7 @@ Future<void> _handleSavedPlacesGeofence({
 
       print("Aktiflik bitti, 5 dkk geri sayım...");
       _cooldownTimer = Timer(const Duration(minutes: 2), () {
-        currentIntervalSeconds = 3600;
+        currentIntervalSeconds = 30;//3600;
 		onIntervalChanged?.call(currentIntervalSeconds);
         print("Vites: 3600s (Sessizlik sağlandı)");
       });

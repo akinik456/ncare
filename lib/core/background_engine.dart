@@ -28,7 +28,6 @@ class BackgroundEngine {
     print("LynraCareBGEngine: role:$role,setupDone:$setupDone,groupId:$groupId,deviceId:$deviceId");
     return;
   }  
-  print("LynraCareBGEngine: role:$role,setupDone:$setupDone,groupId:$groupId,deviceId:$deviceId");
   print("LynraCareBackgroundEngine: Konfigüre ediliyor...");
   final service = FlutterBackgroundService();
 	if (await service.isRunning()) return;

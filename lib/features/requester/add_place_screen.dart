@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
 
@@ -44,6 +45,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() {
       _loading = true;
       _error = null;
@@ -51,71 +53,79 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
 
     try {
 	final groupId = await IdentityManager.getLocalGroupId();
-		//if (groupId == null || groupId.isEmpty) return;
+	final myDeviceId = await IdentityManager.getOrCreateDeviceId();
+	if (groupId == null) {
+      _error = "Group ID bulunamadı";
+      return;
+    }
+	print("add_place_screen groupId:$groupId,myDeviceId:$myDeviceId");
       final placesSnap = await FirebaseFirestore.instance
           .collection('groups')
-          .doc(await IdentityManager.getOrCreateDeviceId())
-          .collection('groupId')
+          .doc(groupId)
+		  .collection('locators')
           .doc(widget.locatorId)
           .collection('places')
           .get();
 
       _nextIndex = placesSnap.docs.length + 1;
       _nameController.text = 'Place $_nextIndex';
+	 print("add_place_screen _nextIndex:$_nextIndex");
 
-      final locatorDoc = await FirebaseFirestore.instance
-          .collection('locators')
-          .doc(widget.locatorId)
-          .get();
+      // 2. Firestore yerine RTDB'den güncel konumu çekiyoruz
+	  final rtdbRef = FirebaseDatabase.instance.ref("presence/groups/$groupId/locators/${widget.locatorId}");
+	  final DataSnapshot snapshot = await rtdbRef.get();
 
-      final data = locatorDoc.data();
-      if (data == null) {
-        _error = 'Locator not found';
-        return;
-      }
-
+	  if (!snapshot.exists) {
+		_error = 'Locator not found in RTDB';
+	print("add_place_screen locator not found");
+		
+		return;
+	  }
+	print("add_place_screen locator found");
+	  // RTDB'de veri genellikle Map olarak döner
+	  final data = Map<String, dynamic>.from(snapshot.value as Map);
+setState(() {
       _lat = (data['lat'] as num?)?.toDouble();
       _lng = (data['lng'] as num?)?.toDouble();
       _accuracy = (data['acc'] as num?)?.toDouble();
+	  print("add_place_screen lat:$_lat,lng:$_lng");
       final ts = data['lastSeen'];
-      if (ts is Timestamp) {
-        _locationAt = ts.toDate();
-      }
+		if (ts is int) {
+  _locationAt = DateTime.fromMillisecondsSinceEpoch(ts);
+		print("add_place_screen ts:$ts,_locationAt:$_locationAt");
+  }
+}); 
 
-      if (_lat == null || _lng == null) {
-        _error = 'Locator location is not available yet';
-        return;
-      }
+		if (_lat == null || _lng == null) {
+		  _error = 'Locator location is not available yet';
+		  return;
+		}      
 
       try {
-        final placemarks = await placemarkFromCoordinates(_lat!, _lng!);
-        if (placemarks.isNotEmpty) {
-          final p = placemarks.first;
-          final parts = <String?>[
-            p.name,
-            p.street,
-            p.subLocality,
-            p.locality,
-            p.administrativeArea,
-            p.country,
-          ].where((e) => e != null && e.trim().isNotEmpty).cast<String>().toList();
-          _address = parts.toSet().join(', ');
-        }
-      } catch (_) {
-        _address = null;
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
-    }
+        final placemarks = await placemarkFromCoordinates(_lat!, _lng!)
+		.timeout(const Duration(seconds: 5));
+			if (placemarks.isNotEmpty) {
+			final p = placemarks.first;
+			_address = [p.street, p.subLocality, p.locality, p.administrativeArea]
+				.where((e) => e != null && e.isNotEmpty)
+				.join(', ');
+		  }
+		} catch (e) {
+		  print("ZINK Adres alınamadı: $e");
+		  _address = "Address not available";
+		}
+    } catch (e) {
+    print("ZINK _load Error: $e");
+    _error = 'An error occurred while loading data';
+	} finally {
+    if (mounted) setState(() => _loading = false);
+	}
   }
 
   bool get _isFresh {
+  return true;
     if (_locationAt == null) return false;
-    return DateTime.now().difference(_locationAt!).inSeconds <= 60;
+    return DateTime.now().difference(_locationAt!).inSeconds <= 6000;//60;
   }
 
   String get _ageText {
@@ -312,11 +322,11 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
                             ),
                           ),
                         ] else ...[
-                          _infoRow('Latitude', _lat!.toStringAsFixed(6)),
-                          _infoRow('Longitude', _lng!.toStringAsFixed(6)),
-                          _infoRow('Address', (_address == null || _address!.isEmpty) ? 'Address not available' : _address!),
-                          _infoRow('Accuracy', _accuracy == null ? '-' : '${_accuracy!.toStringAsFixed(0)} m'),
-                          _infoRow('Location age', _ageText),
+                          Text('Latitude: ${_lat!.toStringAsFixed(6)}', style: const TextStyle(color: Colors.white, fontSize: 14)),
+                          Text('Longitude: ${_lng!.toStringAsFixed(6)}', style: const TextStyle(color: Colors.white, fontSize: 14)),
+                          Text('Address: $_address', style: const TextStyle(color: Colors.white, fontSize: 14)),
+                          Text('Accuracy: ${_accuracy!.toStringAsFixed(6)}', style: const TextStyle(color: Colors.white, fontSize: 14)),
+                          Text('Location age: $_ageText', style: const TextStyle(color: Colors.white, fontSize: 14)),
                           const SizedBox(height: 8),
                           if (!_isFresh)
                             const Text(
