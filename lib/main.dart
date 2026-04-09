@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 
 import 'core/device_state_manager.dart';
 import 'core/setup_manager.dart';
@@ -38,6 +39,9 @@ Future<void> main() async {
   bool setupDone = await SetupManager.isSetupDone();
   final groupId = await IdentityManager.getLocalGroupId();
   final String? role = await RoleManager.getRole();
+  final service = FlutterBackgroundService();
+  bool isRunning = await service.isRunning();
+  
     if (role != null) 
 	{
 	print('ROLE => $role');
@@ -51,7 +55,12 @@ Future<void> main() async {
 	  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 	  await NotificationService.init();
 	  print("LynraCareAPP_START");
-	  DeviceStateManager.instance.start();
+	  //if (!isRunning) {
+      // Sadece servis çalışmıyorsa ana uygulama start versin
+	     print("DeviceStateManager start called from main");
+
+      //DeviceStateManager.instance.start(); 
+      //}
 	  print("LynraCareSETUP CHECK DONE");
   
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
@@ -80,6 +89,7 @@ String? myLocatorId;
 if (role == 'locator' && setupDone && groupId != null) {
   myLocatorId = await IdentityManager.getOrCreateDeviceId();
   final locatorTopic = 'locator_$myLocatorId';
+  print("BackgroundEngine.initialize start called from main DeviceStateManager ");
   await BackgroundEngine.initialize();
 } else {
   print("LynraCareLOCATOR FLOW SKIPPED => role=$role");

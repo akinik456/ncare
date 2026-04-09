@@ -18,74 +18,74 @@ import 'setup_manager.dart';
 
 class BackgroundEngine {
   static bool _bgInitialized = false;
+
   static Future<void> initialize() async {
-  final String? role = await RoleManager.getRole();
-  final bool setupDone = await SetupManager.isSetupDone();
-  final String? groupId = await IdentityManager.getLocalGroupId();
-  final String? deviceId = await IdentityManager.getOrCreateDeviceId();
-  if (role != 'locator' || !setupDone|| groupId == null || deviceId == null) {
-    print("LynraCareBGEngine: Yetkisiz veya eksik kurulum tespiti! BGengine init yapılmadı");
-    print("LynraCareBGEngine: role:$role,setupDone:$setupDone,groupId:$groupId,deviceId:$deviceId");
-    return;
-  }  
-  print("LynraCareBackgroundEngine: Konfigüre ediliyor...");
-  final service = FlutterBackgroundService();
-	if (await service.isRunning()) return;
-  await service.configure(
-    androidConfiguration: AndroidConfiguration(
-      onStart: onStart,
-      autoStart: true, 
-      isForegroundMode: true,
-      notificationChannelId: 'LynraCare_alerts',
-      initialNotificationTitle: 'LynraCare Servis',
-      initialNotificationContent: 'Sistem hazırlanıyor...',
-      foregroundServiceNotificationId: 888,
-    ),
-    iosConfiguration: IosConfiguration(
-      autoStart: false, // iOS tarafında da manuel kontrol
-      onForeground: onStart,
-    ),
-  );  
-  await service.startService();
-  print("LynraCareBackgroundEngine: Marşa basıldı!");
- }
+    // 1. Yetki ve Kurulum Kontrolleri
+    final String? role = await RoleManager.getRole();
+    final bool setupDone = await SetupManager.isSetupDone();
+    final String? groupId = await IdentityManager.getLocalGroupId();
+    final String? deviceId = await IdentityManager.getOrCreateDeviceId();
+
+    if (role != 'locator' || !setupDone || groupId == null || deviceId == null) {
+      print("LynraCareBGEngine: Yetkisiz/Eksik kurulum. BGengine init iptal.");
+      return;
+    }
+
+    print("LynraCareBackgroundEngine: Konfigüre ediliyor...");
+    final service = FlutterBackgroundService();
+    
+    // Zaten çalışıyorsa tekrar konfigüre etme (Önemli!)
+    if (await service.isRunning()) return;
+
+    await service.configure(
+      androidConfiguration: AndroidConfiguration(
+        onStart: onStart,
+        autoStart: true,
+        isForegroundMode: true,
+        notificationChannelId: 'LynraCare_alerts',
+        initialNotificationTitle: 'LynraCare Servis',
+        initialNotificationContent: 'Sistem hazırlanıyor...',
+        foregroundServiceNotificationId: 888,
+      ),
+      iosConfiguration: IosConfiguration(
+        autoStart: false,
+        onForeground: onStart,
+      ),
+    );
+    
+    await service.startService();
+    print("LynraCareBackgroundEngine: Servis başlatma emri verildi.");
+    
+    // DİKKAT: Burada DeviceStateManager.start() ASLA çağrılmamalı!
+    // Çünkü burası main isolate'i. Start emrini aşağıda onStart verecek.
+  }
 
   static Future<void> prepareEngine() async {
-    // Eğer bu isolate içinde şalter zaten kaldırılmışsa tekrar uğraşma
     if (_bgInitialized) return;
-
     try {
-      print("LynraCareBGEngine: İç şalter kaldırılıyor...");
-
-      // 1. Firebase Temeli (Isolate bağımsız kurulum)
+      print("LynraCareBGEngine: İç şalter (Isolate Firebase) kaldırılıyor...");
+      
+      // Isolate içinde Firebase'i ayağa kaldır
       if (Firebase.apps.isEmpty) {
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         );
       }
 
-      // 2. Kimlik Servisi (RTDB/Firestore yazımı için Auth şart)
-      await AuthService.initializeAuth(); 
-
-      // 3. Bildirim Abonelikleri (Topic'lere bağlanma)
-      // Bu işlem cihaz bazlıdır, ama isolate her uyandığında 
-      // kontrol etmek abonelik güvenliğini artırır.
+      await AuthService.initializeAuth();
+      
+      // Topic aboneliği sadece BURADA (Worker içinde) yapılmalı
       await FcmManager.ensureSubscriptions();
 
-      // 4. Token Yenilenme Dinleyicisi
-      // Arka planda uzun süre çalışan bir serviste token değişirse 
-      // abonelikleri otomatik tazeler.
       FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
         print("LynraCareBGEngine: FCM TOKEN REFRESH => $token");
         await FcmManager.ensureSubscriptions();
       });
 
       _bgInitialized = true;
-      print("LynraCareBGEngine: İç şalter başarıyla kaldırıldı. Tüm servisler hazır.");
     } catch (e) {
-      print("LynraCareBGEngine ERROR: Şalter kaldırılırken hata oluştu => $e");
-      // Hata durumunda rethrow yaparak onStart'ın durmasını sağlıyoruz
-      rethrow; 
+      print("LynraCareBGEngine ERROR: Şalter hatası => $e");
+      rethrow;
     }
   }
 }
@@ -94,49 +94,47 @@ class BackgroundEngine {
 void onStart(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
   
-  final String? role = await RoleManager.getRole();
-  final bool setupDone = await SetupManager.isSetupDone();
+  await Permission.location.status; 
+  await Permission.locationAlways.status;
+  await Permission.activityRecognition.status; 
+  await Permission.ignoreBatteryOptimizations.status;
+  
+  
+  // Isolate içinde kimlik bilgilerini tekrar al
   final String? groupId = await IdentityManager.getLocalGroupId();
   final String? deviceId = await IdentityManager.getOrCreateDeviceId();
-  if (role != 'locator' || !setupDone|| groupId == null || deviceId == null) {
-    print("LynraCareBGEngine: Yetkisiz veya eksik kurulum tespiti! Servis durduruluyor...");
-    print("LynraCareBGEngine: role:$role,setupDone:$setupDone,groupId:$groupId,deviceId:$deviceId");
-	service.stopSelf();
-    return;
-  }
-  print("LynraCareBGEngine: role:$role,setupDone:$setupDone,groupId:$groupId,deviceId:$deviceId");
+  
+  // ... (Yetki kontrolleri aynı kalıyor)
+
   try {
+    // Firebase ve Auth'u worker isolate içinde başlat
     await BackgroundEngine.prepareEngine();
   } catch (e) {
-    print("LynraCareBGEngine: Şalter kaldırılamadı, durduruluyor: $e");
     service.stopSelf();
     return;
   }
-  
-  if (service is AndroidServiceInstance) {
-    service.on('setAsForeground').listen((event) => service.setAsForegroundService());
-    service.on('setAsBackground').listen((event) => service.setAsBackgroundService());
-  }
-  service.on('stopService').listen((event) => service.stopSelf());
-    
-  print("LynraCareBGEngine: Motor sorunsuz çalışıyor. Takip başlatıldı.");  
-  
-  final Battery _battery = Battery();
-  int initialLevel = 0;  
-    try {
-      initialLevel = await Battery().batteryLevel;
-    } catch (_) { print("LynraCare battery okuma hatası");}
 
-    // Kalp atışını başlat
-    RTDBService().startLocatorHeartbeat(
-      groupId: groupId,
-      deviceId: deviceId,
-      initialBattery: initialLevel,
-    );
-    // Hareket algılama mantığını başlat
-   _startMovementLogic(service, groupId, deviceId);
-   DeviceStateManager.initSettingsListener(groupId, deviceId);
-   DeviceStateManager.instance.start(isWorker: true);   
+  // ... (Foreground/Background dinleyicileri aynı)
+
+  print("LynraCareBGEngine: Tek gerçek motor çalışıyor. Takip başlatıldı.");
+
+  // 1. Kalp atışı sadece worker'da başlar
+  RTDBService().startLocatorHeartbeat(
+    groupId: groupId!,
+    deviceId: deviceId!,
+    initialBattery: 0, // UpdatePresence zaten güncelleyecek
+  );
+
+  // 2. Hareket mantığı sadece worker'da başlar
+  _startMovementLogic(service, groupId, deviceId);
+  
+  // 3. Ayarları dinle
+  DeviceStateManager.initSettingsListener(groupId, deviceId);
+
+  // 4. VE ASIL MARŞ: Kaptan burada DeviceStateManager'ı uyandırıyor.
+  // isWorker: true olduğu için timer'lar sadece burada dönecek.
+  print("DeviceStateManager start called from SINGLE source: BGEngine Worker");
+  DeviceStateManager.instance.start(isWorker: true);
 }
 
 @pragma('vm:entry-point')

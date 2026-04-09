@@ -49,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
   StreamSubscription<DatabaseEvent>? _watchersSubscription;
   bool _isBeingWatched = false;
   String _watcherName = "";
-  int _displayInterval = 3600;
+  int _displayInterval = 30;
   
  
 @override

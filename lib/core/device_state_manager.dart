@@ -21,7 +21,7 @@ class DeviceStateManager {
   static   int currentIntervalSeconds = 30;//3600; // Başlangıç: 1 Saat
   bool _isWorkerMode = false; // Isolate kimliğini tutacak bayrak
   bool _isActiveRequest = false; 
-  Timer? _presenceTimer;
+static  Timer? _presenceTimer;
   Timer? _autoSleepTimer;
   Timer? _ticker;
   Timer? _geoTicker;
@@ -41,7 +41,7 @@ static Function(int)? onIntervalChanged;
   bool? _gfInside;
   bool _isReady = false;
   final _readyController = StreamController<bool>.broadcast();
-  final Battery _battery = Battery();
+static  final Battery _battery = Battery();
   StreamSubscription<geo.ServiceStatus>? _gpsSub;
   static bool _gfEnabled = false;
 // Places (Çoklu Mekanlar)
@@ -62,7 +62,7 @@ static bool _isMovingByAccel = false;
 // Hassasiyet eşiği: 
 // 0.2-0.5 arası çok hassas (masa titremesi)
 // 1.0-2.0 arası gerçek hareket (yürüme/araç sarsıntısı)
-static const double _accelThreshold = 1.5;
+static const double _accelThreshold = 10;
 
 static DateTime? _lastMovementTime;
 static const Duration _movementExpiry = Duration(minutes: 5); // 3 dakika tolerans
@@ -75,27 +75,28 @@ static const Duration _movementExpiry = Duration(minutes: 5); // 3 dakika tolera
   }
   
   void start({bool isWorker = false}) {
+  print("DeviceStateManager called");
     _isWorkerMode = isWorker;
     _ticker?.cancel();
+	_ticker = null;
     _geoTicker?.cancel(); 
+	_geoTicker = null; 
 	_presenceTimer?.cancel();
+	_presenceTimer = null;
+	_accelSub?.cancel();
+    _accelSub = null;
 	
 	print("LynraCare: Manager Mode => ${isWorker ? 'WORKER (BG)' : 'OBSERVER (UI)'}");
     
-	// 1. ORTAK GÖREV: Durum Kontrolleri (Her iki tarafta da çalışır)
     _checkState();
 	_gpsSub?.cancel();
     _gpsSub = geo.Geolocator.getServiceStatusStream().listen((_) => _checkState());
 	initAccelerometer();
+    _restartPresenceTimer();
 	
 	// UI tarafı 10 saniyede bir, BG tarafı 30 saniyede bir check etsin (Gereksiz yük olmasın)
     _ticker = Timer.periodic(Duration(seconds: isWorker ? 30 : 10), (_) => _checkState());
-	
-	// 2. ÖZEL GÖREV: Sadece İşçi (BGEngine) ise Timer'ları kur
-    if (_isWorkerMode) {
-      _restartPresenceTimer();
-      _startGeofenceTicker();
-    }
+   // _startGeofenceTicker();
   }
   
 static void initSettingsListener(String groupId, String locatorId) {
@@ -137,22 +138,23 @@ static void initSettingsListener(String groupId, String locatorId) {
   
 } 
   
-  void _restartPresenceTimer() {
-  print("LynraCare PresenceTimer started");
+static  void _restartPresenceTimer() {
+  print("LynraCare updatePresence Timer started");
+  updatePresence(source: "PRESENCE_TIMER");
     _presenceTimer?.cancel();
     _presenceTimer = Timer.periodic(
       Duration(seconds: currentIntervalSeconds),
-      (_) => updatePresence(),
+      (_) => updatePresence(source: "MAIN_TICKER"),
     );
   }
   
 
   // --- RTDB GÜNCELLEME ---  
-  Future<void> updatePresence() async {
-  print("LynraCare updatePresence started");
+static  Future<void> updatePresence({String source = "UNKNOWN"}) async {
+ print("DEBUG: updatePresence tetiklendi! Kaynak: $source, Süre: $currentIntervalSeconds");
+ print("LynraCare: currentIntervalSeconds:$currentIntervalSeconds ,RTDB updateStatus [${DateTime.now()}]");
   final locatorId = await IdentityManager.getOrCreateDeviceId();
   final groupId = await IdentityManager.getLocalGroupId(); // Grup ID'sini al
-  print("LynraCare updatePresence started groupId:$groupId");
   
   if (groupId == null) return;
   
@@ -189,10 +191,10 @@ static void initSettingsListener(String groupId, String locatorId) {
       deviceId: locatorId,
       data: rtdbData,
     );
-    print("LynraCare: RTDB updateStatus [${DateTime.now()}]");
   }
   
 Future<void> _checkState() async {
+print("LynraCare _checkState");
   // 1. Cihaz içi kontroller (Hızlı ve Bedava)
   gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
   final permission = await geo.Geolocator.checkPermission();
@@ -235,6 +237,24 @@ Future<void> _checkState() async {
         );
         await prefs.setBool('gpsOffAlertSent', true);
     }
+
+// Bu kısım _checkState() fonksiyonunun içine eklenmeli:
+if (_isMovingByAccel && _lastMovementTime != null) {
+  final silenceDuration = DateTime.now().difference(_lastMovementTime!);
+
+  // Eğer 3 dakikadır (veya belirlediğin süre) hareket yoksa
+  if (silenceDuration > const Duration(minutes: 3)) {
+    _isMovingByAccel = false;
+    print("ZINK: Uzun süreli sessizlik. İvmeölçer tekrar nöbete geçiyor...");
+    
+    // İvmeölçeri tekrar uyandır
+    initAccelerometer();
+    
+    // Hareket bittiği için Geofence Ticker'ı durdurabilirsin (Opsiyonel)
+    _geoTicker?.cancel();
+  }
+}
+	
   } catch (e) {
     print('GPS OFF ALERT ERROR => $e');
   }
@@ -248,27 +268,21 @@ Future<void> _checkState() async {
   
 void initAccelerometer() {
   _accelSub?.cancel();
-  
+  print("LynraCare: İvmeölçer bekçisi aktif (Threshold: 10)");
+
   _accelSub = userAccelerometerEvents.listen((UserAccelerometerEvent event) {
+    // x^2 + y^2 + z^2 ile toplam ivmeyi hesapla
     final double power = (event.x * event.x) + (event.y * event.y) + (event.z * event.z);
 
-    if (power > _accelThreshold) {
-      // Hareket algılandığı an zaman damgasını güncelle
+    if (power > _accelThreshold) { // Threshold'u 10'a çektik
       _lastMovementTime = DateTime.now();
+      print("LynraCare: Yüksek ivme tespit edildi ($power). İvmeölçer kapatılıyor...");
+      
+      // HAREKET ALGILANDI: Donanımsal dinlemeyi durdur (CPU'yu koru)
+      _accelSub?.cancel();
+      _accelSub = null;
+      
       onMovementDetected();
-    } else {
-      // Eğer güç eşiğin altındaysa, hemen 'false' yapma!
-      // Son hareketin üzerinden 3 dakika geçti mi diye bak.
-      if (_lastMovementTime != null) {
-        final silenceDuration = DateTime.now().difference(_lastMovementTime!);
-        
-        if (silenceDuration > _movementExpiry) {
-          if (_isMovingByAccel) {
-            _isMovingByAccel = false;
-            print("ZINK: 3 dakikadır hareket yok. Cihaz uykuda.");
-          }
-        }
-      }
     }
   });
 }
@@ -326,20 +340,15 @@ print("ZINK _performGeofenceCheck _gfEnabled:$_gfEnabled");
   }
 }
 
-// 2. İVMEÖLÇER İÇİNDEKİ TETİKLEYİCİ
-// (initAccelerometer içinde hareket algılandığında burası çalışacak)
 void onMovementDetected() {
   if (!_isMovingByAccel) {
     _isMovingByAccel = true;
-    print("ZINK: Hareket başladı! Motorlar ısınıyor...");
-    
-    // ANINDA UYANIŞ: 60 saniye beklemeden ilk kontrolü çak!
+    print("ZINK: Cihaz hareket moduna geçti!");
+
+    // Anlık kontrolü yap ve rutin Ticker'ı başlat
     _performGeofenceCheck();
-    
-    // RUTİNİ BAŞLAT: Timer'ı şimdi ateşle!
     _startGeofenceTicker();
   }
-  _lastMovementTime = DateTime.now(); // Zaman damgasını tazele
 }
 
 Future<void> _handleSavedPlacesGeofence({
@@ -437,28 +446,38 @@ Future<void> _handleSavedPlacesGeofence({
   }
 }  
   
-  static void setTrackingState({bool? moving, bool? watched}) {
-    // Sadece gelen bilgiyi güncelle, gelmeyene dokunma
+static void setTrackingState({bool? moving, bool? watched}) {
+    // 1. Durumları güncelle
     if (moving != null) _isMoving = moving;
     if (watched != null) _isWatched = watched;
 
-    // ANA MANTIK: İkisinden biri bile true ise vites 30sn olmalı
+    // 2. Hedef vitesi belirle
+    // İkisinden biri aktifse 10sn, ikisi de pasifse (soğuma sonrası) 30sn
     bool shouldBeFast = _isMoving || _isWatched;
 
     if (shouldBeFast) {
-      _cooldownTimer?.cancel(); // Uyku sayacını durdur
-      currentIntervalSeconds = 10;
-	  onIntervalChanged?.call(currentIntervalSeconds);
-      print("Vites: 30s (Durum -> Hareket: $_isMoving, İzleyici: $_isWatched)");
+      // Hareket veya izleme geldiği an "Hızlı Mod"a geç
+      _cooldownTimer?.cancel(); 
+      
+      // SADECE vites değişirse callback tetikle (CPU'yu gereksiz yorma)
+      if (currentIntervalSeconds != 10) {
+        currentIntervalSeconds = 10;
+        print("Vites: 10s (Durum -> Hareket: $_isMoving, İzleyici: $_isWatched)");
+        onIntervalChanged?.call(currentIntervalSeconds); 
+		_restartPresenceTimer();
+      }
     } else {
-      // İkisi de false ise soğuma başlasın
+      // İkisi de false ise ve zaten geri sayım başlamadıysa başlat
       if (_cooldownTimer?.isActive ?? false) return;
 
-      print("Aktiflik bitti, 5 dkk geri sayım...");
+      print("Aktiflik bitti, 2 dkk sonra 30s moduna geçilecek...");
       _cooldownTimer = Timer(const Duration(minutes: 2), () {
-        currentIntervalSeconds = 30;//3600;
-		onIntervalChanged?.call(currentIntervalSeconds);
-        print("Vites: 3600s (Sessizlik sağlandı)");
+        if (currentIntervalSeconds != 30) {
+          currentIntervalSeconds = 30;
+          print("Vites: 30s (Sessizlik sağlandı, cooldown bitti)");
+          onIntervalChanged?.call(currentIntervalSeconds);
+		  _restartPresenceTimer();
+        }
       });
     }
   }
