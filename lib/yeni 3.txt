@@ -1,0 +1,133 @@
+return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+  stream: FirebaseFirestore.instance
+      .collection('groups')
+      .doc(_groupId)
+      .collection('locators')
+      .doc(_selectedLocatorId)
+      .collection('responses')
+      .doc(pendingRequestId ?? visibleRequestId)
+      .snapshots(),
+  builder: (context, snapshot) {    if (snapshot.connectionState == ConnectionState.waiting) {
+      return const SizedBox();
+    }
+
+    if (snapshot.hasError) {
+      return const SizedBox();
+    }
+
+    if (!snapshot.hasData || snapshot.data == null) {
+      return const SizedBox();
+    }
+
+    final responseDoc = snapshot.data!;
+    if (!responseDoc.exists) {
+      return const SizedBox();
+    }
+
+    final data = responseDoc.data();
+    if (data == null) {
+      return const SizedBox();
+    }
+
+    final responseDeviceId =
+        (data['requesterDeviceId'] ?? '').toString().trim();
+
+    if (_requesterDeviceId != null &&
+        responseDeviceId.isNotEmpty &&
+        responseDeviceId != _requesterDeviceId) {
+      return const SizedBox();
+    }
+
+    final status = (data['status'] ?? '').toString();
+    final lat = (data['lat'] as num?)?.toDouble();
+    final lng = (data['lng'] as num?)?.toDouble();
+    final hasFix = (status == 'ok' && lat != null && lng != null);
+
+    if (hasFix && pendingRequestId != null) {
+      final currentPending = pendingRequestId;
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+
+        setState(() {
+          _lastRequestId = currentPending;
+          _pendingRequestId = null;
+          _timeout = false;
+          _lastAddress = null;
+          _lastAddressKey = null;
+        });
+      });
+    }
+
+    if (visibleRequestId == null && pendingRequestId != null) {
+      return const SizedBox();
+    }
+
+    if (visibleRequestId == null && pendingRequestId == null) {
+      return const SizedBox();
+    }
+
+    final displayDocId = _lastRequestId ?? visibleRequestId;
+    if (displayDocId == null) {
+      return const SizedBox();
+    }
+
+  
+  return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('groups')
+          .doc(_groupId)
+          .collection('locators')
+          .doc(_selectedLocatorId)
+          .collection('responses')
+          .doc(displayDocId)
+          .snapshots(),
+      builder: (context, visibleSnapshot) {
+	          final visibleData = visibleSnapshot.data?.data();
+
+        if (visibleData == null) {
+          return const SizedBox();
+        }
+
+        final visibleResponseDeviceId =
+            (visibleData['requesterDeviceId'] ?? '').toString().trim();
+
+        if (_requesterDeviceId != null &&
+            visibleResponseDeviceId.isNotEmpty &&
+            visibleResponseDeviceId != _requesterDeviceId) {
+          return const SizedBox();
+        }
+
+        final status = (visibleData['status'] ?? '').toString();
+        final lat = (visibleData['lat'] as num?)?.toDouble();
+        final lng = (visibleData['lng'] as num?)?.toDouble();
+        final acc = (visibleData['acc'] as num?)?.toDouble();
+        final ts = visibleData['ts'] as Timestamp?;
+        final battery = (visibleData['battery'] as num?)?.toInt();
+
+        final hasFix = (status == 'ok' && lat != null && lng != null);
+        final online =
+            ts != null &&
+            DateTime.now().difference(ts.toDate()).inSeconds <= 60;
+
+        if (!hasFix) {
+          return _StatusCard(
+            icon: Icons.sync_problem_rounded,
+            iconBg: const Color(0xFFFEF2F2),
+            iconColor: const Color(0xFFDC2626),
+            title: 'Response received',
+            subtitle: 'Status: $status\nWaiting for valid location...',
+          );
+        }
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _resolveAddress(lat, lng);
+        });
+
+
+			return Container(
+			);
+  
+        },
+    );
+  },
+);
