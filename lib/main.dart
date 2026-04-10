@@ -59,7 +59,7 @@ Future<void> main() async {
       // Sadece servis çalışmıyorsa ana uygulama start versin
 	     print("DeviceStateManager start called from main");
 
-      //DeviceStateManager.instance.start(); 
+      DeviceStateManager.instance.start(); 
       //}
 	  print("LynraCareSETUP CHECK DONE");
   
@@ -189,7 +189,7 @@ FirebaseMessaging.onMessage.listen((message) async {
         'ts': FieldValue.serverTimestamp(),
         'via': 'cached',
       }, SetOptions(merge: true));
-
+DeviceStateManager.updatePresence(source: "MAIN_UI");
       LocatorUiState.instance.onSentOk();
       print("LynraCareFG CACHED SENT => $requestId $cachedLat,$cachedLng age=$age");
       return;
@@ -220,7 +220,7 @@ FirebaseMessaging.onMessage.listen((message) async {
       'ts': FieldValue.serverTimestamp(),
       'via': 'fg',
     }, SetOptions(merge: true));
-
+DeviceStateManager.updatePresence(source: "MAIN_UI");
     LocatorUiState.instance.onSentOk();
     print("LynraCareFG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
   } catch (e) {
@@ -239,7 +239,7 @@ FirebaseMessaging.onMessage.listen((message) async {
       'ts': FieldValue.serverTimestamp(),
       'via': 'fg',
     }, SetOptions(merge: true));
-
+	DeviceStateManager.updatePresence(source: "MAIN_UI");
     LocatorUiState.instance.reset();
   }
 });
@@ -352,6 +352,7 @@ if (groupId == null || groupId.isEmpty) {
         'ts': FieldValue.serverTimestamp(),
         'via': 'cached_bg',
       }, SetOptions(merge: true));
+DeviceStateManager.updatePresence(source: "MAIN_UI");
       //LocatorUiState.instance.onSentOk();
       print("LynraCareBG CACHED SENT => $requestId $cachedLat,$cachedLng age=$age");
       return;
@@ -400,7 +401,7 @@ if (groupId == null || groupId.isEmpty) {
       'ts': FieldValue.serverTimestamp(),
       'via': 'bg',
     }, SetOptions(merge: true));
-
+DeviceStateManager.updatePresence(source: "MAIN_UI");
     print("LynraCareBG LOC SENT => $requestId ${pos.latitude},${pos.longitude}");
   } catch (e) {
   print("LynraCareBG_HANDLER ERROR => $e");

@@ -1,0 +1,57 @@
+return StreamBuilder<DatabaseEvent>(
+  stream: RTDBService().getGroupPresenceStream(_groupId!),
+  builder: (context, snapshot) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return const SizedBox();
+    }
+
+    if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
+      return const SizedBox();
+    }
+
+    // RTDB'den gelen tüm grubun verisi
+    final allLocators = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
+    // Sadece seçili olan cihazın verisi
+    final myData = allLocators[_selectedLocatorId] as Map<dynamic, dynamic>?;
+
+    if (myData == null) {
+      return const SizedBox();
+    }
+
+    // UI'ın beklediği değişkenlerin RTDB'den parse edilmesi
+    final status = (myData['status'] ?? '').toString();
+    final lat = (myData['lat'] as num?)?.toDouble();
+    final lng = (myData['lng'] as num?)?.toDouble();
+    final acc = (myData['acc'] as num?)?.toDouble();
+    final battery = (myData['battery'] as num?)?.toInt();
+    
+    // Zaman damgası dönüşümü
+    final tsInt = myData['lastSeen'] as int?;
+    final tsDate = tsInt != null ? DateTime.fromMillisecondsSinceEpoch(tsInt) : null;
+
+    final hasFix = (status == 'ok' || (lat != null && lng != null));
+    final online = status == 'online';
+
+    if (!hasFix) {
+      return _StatusCard(
+        icon: Icons.sync_problem_rounded,
+        iconBg: const Color(0xFFFEF2F2),
+        iconColor: const Color(0xFFDC2626),
+        title: 'Waiting for Fix',
+        subtitle: 'Status: $status\nLocation data not valid yet...',
+      );
+    }
+
+    // Adres çözme tetikleyicisi
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (lat != null && lng != null) {
+        _resolveAddress(lat, lng);
+      }
+    });
+
+    return Container(
+      // --- İÇERİĞİ SENİN 1. BLOKTAKİ GİBİ DOLDURULACAK ---
+      // Örn: Column(children: [ ... Location result, Maps Button vb. ... ])
+    );
+  },
+);

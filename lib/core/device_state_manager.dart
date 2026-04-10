@@ -460,8 +460,8 @@ static void setTrackingState({bool? moving, bool? watched}) {
       _cooldownTimer?.cancel(); 
       
       // SADECE vites değişirse callback tetikle (CPU'yu gereksiz yorma)
-      if (currentIntervalSeconds != 10) {
-        currentIntervalSeconds = 10;
+      if (currentIntervalSeconds != 3600) {
+        currentIntervalSeconds = 3600;
         print("Vites: 10s (Durum -> Hareket: $_isMoving, İzleyici: $_isWatched)");
         onIntervalChanged?.call(currentIntervalSeconds); 
 		_restartPresenceTimer();
@@ -472,8 +472,8 @@ static void setTrackingState({bool? moving, bool? watched}) {
 
       print("Aktiflik bitti, 2 dkk sonra 30s moduna geçilecek...");
       _cooldownTimer = Timer(const Duration(minutes: 2), () {
-        if (currentIntervalSeconds != 30) {
-          currentIntervalSeconds = 30;
+        if (currentIntervalSeconds != 3600) {
+          currentIntervalSeconds = 3600;
           print("Vites: 30s (Sessizlik sağlandı, cooldown bitti)");
           onIntervalChanged?.call(currentIntervalSeconds);
 		  _restartPresenceTimer();
