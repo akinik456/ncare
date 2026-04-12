@@ -1315,14 +1315,12 @@ return Wrap(
 				  return StreamBuilder<DatabaseEvent>(
   stream: RTDBService().getGroupPresenceStream(_groupId!),
   builder: (context, snapshot) {
-
     if (snapshot.connectionState == ConnectionState.waiting) {
-      return const SizedBox();
-    }
-
+      return const SizedBox();}	
+	if (snapshot.hasError) {
+      return const SizedBox();}
     if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-      return const SizedBox();
-    }
+      return const SizedBox();}
 
     // RTDB'den gelen tüm grubun verisi
     final allLocators = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
@@ -1334,7 +1332,7 @@ return Wrap(
     }
 
     // UI'ın beklediği değişkenlerin RTDB'den parse edilmesi
-    final status = 'ok';//(myData['status'] ?? '').toString();
+    final status = (myData['status'] ?? '').toString();
     final lat = (myData['lat'] as num?)?.toDouble();
     final lng = (myData['lng'] as num?)?.toDouble();
     final acc = (myData['acc'] as num?)?.toDouble();
@@ -1346,7 +1344,7 @@ return Wrap(
     ? Timestamp.fromMillisecondsSinceEpoch(tsInt) 
     : null;
 
-    final hasFix = (status == 'ok' || (lat != null && lng != null));
+    final hasFix = (status == 'online' || (lat != null && lng != null));
     final online = status == 'online';
 
     if (!hasFix) {

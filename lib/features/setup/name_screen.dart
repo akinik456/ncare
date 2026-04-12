@@ -1,3 +1,50 @@
+/*Typography scale (tüm app için kullan)
+Brand (Lynra Care) → 22 / W700
+Page Title (Locator Setup) → 30 / W900
+Section Title (Name visible...) → 15-16 / W700
+Input text → 16 / W600
+Hint text → 14-15 / W500
+
+primaryColor       = #14B8A6  // Teal
+backgroundColor    = #020617  // Midnight
+gradientTopColor   = #0F172A  // Dark Navy
+cardColor          = #1E293B  // Slate
+borderColor        = #334155  // Slate Border
+secondaryTextColor = #64748B  // Muted Slate
+*/
+
+/*
+onboard
+	role_screen
+	name_screen	
+	locator_permission_screen
+	requester_permission_screen
+main
+	requester_screen
+	home_screen
+settings
+	add_locator_screen
+	add_place_screen
+	locator_name_screen
+	pairing_options_screen
+	pair_screen
+	setup_screen
+	
+Yeni ekran yaparken:
+
+❌ TextField yazma
+❌ FilledButton yazma
+❌ Color hex yazma
+❌ TextStyle yazma
+
+👉 sadece:
+
+AppInputField
+AppButton
+AppColors
+AppTextStyles	
+	
+*/
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
@@ -6,6 +53,11 @@ import '../../core/role_manager.dart';
 import '../../core/auth_service.dart';
 import '../../core/fcm_manager.dart';
 import '../../core/background_engine.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/app_input_field.dart';
+import '../../core/widgets/app_button.dart';
+import 'app_card.dart';
 import '../requester/requester_screen.dart';
 import '../requester/requester_permission_screen.dart';
 import '../locator/locator_permission_screen.dart';
@@ -167,218 +219,94 @@ class _NameScreenState extends State<NameScreen> {
 
     final heroTitle = isRequester ? 'Requester Setup' : 'Locator Setup';
     final inputTitle = isRequester
-        ? 'Name shown on locator'
-        : 'Name shown on requester';
-    final helperText = isRequester
-        ? 'Enter the name that paired locator devices will see for this phone.'
-        : 'Enter the name that requester devices will see for this phone.';
+        ? 'Name visible to locators'
+        : 'Name visible to requesters';
     final hintText = isRequester ? 'Enter requester name' : 'Enter locator name';
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF020617), // En alt katman rengi [cite: 2]
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF0F172A), 
-              Color(0xFF020617),
-            ],
-            stops: [0.0, 0.85],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Header Section [cite: 2]
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF14B8A6).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Icon(
-                              isRequester ? Icons.travel_explore_rounded : Icons.phone_android_rounded,
-                              color: const Color(0xFF14B8A6),
-                              size: 32,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            heroTitle,
-                            style: const TextStyle(
-                                fontSize: 30,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                letterSpacing: -1),
-                          ),
-                          Text(
-                            helperText,
-                            style: const TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF94A3B8),
-                                fontWeight: FontWeight.w500),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 32),
+	return Scaffold(
+	  backgroundColor: AppColors.background,
+	  body: Container(
+		decoration: const BoxDecoration(
+		  gradient: LinearGradient(
+			begin: Alignment.topCenter,
+			end: Alignment.bottomCenter,
+			colors: [
+			  AppColors.gradientTop,
+			  AppColors.background,
+			],
+			stops: [0.0, 0.85],
+		  ),
+		),
+		child: SafeArea(
+		  child: Column(
+			children: [
+			  // 🔼 CONTENT
+			  Expanded(
+				child: SingleChildScrollView(
+				  padding: const EdgeInsets.all(24),
+				  child: Column(
+					crossAxisAlignment: CrossAxisAlignment.start,
+					children: [
+					  // 🟢 BRAND + TITLE
+					  const Text(
+						'Lynra Care',
+						style: AppTextStyles.brand,
+					  ),
+					  const SizedBox(height: 8),
+					  Text(
+						heroTitle,
+						style: AppTextStyles.pageTitle,
+					  ),
 
-                      // Input Section [cite: 2]
-                      Text(
-                        "IDENTIFICATION",
-                        style: TextStyle(
-                            color: const Color(0xFF5EEAD4),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1.2),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1E293B).withOpacity(0.4),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: const Color(0xFF334155),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              inputTitle,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            TextField(
-                              controller: controller,
-							  focusNode: focusNode, // Node'u bağladık
-							  autofocus: true,      // İlk açılışta otomatik focus atar
-                              textInputAction: TextInputAction.done,
-                              onSubmitted: (_) => saving ? null : _save(),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                              decoration: InputDecoration(
-                                hintText: hintText,
-                                hintStyle: const TextStyle(
-                                  color: Color(0xFF64748B),
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                filled: true,
-                                fillColor: const Color(0xFF020617).withOpacity(0.5),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 16,
-                                ),
-                                prefixIcon: Icon(
-                                  isRequester ? Icons.badge_rounded : Icons.person_pin_circle_rounded,
-                                  color: const Color(0xFF14B8A6),
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide.none,
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF334155),
-                                    width: 1,
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF14B8A6),
-                                    width: 1.5,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              
-              // Bottom Bar (Dış Işımalı Buton Bölümü) [cite: 2]
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.transparent, 
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 40,
-                      offset: const Offset(0, -10),
-                    )
-                  ],
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF14B8A6).withOpacity(0.35),
-                        blurRadius: 25,
-                        spreadRadius: 1,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: FilledButton(
-                    onPressed: saving ? null : _save,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF14B8A6),
-                      disabledBackgroundColor: const Color(0xFF1E293B),
-                      minimumSize: const Size(double.infinity, 64),
-                      shadowColor: Colors.transparent,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20)),
-                    ),
-                    child: saving
-                        ? const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
-                        : const Text(
-                            'CONTINUE',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.5,
-                              color: Colors.white,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+					  const SizedBox(height: 16),
+
+					  // 🧱 CARD
+					  AppCard(
+						child: Column(
+						  crossAxisAlignment: CrossAxisAlignment.start,
+						  children: [
+							Text(
+							  inputTitle,
+							  style: AppTextStyles.sectionTitle,
+							),
+							const SizedBox(height: 14),
+
+							AppInputField(
+							  controller: controller,
+							  focusNode: focusNode,
+							  hintText: hintText,
+							  onSubmitted: saving ? null : _save,
+							),
+						  ],
+						),
+					  ),
+					],
+				  ),
+				),
+			  ),
+
+			  // 🔽 BOTTOM BUTTON
+			  Container(
+				padding: const EdgeInsets.all(24),
+				decoration: BoxDecoration(
+				  boxShadow: [
+					BoxShadow(
+					  color: AppColors.black.withOpacity(0.2),
+					  blurRadius: 40,
+					  offset: const Offset(0, -10),
+					),
+				  ],
+				),
+				child: AppButton(
+				  onPressed: _save,
+				  loading: saving,
+				  text: 'CONTINUE',
+				),
+			  ),
+			],
+		  ),
+		),
+	  ),
+	);
   }
 }
