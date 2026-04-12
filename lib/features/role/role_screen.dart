@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../core/role_manager.dart';
-import '../setup/name_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../core/role_manager.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../setup/app_card.dart';
+import '../setup/name_screen.dart';
 
 class RoleScreen extends StatelessWidget {
   const RoleScreen({super.key});
@@ -35,84 +39,80 @@ class RoleScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF1E293B),
-  Color(0xFF1E293B),
-  Color(0xFF334155),
+              AppColors.gradientTop,
+              AppColors.background,
             ],
+            stops: [0.0, 0.9],
           ),
         ),
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 560),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    const SizedBox(height: 24),
 
-                    const SizedBox(height: 10),
-
-                    Text(
-                      "LynraCare",
+                    const Text(
+                      'Lynra Care',
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontSize: 38,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: -1,
-                      ),
+                      style: AppTextStyles.brand,
                     ),
 
                     const SizedBox(height: 10),
 
                     Text(
-                      "Choose device role",
+                      'Choose device role',
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: const Color(0xFF94A3B8),
-                      ),
+                      style: AppTextStyles.pageTitle.copyWith(fontSize: 32),
+                    ),
+
+                    const SizedBox(height: 10),
+
+                    Text(
+                      'Select how this device will be used',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.hint.copyWith(fontSize: 16),
                     ),
 
                     const SizedBox(height: 32),
 
-                    /// CREATE GROUP (TOP)
                     _MainCard(
-                      title: "Create New Group",
-                      subtitle: "Start a fresh LynraCare group on this device",
+                      title: 'Create New Group',
+                      subtitle: 'Start a fresh Lynra Care group on this device',
                       icon: Icons.group_add_rounded,
-                      color: const Color(0xFF6366F1),
+                      accentColor: const Color(0xFF8B5CF6),
                       onTap: () => _startNewGroup(context),
                     ),
 
                     const SizedBox(height: 18),
 
                     _MainCard(
-                      title: "Locator",
-                      subtitle: "Share location when request arrives",
+                      title: 'Locator',
+                      subtitle: 'Share location when a request arrives',
                       icon: Icons.phone_android_rounded,
-                      color: const Color(0xFF22C55E),
+                      accentColor: AppColors.primary,
                       onTap: () => _select(context, "locator"),
                     ),
 
                     const SizedBox(height: 18),
 
                     _MainCard(
-                      title: "Requester",
-                      subtitle: "Ask paired locator for location",
+                      title: 'Requester',
+                      subtitle: 'Ask a paired locator for location',
                       icon: Icons.travel_explore_rounded,
-                      color: const Color(0xFF38BDF8),
+                      accentColor: const Color(0xFF38BDF8),
                       onTap: () => _select(context, "requester"),
                     ),
 
@@ -132,14 +132,14 @@ class _MainCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
-  final Color color;
+  final Color accentColor;
   final VoidCallback onTap;
 
   const _MainCard({
     required this.title,
     required this.subtitle,
     required this.icon,
-    required this.color,
+    required this.accentColor,
     required this.onTap,
   });
 
@@ -149,61 +149,66 @@ class _MainCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(28),
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            color: const Color(0xFF334155),
-            border: Border.all(color: color.withOpacity(.35)),
-            boxShadow: [
-              BoxShadow(
-                color: color.withOpacity(.25),
-                blurRadius: 25,
-                offset: const Offset(0, 10),
-              )
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: Row(
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    color: color.withOpacity(.15),
-                  ),
-                  child: Icon(icon, color: color, size: 30),
+        borderRadius: BorderRadius.circular(24),
+        child: AppCard(
+          padding: EdgeInsets.zero,
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.black.withOpacity(0.18),
+                  blurRadius: 20,
+                  offset: const Offset(0, 8),
                 ),
-                const SizedBox(width: 18),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 21,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(
-                          color: Color(0xFF94A3B8),
-                          fontSize: 15,
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.arrow_forward_ios_rounded,
-                    size: 18, color: color),
               ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              child: Row(
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(22),
+                      color: accentColor.withOpacity(0.12),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: accentColor,
+                      size: 34,
+                    ),
+                  ),
+                  const SizedBox(width: 18),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: AppTextStyles.sectionTitle.copyWith(
+                            fontSize: 20,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          subtitle,
+                          style: AppTextStyles.hint.copyWith(
+                            height: 1.35,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 18,
+                    color: accentColor,
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -1,82 +1,78 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'dart:io';
-import 'package:device_info_plus/device_info_plus.dart';
-import 'package:android_intent_plus/android_intent.dart';
-
-import '../../core/role_manager.dart';
 import 'package:restart_app/restart_app.dart';
 
-import 'package:flutter/material.dart';
 import '../../core/setup_manager.dart';
-
-import 'package:permission_handler/permission_handler.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_button.dart';
 
 class RequesterPermissionScreen extends StatelessWidget {
   const RequesterPermissionScreen({super.key});
 
+  Future<void> _handleContinue() async {
+    await Permission.locationWhenInUse.request();
+    await SetupManager.setSetupDone();
+    Restart.restartApp();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A), // Senin koyu lacivert/siyah tonun
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Üst Kısım: İkon ve Başlık
-              const Icon(Icons.location_on_rounded, size: 80, color: Color(0xFF14B8A6)), // Teal
-              const SizedBox(height: 32),
-              const Text(
-                "Location Access",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              
-              // Açıklayıcı Metin (Senin istediğin o "Mesafe" vurgusu)
-              const Text(
-                "To accurately see your distance from the locator, we need your location permission while using the app.",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Color(0xFF94A3B8), // Gri/Mavi tonu
-                  fontSize: 16,
-                  height: 1.5,
-                ),
-              ),
-              const Spacer(),
-
-              // "OK" Butonu - Senin tasarımdaki FilledButton stili
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: FilledButton(
-                  onPressed: () async {
-                    // 1. İzin iste (Sadece WhileInUse)
-                    await Permission.locationWhenInUse.request();
-                    
-                    // 2. İzin versin ya da vermesin (kendi tercihi), Requester Home'a uçur
-                    if (context.mounted) {
-					await SetupManager.setSetupDone();
-					Restart.restartApp();
-                      Navigator.pushReplacementNamed(context, 'requester_screen');
-                    }
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFF14B8A6),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  child: const Text(
-                    "OK, UNDERSTOOD",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
+      backgroundColor: AppColors.background,
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              AppColors.gradientTop,
+              AppColors.background,
             ],
+            stops: [0.0, 0.85],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: Column(
+              children: [
+                Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.location_on_rounded,
+                          size: 96,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(height: 28),
+                        Text(
+                          'Location Access',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.pageTitle.copyWith(fontSize: 28),
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          'To accurately see your distance from the locator, we need your location permission while using the app.',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.hint.copyWith(
+                            fontSize: 16,
+                            height: 1.55,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                AppButton(
+                  onPressed: _handleContinue,
+                  loading: false,
+                  text: 'OK, UNDERSTOOD',
+                ),
+              ],
+            ),
           ),
         ),
       ),
