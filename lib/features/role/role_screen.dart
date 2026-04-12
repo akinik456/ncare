@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/role_manager.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../setup/app_card.dart';
+import '../../core/widgets/app_card.dart';
 import '../setup/name_screen.dart';
 
 class RoleScreen extends StatelessWidget {

@@ -57,7 +57,7 @@ import '../../core/theme/app_text_styles.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/widgets/app_input_field.dart';
 import '../../core/widgets/app_button.dart';
-import 'app_card.dart';
+import '../../core/widgets/app_card.dart';
 import '../requester/requester_screen.dart';
 import '../requester/requester_permission_screen.dart';
 import '../locator/locator_permission_screen.dart';

@@ -3,11 +3,17 @@ import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:android_intent_plus/android_intent.dart';
+import 'package:restart_app/restart_app.dart';
 
 import '../../core/role_manager.dart';
 import '../../core/setup_manager.dart';
 import '../home/home_screen.dart';
-import 'package:restart_app/restart_app.dart';
+
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_card.dart';
+
 
 class LocatorPermissionScreen extends StatefulWidget {
   const LocatorPermissionScreen({super.key});
@@ -164,7 +170,7 @@ void _showXiaomiGuide() {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text("ANLADIM, AÇ", style: TextStyle(color: Color(0xFF14B8A6))),
+          child: const Text("ANLADIM, AÇ", style: TextStyle(color: AppColors.primary)),
         ),
       ],
     ),
@@ -174,13 +180,16 @@ void _showXiaomiGuide() {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF020617),
+      backgroundColor: AppColors.background,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF020617), Color(0xFF0F172A)],
+            colors: [
+			  AppColors.background,
+			  AppColors.gradientTop,
+			],
           ),
         ),
         child: SafeArea(
@@ -275,7 +284,7 @@ void _showXiaomiGuide() {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Row(
             children: [
-              Icon(Icons.info_outline, color: Color(0xFF14B8A6)),
+              Icon(Icons.info_outline, color: AppColors.primary),
               SizedBox(width: 10),
               Text("Action Required", style: TextStyle(color: Colors.white)),
             ],
@@ -313,7 +322,7 @@ void _showXiaomiGuide() {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           title: const Row(
             children: [
-              Icon(Icons.lock_clock_rounded, color: Color(0xFF14B8A6)),
+              Icon(Icons.lock_clock_rounded, color: AppColors.primary),
               SizedBox(width: 12),
               Text("Memory Protection", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ],
@@ -332,7 +341,7 @@ void _showXiaomiGuide() {
                 setState(() => _isProtectedAppOk = true);
               },
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF14B8A6),
+                backgroundColor: AppColors.primary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text("I UNDERSTAND", style: TextStyle(fontWeight: FontWeight.w900)),
@@ -362,24 +371,19 @@ void _showXiaomiGuide() {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: const Color(0xFF14B8A6).withOpacity(0.1),
+            color: AppColors.primary.withOpacity(0.1),
             borderRadius: BorderRadius.circular(14),
           ),
-          child: const Icon(Icons.shield_rounded, color: Color(0xFF14B8A6), size: 32),
+          child: const Icon(Icons.shield_rounded, color: AppColors.primary, size: 32),
         ),
         const SizedBox(height: 12),
         const Text(
         'Permissions',
-        style: TextStyle(
-          fontSize: 30, // 34 -> 30 (Hala büyük ve heybetli ama yer kaplamıyor)
-          fontWeight: FontWeight.w900, 
-          color: Colors.white, 
-          letterSpacing: -1
-        ),
+        style: AppTextStyles.pageTitle,
       ),
         const Text(
           'LynraCare requires these to function in background.',
-          style: TextStyle(fontSize: 14, color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
+          style: AppTextStyles.hint,
         ),
       ],
     );
@@ -390,7 +394,12 @@ void _showXiaomiGuide() {
       padding: const EdgeInsets.only(bottom: 8, left: 4),
       child: Text(
         title.toUpperCase(),
-        style: const TextStyle(color: Color(0xFF5EEAD4), fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.2),
+        style: AppTextStyles.hint.copyWith(
+  color: AppColors.primary,
+  fontSize: 11,
+  fontWeight: FontWeight.w800,
+  letterSpacing: 1.2,
+),
       ),
     );
   }
@@ -409,16 +418,16 @@ void _showXiaomiGuide() {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isGranted ? const Color(0xFF14B8A6).withOpacity(0.05) : const Color(0xFF1E293B).withOpacity(0.4),
+          color: isGranted ? AppColors.primary.withOpacity(0.05) : const Color(0xFF1E293B).withOpacity(0.4),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isGranted ? const Color(0xFF14B8A6).withOpacity(0.5) : const Color(0xFF334155),
+            color: isGranted ? AppColors.primary.withOpacity(0.5) : const Color(0xFF334155),
             width: 1.5,
           ),
         ),
         child: Row(
           children: [
-            Icon(icon, color: isGranted ? const Color(0xFF14B8A6) : const Color(0xFF64748B), size: 26),
+            Icon(icon, color: isGranted ? AppColors.primary : const Color(0xFF64748B), size: 26),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -434,7 +443,7 @@ void _showXiaomiGuide() {
             else
               Icon(
                 isGranted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                color: isGranted ? const Color(0xFF14B8A6) : const Color(0xFF475569),
+                color: isGranted ? AppColors.primary : const Color(0xFF475569),
               ),
           ],
         ),
@@ -452,7 +461,7 @@ void _showXiaomiGuide() {
       child: FilledButton(
         onPressed: _allPermissionsGranted ? _continue : null,
         style: FilledButton.styleFrom(
-          backgroundColor: const Color(0xFF14B8A6),
+          backgroundColor: AppColors.primary,
           disabledBackgroundColor: const Color(0xFF1E293B),
           minimumSize: const Size(double.infinity, 64),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),

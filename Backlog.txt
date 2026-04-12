@@ -31,6 +31,9 @@ gösterilmeli ya da silinmeli
 
 16 firestore,RTDB erişim sayısı
 
+17 locator isim verilip izin tamamlanmadan çıkılınca isim ekranından başlıyor
+requester için de öyledir
+
 ***********************
 
 Kullanıcı Kontrolü (Zorunlu Gereksinim)
