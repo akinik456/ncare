@@ -412,43 +412,54 @@ void _showXiaomiGuide() {
     required VoidCallback onTap,
     bool isManual = false,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isGranted ? AppColors.primary.withOpacity(0.05) : const Color(0xFF1E293B).withOpacity(0.4),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isGranted ? AppColors.primary.withOpacity(0.5) : const Color(0xFF334155),
-            width: 1.5,
+return GestureDetector(
+  onTap: onTap,
+  child: Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: AppCard(
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            color: isGranted ? AppColors.primary : AppColors.textSecondary,
+            size: 26,
           ),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: isGranted ? AppColors.primary : const Color(0xFF64748B), size: 26),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
-                  Text(subtitle, style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500)),
-                ],
-              ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: AppTextStyles.sectionTitle.copyWith(fontSize: 16),
+                ),
+                Text(
+                  subtitle,
+                  style: AppTextStyles.hint.copyWith(fontSize: 12),
+                ),
+              ],
             ),
-            if (isManual && !isGranted)
-              const Icon(Icons.touch_app_rounded, color: Colors.orangeAccent, size: 20)
-            else
-              Icon(
-                isGranted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                color: isGranted ? AppColors.primary : const Color(0xFF475569),
-              ),
-          ],
-        ),
+          ),
+          if (isManual && !isGranted)
+            const Icon(
+              Icons.touch_app_rounded,
+              color: Colors.orangeAccent,
+              size: 20,
+            )
+          else
+            Icon(
+              isGranted
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked_rounded,
+              color: isGranted
+                  ? AppColors.primary
+                  : AppColors.border,
+            ),
+        ],
       ),
-    );
+    ),
+  ),
+);
   }
 
   Widget _buildBottomBar() {
