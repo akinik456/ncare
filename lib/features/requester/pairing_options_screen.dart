@@ -520,29 +520,35 @@ Future<void> _confirmPairing() async {
       else
         ...docs.map((doc) => _placeTile(doc.id, doc.data())),
       const SizedBox(height: 2),
-      AppButton(
-        onPressed: canAdd
-            ? () async {
-                final saved = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => AddPlaceScreen(
-                      locatorId: widget.locatorId,
-                      locatorName: widget.locatorName,
-                    ),
+      SizedBox(
+  width: double.infinity,
+  child: SizedBox(
+    height: 48,
+    child: AppButton(
+      onPressed: canAdd
+          ? () async {
+              final saved = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AddPlaceScreen(
+                    locatorId: widget.locatorId,
+                    locatorName: widget.locatorName,
                   ),
-                );
+                ),
+              );
 
-                if (saved == true && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Place list updated')),
-                  );
-                }
+              if (saved == true && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Place list updated')),
+                );
               }
-            : null,
-        loading: false,
-        text: canAdd ? 'ADD PLACE' : 'MAXIMUM 3 PLACES',
-      ),
+            }
+          : null,
+      loading: false,
+      text: canAdd ? 'ADD PLACE' : 'MAXIMUM 3 PLACES',
+    ),
+  ),
+),
     ],
   ),
 );
@@ -685,7 +691,7 @@ Widget build(BuildContext context) {
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: [10,20, 25, 30].map((level) {
+                      children: [10,20,30].map((level) {
                         final selected = _batteryThreshold == level;
                         return ChoiceChip(
                           label: Text(
@@ -740,21 +746,41 @@ Widget build(BuildContext context) {
 
             const SizedBox(height: 8),
 
-            AppButton(
-              onPressed: _saving ? null : _confirmPairing,
-              loading: _saving,
-              text: 'SAVE SETTINGS',
-            ),
+            Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 14),
+  child: SizedBox(
+    height: 48,
+    child: AppButton(
+      onPressed: _saving ? null : _confirmPairing,
+      loading: _saving,
+      text: 'SAVE SETTINGS',
+    ),
+  ),
+),
 
             const SizedBox(height: 6),
 
-            TextButton(
-              onPressed: _saving ? null : _removeLocator,
-              child: const Text(
-                'Remove locator',
-                style: TextStyle(color: Colors.red),
-              ),
-            ),
+            Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 14),
+  child: SizedBox(
+    height: 48,
+    child: OutlinedButton(
+      onPressed: _saving ? null : _removeLocator,
+      style: OutlinedButton.styleFrom(
+        side: const BorderSide(color: Colors.red),
+        foregroundColor: Colors.red,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+      ),
+      child: const Text(
+        'REMOVE LOCATOR',
+        style: TextStyle(fontWeight: FontWeight.w700),
+      ),
+    ),
+  ),
+),
           ],
         ),
       ),
