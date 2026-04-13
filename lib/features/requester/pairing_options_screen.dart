@@ -352,61 +352,65 @@ Future<void> _confirmPairing() async {
   }
 
   Widget _placeTile(String placeId, Map<String, dynamic> data) {
-    final name = (data['name'] ?? 'Place').toString().trim();
-    final address = (data['address'] ?? '').toString().trim();
-    final enabled = (data['enabled'] ?? true) == true;
+  final name = (data['name'] ?? 'Place').toString().trim();
+  final address = (data['address'] ?? '').toString().trim();
+  final enabled = (data['enabled'] ?? true) == true;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE0E7FF),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(
-              Icons.place_rounded,
-              color: Color(0xFF1D4ED8),
-            ),
+  return Container(
+    margin: const EdgeInsets.only(bottom: 8),
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: AppColors.background.withOpacity(0.45),
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: AppColors.border),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(10),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  style: const TextStyle(
-                    color: Color(0xFF0F172A),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  address.isEmpty ? 'Address not available' : address,
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
+          child: const Icon(
+            Icons.place_rounded,
+            color: AppColors.primary,
+            size: 18,
           ),
-          const SizedBox(width: 12),
-          Column(
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Switch.adaptive(
+              Text(
+                name,
+                style: AppTextStyles.sectionTitle.copyWith(fontSize: 14),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                address.isEmpty ? 'Address not available' : address,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.hint.copyWith(
+                  fontSize: 12,
+                  height: 1.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Transform.scale(
+              scale: 0.85,
+              child: Switch.adaptive(
                 value: enabled,
+                activeColor: AppColors.primary,
                 onChanged: (v) async {
                   await _setPlaceEnabled(
                     placeId: placeId,
@@ -414,22 +418,21 @@ Future<void> _confirmPairing() async {
                   );
                 },
               ),
-              Text(
-                enabled ? 'Enabled' : 'Disabled',
-                style: TextStyle(
-                  color: enabled
-                      ? const Color(0xFF166534)
-                      : const Color(0xFF475569),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
+            ),
+            Text(
+              enabled ? 'On' : 'Off',
+              style: AppTextStyles.hint.copyWith(
+                fontSize: 11,
+                color: enabled ? AppColors.primary : AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
               ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _placesSection() {
     return FutureBuilder<CollectionReference<Map<String, dynamic>>>(
@@ -461,96 +464,88 @@ Future<void> _confirmPairing() async {
             final placeCount = docs.length;
             final canAdd = placeCount < 3;
 
-            return _sectionCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Saved places',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF0F172A),
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFE2E8F0),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          '$placeCount / 3',
-                          style: const TextStyle(
-                            color: Color(0xFF334155),
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Save up to 3 places from the locator current location.',
-                    style: TextStyle(
-                      color: Color(0xFF64748B),
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  if (docs.isEmpty)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                      ),
-                      child: const Text(
-                        'No places saved yet.',
-                        style: TextStyle(
-                          color: Color(0xFF64748B),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    )
-                  else
-                    ...docs.map((doc) => _placeTile(doc.id, doc.data())),
-                  const SizedBox(height: 4),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: canAdd
-                          ? () async {
-                              final saved = await Navigator.push<bool>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => AddPlaceScreen(
-                                    locatorId: widget.locatorId,
-                                    locatorName: widget.locatorName,
-                                  ),
-                                ),
-                              );
-
-                              if (saved == true && mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('Place list updated')),
-                                );
-                              }
-                            }
-                          : null,
-                      icon: const Icon(Icons.add_location_alt_rounded),
-                      label: Text(canAdd ? 'Add place' : 'Maximum 3 places reached'),
-                    ),
-                  ),
-                ],
+            return AppCard(
+  padding: const EdgeInsets.all(14),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Saved places',
+              style: AppTextStyles.sectionTitle.copyWith(fontSize: 15),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Text(
+              '$placeCount / 3',
+              style: AppTextStyles.hint.copyWith(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
               ),
-            );
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 4),
+      Text(
+        'Save up to 3 places from the locator current location.',
+        style: AppTextStyles.hint.copyWith(fontSize: 13, height: 1.25),
+      ),
+      const SizedBox(height: 8),
+      if (docs.isEmpty)
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.background.withOpacity(0.45),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Text(
+            'No places saved yet.',
+            style: AppTextStyles.hint.copyWith(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        )
+      else
+        ...docs.map((doc) => _placeTile(doc.id, doc.data())),
+      const SizedBox(height: 2),
+      AppButton(
+        onPressed: canAdd
+            ? () async {
+                final saved = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AddPlaceScreen(
+                      locatorId: widget.locatorId,
+                      locatorName: widget.locatorName,
+                    ),
+                  ),
+                );
+
+                if (saved == true && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Place list updated')),
+                  );
+                }
+              }
+            : null,
+        loading: false,
+        text: canAdd ? 'ADD PLACE' : 'MAXIMUM 3 PLACES',
+      ),
+    ],
+  ),
+);
           },
         );
       },
@@ -650,12 +645,12 @@ Widget build(BuildContext context) {
     ),
     body: SafeArea(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 🔧 SETTINGS CARD
             AppCard(
+              padding: const EdgeInsets.all(14),
               child: Column(
                 children: [
                   _toggleTile(
@@ -664,74 +659,73 @@ Widget build(BuildContext context) {
                     value: _callEnabled,
                     onChanged: (v) => setState(() => _callEnabled = v),
                   ),
-
-                  const Divider(height: 20),
+                  const Divider(height: 14),
 
                   _toggleTile(
                     title: 'Battery alerts',
-                    subtitle:
-                        'Notify when battery drops below selected level.',
+                    subtitle: 'Notify when battery drops below selected level.',
                     value: _batteryAlarmEnabled,
                     onChanged: (v) async {
-                      final prefs =
-                          await SharedPreferences.getInstance();
+                      final prefs = await SharedPreferences.getInstance();
                       await prefs.setBool('batteryAlarmEnabled', v);
-
                       setState(() => _batteryAlarmEnabled = v);
                     },
                   ),
 
                   if (_batteryAlarmEnabled) ...[
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 6),
                     Align(
                       alignment: Alignment.centerLeft,
                       child: Text(
                         'Battery alert level',
-                        style: AppTextStyles.sectionTitle
-                            .copyWith(fontSize: 14),
+                        style: AppTextStyles.sectionTitle.copyWith(fontSize: 14),
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [10, 15, 20, 25, 30].map((level) {
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [10,20, 25, 30].map((level) {
+                        final selected = _batteryThreshold == level;
                         return ChoiceChip(
-                          label: Text('$level%'),
-                          selected: _batteryThreshold == level,
+                          label: Text(
+                            '$level%',
+                            style: TextStyle(
+                              color: selected
+                                  ? AppColors.textPrimary
+                                  : AppColors.textSecondary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          selected: selected,
                           selectedColor: AppColors.primary,
+                          backgroundColor: AppColors.background,
+                          side: const BorderSide(color: AppColors.border),
                           onSelected: (_) async {
-                            final prefs =
-                                await SharedPreferences.getInstance();
-                            await prefs.setInt(
-                                'batteryAlertThreshold', level);
-
-                            setState(() {
-                              _batteryThreshold = level;
-                            });
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setInt('batteryAlertThreshold', level);
+                            setState(() => _batteryThreshold = level);
                           },
                         );
                       }).toList(),
                     ),
                   ],
 
-                  const Divider(height: 20),
+                  const Divider(height: 14),
 
                   _toggleTile(
                     title: 'GPS off alarm',
-                    subtitle:
-                        'Notify when locator location service is turned off.',
+                    subtitle: 'Notify when locator location service is turned off.',
                     value: _gpsOffAlarmEnabled,
                     onChanged: (v) =>
                         setState(() => _gpsOffAlarmEnabled = v),
                   ),
 
-                  const Divider(height: 20),
+                  const Divider(height: 14),
 
                   _toggleTile(
                     title: 'Geofence alarm',
-                    subtitle:
-                        'Notify when locator leaves the selected area.',
+                    subtitle: 'Notify when locator leaves the selected area.',
                     value: _geofenceAlarmEnabled,
                     onChanged: (v) =>
                         setState(() => _geofenceAlarmEnabled = v),
@@ -740,23 +734,20 @@ Widget build(BuildContext context) {
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
-            // 📍 PLACES
             _placesSection(),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
-            // 💾 SAVE BUTTON
             AppButton(
               onPressed: _saving ? null : _confirmPairing,
               loading: _saving,
               text: 'SAVE SETTINGS',
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
 
-            // ❌ REMOVE
             TextButton(
               onPressed: _saving ? null : _removeLocator,
               child: const Text(
