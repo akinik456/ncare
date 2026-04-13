@@ -5,6 +5,14 @@ import 'package:geocoding/geocoding.dart';
 
 import '../../core/identity_manager.dart';
 
+import '../../core/identity_manager.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_card.dart';
+import '../../core/widgets/app_input_field.dart';
+
+
 class AddPlaceScreen extends StatefulWidget {
   final String locatorId;
   final String locatorName;
@@ -31,7 +39,8 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   double? _accuracy;
   DateTime? _locationAt;
   int _nextIndex = 1;
-
+  final FocusNode _nameFocusNode  = FocusNode();
+  
   @override
   void initState() {
     super.initState();
@@ -41,6 +50,7 @@ class _AddPlaceScreenState extends State<AddPlaceScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+	_nameFocusNode.dispose();
     super.dispose();
   }
 
@@ -203,115 +213,73 @@ setState(() {
     }
   }
 
-  Widget _infoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 96,
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF64748B),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: Color(0xFF0F172A),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF020617),
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: const Color(0xFF020617),
-        surfaceTintColor: Colors.transparent,
-        title: const Text(
-          'LynraCare',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
+Widget _infoRow(String label, String value) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 6),
+    child: Row(
+      children: [
+        SizedBox(
+          width: 90,
+          child: Text(
+            label,
+            style: AppTextStyles.hint.copyWith(fontSize: 13),
           ),
         ),
+        Expanded(
+          child: Text(
+            value,
+            style: AppTextStyles.sectionTitle.copyWith(fontSize: 14),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: AppColors.background,
+    appBar: AppBar(
+      elevation: 0,
+      backgroundColor: AppColors.background,
+      surfaceTintColor: Colors.transparent,
+      title: const Text(
+        'Lynra Care',
+        style: AppTextStyles.brand,
       ),
-      body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+    ),
+    body: SafeArea(
+      child: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF020617),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFF6366F1).withOpacity(.28)),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x120F172A),
-                          blurRadius: 18,
-                          offset: Offset(0, 8),
-                        ),
-                      ],
-                    ),
+                  AppCard(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           widget.locatorName,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
+                          style: AppTextStyles.sectionTitle,
                         ),
                         const SizedBox(height: 6),
-                        const Text(
+                        Text(
                           'Save a place from the locator current location.',
-                          style: TextStyle(
-                            color: Color(0xFF94A3B8),
-                            height: 1.35,
-                          ),
+                          style: AppTextStyles.hint,
                         ),
-                        const SizedBox(height: 18),
-                        TextField(
-                          controller: _nameController,
-                          decoration: const InputDecoration(
-                            labelText: 'Place name',
-                            labelStyle: TextStyle(color: Color(0xFF94A3B8)),
-                            filled: true,
-                            fillColor: Color(0xFF0F172A),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(18)),
-                              borderSide: BorderSide(color: Color(0xFF334155)),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(18)),
-                              borderSide: BorderSide(color: Color(0xFF334155)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.all(Radius.circular(18)),
-                              borderSide: BorderSide(color: Color(0xFF6366F1)),
-                            ),
-                          ),
-                          style: TextStyle(color: Colors.white),
-                        ),
-                        const SizedBox(height: 18),
+
+                        const SizedBox(height: 16),
+
+                        AppInputField(
+						  controller: _nameController,
+						  focusNode: _nameFocusNode,
+						  hintText: 'Place name',
+						),
+
+                        const SizedBox(height: 16),
+
                         if (_error != null) ...[
                           Text(
                             _error!,
@@ -321,12 +289,14 @@ setState(() {
                             ),
                           ),
                         ] else ...[
-                          Text('Latitude: ${_lat!.toStringAsFixed(6)}', style: const TextStyle(color: Colors.white, fontSize: 14)),
-                          Text('Longitude: ${_lng!.toStringAsFixed(6)}', style: const TextStyle(color: Colors.white, fontSize: 14)),
-                          Text('Address: $_address', style: const TextStyle(color: Colors.white, fontSize: 14)),
-                          Text('Accuracy: ${_accuracy!.toStringAsFixed(6)}', style: const TextStyle(color: Colors.white, fontSize: 14)),
-                          Text('Location age: $_ageText', style: const TextStyle(color: Colors.white, fontSize: 14)),
+                          _infoRow('Latitude', _lat!.toStringAsFixed(6)),
+                          _infoRow('Longitude', _lng!.toStringAsFixed(6)),
+                          _infoRow('Address', _address ?? '-'),
+                          _infoRow('Accuracy', _accuracy!.toStringAsFixed(2)),
+                          _infoRow('Updated', _ageText),
+
                           const SizedBox(height: 8),
+
                           if (!_isFresh)
                             const Text(
                               'Location is too old. Wait for a fresh locator update.',
@@ -336,35 +306,21 @@ setState(() {
                               ),
                             ),
                         ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: _canSave ? _save : null,
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
+
+                        const SizedBox(height: 16),
+
+                        AppButton(
+                          onPressed: _canSave ? _save : null,
+                          loading: _saving,
+                          text: 'SAVE PLACE',
                         ),
-                      ),
-                      child: _saving
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text(
-                              'Save place',
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
+                      ],
                     ),
                   ),
                 ],
               ),
-      ),
-    );
-  }
+            ),
+    ),
+  );
+}
 }
