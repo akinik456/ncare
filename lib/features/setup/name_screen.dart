@@ -25,7 +25,6 @@ main
 settings
 	add_locator_screen
 	add_place_screen
-	locator_name_screen
 	pairing_options_screen
 	pair_screen
 	setup_screen

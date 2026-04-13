@@ -6,9 +6,14 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'pair_request_screen.dart';
 
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_card.dart';
+import '../../core/widgets/app_input_field.dart';
+
 class AddLocatorScreen extends StatefulWidget {
   const AddLocatorScreen({super.key});
-
   @override
   State<AddLocatorScreen> createState() => _AddLocatorScreenState();
 }
@@ -19,11 +24,13 @@ class _AddLocatorScreenState extends State<AddLocatorScreen> {
   bool _scannerMode = false;
   bool _lookingUpCode = false;
   final TextEditingController _codeController = TextEditingController();
+  final FocusNode _codeFocusNode = FocusNode();
 
   @override
   void dispose() {
     controller.dispose();
     _codeController.dispose();
+	_codeFocusNode.dispose();
     super.dispose();
   }
 
@@ -125,11 +132,12 @@ class _AddLocatorScreenState extends State<AddLocatorScreen> {
   }
 
   Widget _buildMethodPicker() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    return SingleChildScrollView(
+  padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    mainAxisSize: MainAxisSize.min,
+    children: [
           Container(
             padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
             decoration: BoxDecoration(
@@ -169,15 +177,15 @@ class _AddLocatorScreenState extends State<AddLocatorScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          FilledButton.tonalIcon(
-            onPressed: () {
+		  AppButton(
+			  onPressed: () {
               setState(() {
                 _scannerMode = true;
               });
             },
-            icon: const Icon(Icons.qr_code_scanner_rounded),
-            label: const Text('Scan QR'),
-          ),
+			  loading: false,
+			  text: 'SCAN QR',
+			),
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(16),
@@ -186,67 +194,38 @@ class _AddLocatorScreenState extends State<AddLocatorScreen> {
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: const Color(0xFF38BDF8).withOpacity(.25)),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Enter 6-character code',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _codeController,
-                  maxLength: 6,
-                  textCapitalization: TextCapitalization.characters,
-                  decoration: const InputDecoration(
-                    hintText: 'ABC123',
-                    counterText: '',
-                    filled: true,
-                    fillColor: Color(0xFF0F172A),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(18)),
-                      borderSide: BorderSide(color: Color(0xFF334155)),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(18)),
-                      borderSide: BorderSide(color: Color(0xFF334155)),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(18)),
-                      borderSide: BorderSide(color: Color(0xFF38BDF8)),
-                    ),
-                  ),
-                  onChanged: (value) {
-                    final upper = value.toUpperCase();
-                    if (upper != value) {
-                      _codeController.value = _codeController.value.copyWith(
-                        text: upper,
-                        selection: TextSelection.collapsed(offset: upper.length),
-                      );
-                    }
-                  },
-                ),
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: _lookingUpCode ? null : _submitCode,
-                  child: _lookingUpCode
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Continue'),
-                ),
-              ],
-            ),
+            child: SingleChildScrollView(
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Text(
+        'Enter 6-character code',
+        style: AppTextStyles.sectionTitle,
+      ),
+      const SizedBox(height: 14),
+      AppInputField(
+        controller: _codeController,
+        focusNode: _codeFocusNode,
+        hintText: 'ABC123',
+        onSubmitted: _lookingUpCode ? null : _submitCode,
+      ),
+      const SizedBox(height: 16),
+      AppButton(
+        onPressed: _lookingUpCode ? null : _submitCode,
+        loading: _lookingUpCode,
+        text: 'CONTINUE',
+      ),
+    ],
+  ),
+),
           ),
+		  
+		  
         ],
       ),
     );
+	
   }
 
   Widget _buildScanner() {
@@ -291,10 +270,15 @@ class _AddLocatorScreenState extends State<AddLocatorScreen> {
       appBar: _scannerMode
           ? null
           : AppBar(
-              backgroundColor: const Color(0xFF020617),
-              surfaceTintColor: Colors.transparent,
-              title: const Text('LynraCare', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-            ),
+			  backgroundColor: AppColors.background,
+			  surfaceTintColor: Colors.transparent,
+			  elevation: 0,
+			  centerTitle: false,
+			  title: const Text(
+				'Lynra Care',
+				style: AppTextStyles.brand,
+			  ),
+			),
       body: _scannerMode ? _buildScanner() : _buildMethodPicker(),
     );
   }
