@@ -24,10 +24,12 @@ main
 	home_screen
 settings
 	add_locator_screen
+	setup_screen
+	pair_request_screen
+	
 	add_place_screen
 	pairing_options_screen
-	pair_screen
-	setup_screen
+	
 	
 Yeni ekran yaparken:
 

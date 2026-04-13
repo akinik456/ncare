@@ -2,6 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/identity_manager.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_button.dart';
+import '../../core/widgets/app_card.dart';
+import '../../core/widgets/app_input_field.dart';
 
 class PairRequestScreen extends StatefulWidget {
   final String locatorId;
@@ -83,80 +88,66 @@ class _PairRequestScreenState extends State<PairRequestScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF020617),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF020617),
-        surfaceTintColor: Colors.transparent,
-        title: const Text('LynraCare', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: AppColors.background,
+    appBar: AppBar(
+      backgroundColor: AppColors.background,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      title: const Text(
+        'Lynra Care',
+        style: AppTextStyles.brand,
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF020617),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFF38BDF8).withOpacity(.28)),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x120F172A),
-                      blurRadius: 18,
-                      offset: Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Send pairing request',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Pairing will finish only after the locator approves this request.',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Color(0xFF94A3B8),
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    _infoRow(Icons.person_pin_circle_outlined, widget.locatorName),
-                    const SizedBox(height: 10),
-                    _infoRow(Icons.badge_outlined, widget.locatorId),
-                  ],
-                ),
+    ),
+    body: SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Send pairing request',
+                    style: AppTextStyles.sectionTitle,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Pairing will finish only after the locator approves this request.',
+                    style: AppTextStyles.hint,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  _infoRow(
+                    Icons.person_pin_circle_outlined,
+                    widget.locatorName,
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  Text(
+                    widget.locatorId,
+                    style: AppTextStyles.hint.copyWith(fontSize: 12),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  AppButton(
+                    onPressed: _sending ? null : _sendPairRequest,
+                    loading: _sending,
+                    text: 'SEND REQUEST',
+                  ),
+                ],
               ),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: _sending ? null : _sendPairRequest,
-                icon: _sending
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.send_rounded),
-                label: Text(_sending ? 'Sending...' : 'Send Pair Request'),
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
