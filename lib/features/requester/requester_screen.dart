@@ -72,12 +72,12 @@ class _RequesterScreenState extends State<RequesterScreen>
 
     _pulse = Tween<double>(begin: 0.8, end: 2).animate(_pulseController);
 
-    _presenceUiTimer = Timer.periodic(
+    /*_presenceUiTimer = Timer.periodic(
       const Duration(seconds: 15),
       (_) {
         if (mounted) setState(() {});
       },
-    );
+    );*/
 
     _reqLocationTimer = Timer.periodic(
       const Duration(seconds: 15),

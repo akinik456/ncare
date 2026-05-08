@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -646,6 +647,123 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
     );
   }
 
+  void _showLocatorQrDialog(String qrData, String currentPairCode) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Pair this locator',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Scan this code on requester device',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: QrImageView(
+                  data: qrData,
+                  version: QrVersions.auto,
+                  size: 250,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Remote Pairing Code',
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    SelectableText(
+                      currentPairCode,
+                      style: const TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: locatorId ?? ''));
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(Icons.copy_rounded),
+                  label: const Text('Copy locator ID'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0F172A),
+                    side: const BorderSide(color: Color(0xFFE2E8F0)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _friendlyMovementText() {
+    if (_movementStatus.contains('Aktif')) {
+      return 'Moving';
+    }
+    return 'Stationary';
+  }
+
+  Color _movementColor() {
+    if (_movementStatus.contains('Aktif')) {
+      return const Color(0xFF0D9488);
+    }
+    return const Color(0xFF64748B);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (locatorId == null) {
@@ -653,221 +771,330 @@ if (!locatorAlreadyInGroup && activeDevicesCount >= maxDevicesCount) {
         body: Center(child: CircularProgressIndicator()),
       );
     }
-	
 
-
-    final theme = Theme.of(context);
     final currentPairCode = pairCode ?? AppUtils.generatePairCode(locatorId!);
-
     final qrData = jsonEncode({
       'type': 'Lynracare_locator',
       'locatorId': locatorId,
       'locatorName': locatorName ?? 'Locator',
     });
 
-return Scaffold(
-  backgroundColor: const Color(0xFFF1F5F9),
-  appBar: AppBar(
-    backgroundColor: const Color(0xFFF1F5F9),
-    surfaceTintColor: Colors.transparent,
-    elevation: 0,
-    centerTitle: true,
-    title: const Text(
-      'LYNRA Care',
-      style: TextStyle(
-        fontWeight: FontWeight.w800,
-        color: Color(0xFF0F172A),
-      ),
-    ),
-  ),
-
-  body: SafeArea(
-    child: Column(
-      children: [
-        const SizedBox(height: 6),
-
-        Center(
-          child: Text(
-            locatorName ?? 'Device',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF334155),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF1F5F9),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF1F5F9),
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        titleSpacing: 20,
+        title: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE0F2FE),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.shield_rounded,
+                color: Color(0xFF0369A1),
+                size: 21,
+              ),
             ),
-          ),
-        ),
-if (_isBeingWatched)
-  Padding(
-    padding: const EdgeInsets.only(top: 8.0),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.visibility, color: Colors.greenAccent, size: 18),
-        const SizedBox(width: 6),
-        Flexible( // <--- İsim çok uzunsa ekranın dışına taşmasın diye
-          child: Text(
-            _watcherName,
-            style: const TextStyle(
-              color: Colors.greenAccent, 
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'LynraCare',
+                    style: TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  Text(
+                    locatorName ?? 'Locator device',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
             ),
-            overflow: TextOverflow.ellipsis, // Taşarsa "..." yapar
-          ),
+          ],
         ),
-      ],
-    ),
-  ),
- 
-Container(
-  padding: const EdgeInsets.all(4),
-  decoration: BoxDecoration(
-    color: Colors.black54,
-    borderRadius: BorderRadius.circular(4),
-  ),
-  child: Text(
-    "Vites: ${_displayInterval}s",
-    style: const TextStyle(
-      color: Colors.yellowAccent, 
-      fontSize: 10, 
-      fontWeight: FontWeight.bold
-    ),
-  ),
-),
- 
-  
-const SizedBox(height: 6),
-// --- GÜNCELLENMİŞ TAKİP VE ADIM DURUMU ---
-Container(
-  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-  decoration: BoxDecoration(
-    color: _movementStatus.contains("Aktif") 
-        ? Colors.teal.shade50 
-        : Colors.blueGrey.shade50,
-    borderRadius: BorderRadius.circular(12),
-    border: Border.all(
-      color: _movementStatus.contains("Aktif") 
-          ? Colors.teal.withOpacity(0.2) 
-          : Colors.blueGrey.withOpacity(0.2),
-    ),
-  ),
-  child: Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Text(
-        _movementStatus,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: _movementStatus.contains("Aktif") ? Colors.teal : Colors.blueGrey,
-        ),
-      ),
-      const SizedBox(height: 2),
-      Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.directions_walk, 
-            size: 16, 
-            color: _movementStatus.contains("Aktif") ? Colors.teal : Colors.blueGrey
+        actions: [
+          IconButton(
+            onPressed: () => _showLocatorQrDialog(qrData, currentPairCode),
+            icon: const Icon(Icons.qr_code_2_rounded),
+            color: const Color(0xFF0F172A),
+            tooltip: 'Pairing QR',
           ),
-          const SizedBox(width: 4),
-          Text(
-            "$_displaySteps Adım",
-            style: TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.bold,
-              color: _movementStatus.contains("Aktif") ? Colors.teal.shade700 : Colors.blueGrey.shade700,
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: IconButton(
+              onPressed: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const SetupScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.settings_rounded),
+              color: const Color(0xFF0F172A),
+              tooltip: 'Setup',
             ),
           ),
         ],
       ),
-    ],
-  ),
-),
-
-
-      Expanded(
-  child: Center(
-    child: SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
+      body: SafeArea(
         child: StreamBuilder<bool>(
           stream: DeviceStateManager.instance.readyStream,
-		  initialData: DeviceStateManager.instance.isReady,
-          
-          builder: (context, snapshot) {
-  final ready = snapshot.data ?? false;
-  
-  // Manager'dan güncel durumları çekiyoruz
-  final gpsEn = DeviceStateManager.instance.gpsEnabled;
-  print("LynraCareizin ekranından gelindi gpsenabled:$gpsEn");
-  final hasBgLoc = DeviceStateManager.instance.hasBackgroundLocationPermission;
-  final hasActivity = DeviceStateManager.instance.hasActivityPermission;
-  final batteryOptimized = DeviceStateManager.instance.isBatteryOptimized;
+          initialData: DeviceStateManager.instance.isReady,
+          builder: (context, readySnapshot) {
+            final ready = readySnapshot.data ?? false;
+            final gpsEn = DeviceStateManager.instance.gpsEnabled;
+            final hasBgLoc = DeviceStateManager.instance.hasBackgroundLocationPermission;
+            final hasActivity = DeviceStateManager.instance.hasActivityPermission;
+            final batteryOptimized = DeviceStateManager.instance.isBatteryOptimized;
 
-  // ÖNCELİK SIRASINA GÖRE MESAJ BELİRLEME
-  String statusTitle;
-  String statusMessage;
-  IconData statusIcon = Icons.warning_amber_rounded;
+            String statusTitle;
+            String statusMessage;
+            IconData statusIcon;
+            Color statusColor;
 
-  if (ready) {
-    statusTitle = 'Locator Device Ready';
-    statusMessage = 'This device is ready to receive location requests.';
-    statusIcon = Icons.check_circle_rounded;
-  } else if (!gpsEn) {
-    statusTitle = 'Location Service Off';
-    statusMessage = 'Please turn on GPS/Location services in system settings.';
-  } else if (!hasBgLoc) {
-    statusTitle = 'Background Location Required';
-    statusMessage = 'Set location access to "Allow all the time" to work in background.';
-  } else if (!hasActivity) {
-    statusTitle = 'Activity Access Required';
-    statusMessage = 'Physical activity permission is needed for smart tracking.';
-  } else if (batteryOptimized) {
-    statusTitle = 'Battery Optimization Active';
-    statusMessage = 'Set battery to "Unrestricted" to prevent tracking gaps.';
-  } else {
-    statusTitle = 'Permissions Required';
-    statusMessage = 'Grant necessary permissions to continue tracking.';
+            if (ready) {
+              statusTitle = 'Protected device ready';
+              statusMessage = 'This locator is active and ready to share live state with approved requesters.';
+              statusIcon = Icons.verified_rounded;
+              statusColor = const Color(0xFF0F766E);
+            } else if (!gpsEn) {
+              statusTitle = 'Location service off';
+              statusMessage = 'Turn on GPS / Location services in system settings.';
+              statusIcon = Icons.location_off_rounded;
+              statusColor = const Color(0xFFD97706);
+            } else if (!hasBgLoc) {
+              statusTitle = 'Background location required';
+              statusMessage = 'Set location access to “Allow all the time” to work in background.';
+              statusIcon = Icons.lock_clock_rounded;
+              statusColor = const Color(0xFFD97706);
+            } else if (!hasActivity) {
+              statusTitle = 'Activity access required';
+              statusMessage = 'Physical activity permission is needed for smart tracking.';
+              statusIcon = Icons.directions_walk_rounded;
+              statusColor = const Color(0xFFD97706);
+            } else if (batteryOptimized) {
+              statusTitle = 'Battery optimization active';
+              statusMessage = 'Set battery to “Unrestricted” to prevent tracking gaps.';
+              statusIcon = Icons.battery_alert_rounded;
+              statusColor = const Color(0xFFD97706);
+            } else {
+              statusTitle = 'Permissions required';
+              statusMessage = 'Grant necessary permissions to continue tracking.';
+              statusIcon = Icons.warning_amber_rounded;
+              statusColor = const Color(0xFFD97706);
+            }
+
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              children: [
+                _LocatorHeroCard(
+                  ready: ready,
+                  statusTitle: statusTitle,
+                  statusMessage: statusMessage,
+                  statusIcon: statusIcon,
+                  statusColor: statusColor,
+                  batteryLevel: _lastBatteryLevel,
+                  gpsEnabled: gpsEn,
+                  backgroundLocationOk: hasBgLoc,
+                  activityOk: hasActivity,
+                  batteryOptimized: batteryOptimized,
+                  interval: _displayInterval,
+                  movementText: _friendlyMovementText(),
+                  movementColor: _movementColor(),
+                  steps: _displaySteps,
+                ),
+                const SizedBox(height: 14),
+                _WatchersCard(
+                  isBeingWatched: _isBeingWatched,
+                  watcherName: _watcherName,
+                ),
+                const SizedBox(height: 14),
+                StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: FirebaseFirestore.instance
+                      .collection('locators')
+                      .doc(locatorId)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    final data = snapshot.data?.data();
+                    final hasPendingPair =
+                        (data?['pendingPairRequesterId'] ?? '')
+                            .toString()
+                            .trim()
+                            .isNotEmpty;
+
+                    final pairedRequesters =
+                        data?['pairedRequesters'] as Map<String, dynamic>?;
+
+                    final activeRequesters = pairedRequesters == null
+                        ? <MapEntry<String, dynamic>>[]
+                        : pairedRequesters.entries
+                            .where((e) => e.value is Map && e.value['active'] == true)
+                            .toList();
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (hasPendingPair) ...[
+                          _buildPendingPairCard(Theme.of(context), data),
+                          const SizedBox(height: 14),
+                        ],
+                        _PairedRequestersCard(
+                          activeRequesters: activeRequesters,
+                          onCallOne: (requesterId, name) {
+                            _sendCallMeRequest(
+                              requesterId: requesterId,
+                              requesterName: name,
+                            );
+                          },
+                          onCallAll: activeRequesters.length > 1
+                              ? () => _sendCallMeRequest()
+                              : null,
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 14),
+                _PairingCompactCard(
+                  pairCode: currentPairCode,
+                  onShowQr: () => _showLocatorQrDialog(qrData, currentPairCode),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const SetupScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.settings_rounded),
+                    label: const Text('Open setup'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF0F172A),
+                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      backgroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
   }
+}
 
-  return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: ready
-                  ? const [
-                      Color(0xFF0F766E),
-                      Color(0xFF0D9488),
-                      Color(0xFF14B8A6),
-                    ]
-                  : const [
-                      Color(0xFFB45309),
-                      Color(0xFFD97706),
-                      Color(0xFFF59E0B),
-                    ],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: ready
-                    ? const Color(0x220F766E)
-                    : const Color(0x22B45309),
-                blurRadius: 28,
-                offset: const Offset(0, 12),
-              ),
-            ],
+class _LocatorHeroCard extends StatelessWidget {
+  final bool ready;
+  final String statusTitle;
+  final String statusMessage;
+  final IconData statusIcon;
+  final Color statusColor;
+  final int? batteryLevel;
+  final bool gpsEnabled;
+  final bool backgroundLocationOk;
+  final bool hasActivityPermission;
+  final bool batteryOptimized;
+  final int interval;
+  final String movementText;
+  final Color movementColor;
+  final int steps;
+
+  const _LocatorHeroCard({
+    required this.ready,
+    required this.statusTitle,
+    required this.statusMessage,
+    required this.statusIcon,
+    required this.statusColor,
+    required this.batteryLevel,
+    required this.gpsEnabled,
+    required bool activityOk,
+    required this.backgroundLocationOk,
+    required this.batteryOptimized,
+    required this.interval,
+    required this.movementText,
+    required this.movementColor,
+    required this.steps,
+  }) : hasActivityPermission = activityOk;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(30),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: ready
+              ? const [
+                  Color(0xFF0F766E),
+                  Color(0xFF0D9488),
+                  Color(0xFF14B8A6),
+                ]
+              : const [
+                  Color(0xFFB45309),
+                  Color(0xFFD97706),
+                  Color(0xFFF59E0B),
+                ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: ready ? const Color(0x260F766E) : const Color(0x26B45309),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
           ),
-          child: Row(
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.16),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  statusIcon,
+                  color: Colors.white,
+                  size: 25,
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -875,340 +1102,551 @@ Container(
                     Row(
                       children: [
                         Container(
-                          width: 46,
-                          height: 46,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.16),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Icon(
-                            ready
-                                ? Icons.verified_rounded
-                                : Icons.warning_amber_rounded,
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
                             color: Colors.white,
-                            size: 24,
+                            shape: BoxShape.circle,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            statusTitle,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                            ),
+                        const SizedBox(width: 7),
+                        Text(
+                          ready ? 'ONLINE • PROTECTED' : 'ACTION NEEDED',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.92),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.4,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 5),
                     Text(
-                      statusMessage,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.94),
-                        height: 1.45,
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    const Text(
-                      'Remote Pairing Code',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    SelectableText(
-                      currentPairCode,
+                      statusTitle,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
-                        letterSpacing: 8,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    SelectableText(
-                      locatorId!,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.4,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 14),
-              Column(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (_) => Dialog(
-                          backgroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(28),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Text(
-                                  'Locator QR',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                QrImageView(
-                                  data: qrData,
-                                  version: QrVersions.auto,
-                                  size: 260,
-                                ),
-                                const SizedBox(height: 12),
-                                const Text(
-                                  'Scan this code on requester device',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    color: Color(0xFF475569),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(height: 18),
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 14,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF8FAFC),
-                                    borderRadius: BorderRadius.circular(18),
-                                    border: Border.all(
-                                      color: const Color(0xFFE2E8F0),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: QrImageView(
-                        data: qrData,
-                        version: QrVersions.auto,
-                        size: 120,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: 120,
-                    child: Text(
-                      'Tap to enlarge',
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.95),
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            statusMessage,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.94),
+              height: 1.38,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 2.45,
+            children: [
+              _HeroMetric(
+                icon: Icons.battery_full_rounded,
+                label: 'Battery',
+                value: batteryLevel == null ? '--' : '$batteryLevel%',
+              ),
+              _HeroMetric(
+                icon: gpsEnabled ? Icons.gps_fixed_rounded : Icons.gps_off_rounded,
+                label: 'GPS',
+                value: gpsEnabled ? 'On' : 'Off',
+              ),
+              _HeroMetric(
+                icon: Icons.speed_rounded,
+                label: 'Interval',
+                value: '${interval}s',
+              ),
+              _HeroMetric(
+                icon: Icons.directions_walk_rounded,
+                label: movementText,
+                value: '$steps steps',
               ),
             ],
           ),
-        ),
-					  
-                      const SizedBox(height: 14),
-                      const SizedBox(height: 14),
-                      StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                        stream: FirebaseFirestore.instance
-                            .collection('locators')
-                            .doc(locatorId)
-                            .snapshots(),
-                        builder: (context, snapshot) {
-                          final data = snapshot.data?.data();
-                          final requesterName =
-                              (data?['pairedRequesterName'] ?? '').toString().trim();
-
-                          final paired = requesterName.isNotEmpty;
-						  
-						  final pairedRequesters =
-    data?['pairedRequesters'] as Map<String, dynamic>?;
-
-final pairedNames = pairedRequesters == null
-    ? <String>[]
-    : pairedRequesters.values
-        .map((e) => Map<String, dynamic>.from(e as Map))
-        .where((e) => e['active'] == true)
-        .map((e) => (e['name'] ?? 'Requester').toString())
-        .toList();
-						  
-                          final hasPendingPair =
-                              (data?['pendingPairRequesterId'] ?? '')
-                                  .toString()
-                                  .trim()
-                                  .isNotEmpty;
-
-                          return Column(
-                            children: [
-                              if (hasPendingPair) ...[
-                                _buildPendingPairCard(theme, data),
-                                const SizedBox(height: 12),
-                              ],
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      paired
-                                          ? Icons.check_circle_rounded
-                                          : Icons.link_off_rounded,
-                                      color: paired
-                                          ? const Color(0xFF16A34A)
-                                          : const Color(0xFFDC2626),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-  child: Text(
-    pairedNames.isNotEmpty
-        ? 'Paired with ${pairedNames.join(', ')}'
-        : 'Not paired yet',
-    style: Theme.of(context)
-        .textTheme
-        .bodyMedium
-        ?.copyWith(
-          fontWeight: FontWeight.w700,
-          color: const Color(0xFF0F172A),
-        ),
-  ),
-),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-  stream: FirebaseFirestore.instance
-      .collection('locators')
-      .doc(locatorId)
-      .snapshots(),
-  builder: (context, snapshot) {
-    final data = snapshot.data?.data();
-    final paired = data?['pairedRequesters']
-        as Map<String, dynamic>?;
-
-    if (paired == null) return const SizedBox();
-
-    final activeRequesters = paired.entries
-        .where((e) => e.value['active'] == true)
-        .toList();
-
-    if (activeRequesters.isEmpty) {
-      return const SizedBox();
-    }
-
-    return Column(
-      children: [
-        ...activeRequesters.map((e) {
-          final requesterId = e.key;
-          final name =
-              (e.value['name'] ?? 'Requester').toString();
-
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: FilledButton.icon(
-              onPressed: () =>
-                  _sendCallMeRequest(
-				  requesterId: requesterId, 
-				  requesterName: name
-				),
-              icon: const Icon(Icons.call),
-              label: Text('Ask $name to call me'),
-            ),
-          );
-        }),
-
-        if (activeRequesters.length > 1)
-          FilledButton.icon(
-            onPressed: ()=> _sendCallMeRequest(), // Parametre yoksa otomatik "all" moduna geçer
-            icon: const Icon(Icons.campaign),
-            label: const Text('Ask everyone to call me'),
-          ),
-      ],
-    );
-  },
-),
-							  
-                            ],
-                          );
-                        },
-                      ),
-					  
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                        ),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: () {
-                              Navigator.pushReplacement(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const SetupScreen(),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.settings_rounded),
-                            label: const Text('Open setup'),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: const Color(0xFF0F172A),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 15),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _StatusPill(
+                text: backgroundLocationOk ? 'Background OK' : 'Background needed',
+                good: backgroundLocationOk,
               ),
-			  
+              _StatusPill(
+                text: hasActivityPermission ? 'Activity OK' : 'Activity needed',
+                good: hasActivityPermission,
+              ),
+              _StatusPill(
+                text: batteryOptimized ? 'Battery restricted' : 'Battery unrestricted',
+                good: !batteryOptimized,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroMetric extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _HeroMetric({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.16),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.14)),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.white, size: 19),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.78),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
+        ],
       ),
-	  ],
-	  ),
-	  ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  final String text;
+  final bool good;
+
+  const _StatusPill({
+    required this.text,
+    required this.good,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.16),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            good ? Icons.check_circle_rounded : Icons.error_rounded,
+            color: Colors.white,
+            size: 14,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WatchersCard extends StatelessWidget {
+  final bool isBeingWatched;
+  final String watcherName;
+
+  const _WatchersCard({
+    required this.isBeingWatched,
+    required this.watcherName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x100F172A),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: isBeingWatched
+                  ? const Color(0xFFDCFCE7)
+                  : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              isBeingWatched ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+              color: isBeingWatched
+                  ? const Color(0xFF16A34A)
+                  : const Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isBeingWatched ? 'Currently viewed by' : 'No active viewers',
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  isBeingWatched
+                      ? (watcherName.isEmpty ? 'Approved requester' : watcherName)
+                      : 'Your location is not being actively viewed right now.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PairedRequestersCard extends StatelessWidget {
+  final List<MapEntry<String, dynamic>> activeRequesters;
+  final void Function(String requesterId, String name) onCallOne;
+  final VoidCallback? onCallAll;
+
+  const _PairedRequestersCard({
+    required this.activeRequesters,
+    required this.onCallOne,
+    required this.onCallAll,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x100F172A),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0E7FF),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.people_alt_rounded,
+                  color: Color(0xFF4338CA),
+                  size: 21,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Approved requesters',
+                      style: TextStyle(
+                        color: Color(0xFF0F172A),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'People allowed to view this locator',
+                      style: TextStyle(
+                        color: Color(0xFF64748B),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (activeRequesters.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Text(
+                'Not paired yet',
+                style: TextStyle(
+                  color: Color(0xFF64748B),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            )
+          else ...[
+            ...activeRequesters.map((e) {
+              final requesterId = e.key;
+              final value = Map<String, dynamic>.from(e.value as Map);
+              final name = (value['name'] ?? 'Requester').toString();
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _RequesterCallRow(
+                  name: name,
+                  onPressed: () => onCallOne(requesterId, name),
+                ),
+              );
+            }),
+            if (onCallAll != null) ...[
+              const SizedBox(height: 2),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: onCallAll,
+                  icon: const Icon(Icons.campaign_rounded),
+                  label: const Text('Ask everyone to call me'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F172A),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RequesterCallRow extends StatelessWidget {
+  final String name;
+  final VoidCallback onPressed;
+
+  const _RequesterCallRow({
+    required this.name,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 17,
+            backgroundColor: const Color(0xFFDBEAFE),
+            child: Text(
+              name.trim().isEmpty ? '?' : name.trim()[0].toUpperCase(),
+              style: const TextStyle(
+                color: Color(0xFF1D4ED8),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.icon(
+            onPressed: onPressed,
+            icon: const Icon(Icons.call_rounded, size: 17),
+            label: const Text('Call me'),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF0F766E),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              textStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PairingCompactCard extends StatelessWidget {
+  final String pairCode;
+  final VoidCallback onShowQr;
+
+  const _PairingCompactCard({
+    required this.pairCode,
+    required this.onShowQr,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: const Icon(
+              Icons.qr_code_2_rounded,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Pairing code',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  pairCode,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          OutlinedButton(
+            onPressed: onShowQr,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFF0F172A),
+              side: const BorderSide(color: Color(0xFFE2E8F0)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: const Text('QR'),
+          ),
+        ],
+      ),
     );
   }
 }
