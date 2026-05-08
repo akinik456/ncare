@@ -1,24 +1,21 @@
-import 'package:geocoding/geocoding.dart';
-import 'package:geolocator/geolocator.dart';
 import 'dart:async';
-import 'package:flutter/material.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/identity_manager.dart';
-import '../../core/notification_service.dart';
 import '../../core/location_helper.dart';
-
+import '../../core/notification_service.dart';
+import '../../services/rtdb.dart';
 import 'add_locator_screen.dart';
 import 'pairing_options_screen.dart';
-import 'package:intl/intl.dart';
-import 'package:flutter/services.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
-import '../../services/rtdb.dart';
-import 'package:firebase_database/firebase_database.dart';
 
 class RequesterScreen extends StatefulWidget {
   const RequesterScreen({super.key});
@@ -27,15 +24,31 @@ class RequesterScreen extends StatefulWidget {
   State<RequesterScreen> createState() => _RequesterScreenState();
 }
 
-class _RequesterScreenState extends State<RequesterScreen> with SingleTickerProviderStateMixin{
-  String? _lastRequestId; // ekranda gösterilen son başarılı cevap
-  String? _pendingRequestId; // şu an beklenen yeni request
-  String? _lastAddress;
-  String? _lastAddressKey;
+class _RequesterScreenState extends State<RequesterScreen>
+    with SingleTickerProviderStateMixin {
   String? requesterId;
   String? _groupId;
-  String? _selectedLocatorId;
-  bool _timeout = false;
+  String? _requesterDeviceId;
+
+  String? requesterName;
+  String? _currentRequesterName;
+  String? _cachedMyName;
+
+  bool isMaster = false;
+  bool requestAlertsEnabled = true;
+  bool deviceWarningsEnabled = true;
+
+  double? _myLat;
+  double? _myLng;
+
+  Timer? _presenceUiTimer;
+  Timer? _reqLocationTimer;
+
+  late AnimationController _pulseController;
+  late Animation<double> _pulse;
+
+  StreamSubscription? _callMeRtdbSub;
+
   String? _callRequestFrom;
   String? _callRequestTs;
   String? _lastAlertId;
@@ -43,955 +56,726 @@ class _RequesterScreenState extends State<RequesterScreen> with SingleTickerProv
   String? _callRequestLocatorId;
   String? targetMode;
   String? targetReqId;
-  
-  bool requestAlertsEnabled=true;
-  bool deviceWarningsEnabled=true;
-  Timer? _presenceUiTimer;
-  late AnimationController _pulseController;
-  late Animation<double> _pulse;
-  double? _myLat;
-  double? _myLng;
-  Timer? _reqLocationTimer;
-  String? _requesterDeviceId;
-  StreamSubscription? _callAlertSub;
-  StreamSubscription? _callMeRtdbSub;
-  String? requesterName;
-  String? _currentRequesterName;
-  String? _cachedMyName;
-  bool isMaster=false;
-  
-  
-	
+
+  final Set<String> _watchedLocatorIds = {};
+
   @override
   void initState() {
     super.initState();
-	NotificationService.suppressForegroundAlerts = true;
-    _initRequesterId();	
-	_loadMyName();
-	_loadAlertSettings();
-	_presenceUiTimer = Timer.periodic(
-  const Duration(seconds: 15),
-  (_) {
-    if (mounted) setState(() {});
-  },
-);
-  _reqLocationTimer = Timer.periodic(
-  const Duration(seconds: 15),
-  (_) => _getMyLocation(),
-  );
-	_pulseController = AnimationController(
-  vsync: this,
-  duration: const Duration(seconds: 1),
-)..repeat(reverse: true);
-_pulse = Tween<double>(begin: 0.8, end: 2).animate(_pulseController);
 
-  //_getMyLocation();
-  _initBatteryDefaults();
-  
-  
-	
-  }
-  
-Future<void> _getMyLocation() async {
+    NotificationService.suppressForegroundAlerts = true;
 
-  LocationPermission permission = await Geolocator.checkPermission();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..repeat(reverse: true);
 
-  if (permission == LocationPermission.denied) {
-    permission = await Geolocator.requestPermission();
+    _pulse = Tween<double>(begin: 0.8, end: 2).animate(_pulseController);
+
+    _presenceUiTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) {
+        if (mounted) setState(() {});
+      },
+    );
+
+    _reqLocationTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => _getMyLocation(),
+    );
+
+    _initRequesterId();
+    _loadMyName();
+    _loadAlertSettings();
+    _initBatteryDefaults();
+    _getMyLocation();
   }
 
-  if (permission == LocationPermission.deniedForever) {
-    return;
+  @override
+  void dispose() {
+    NotificationService.suppressForegroundAlerts = false;
+
+    _clearWatchingStatus();
+
+    _presenceUiTimer?.cancel();
+    _reqLocationTimer?.cancel();
+    _callMeRtdbSub?.cancel();
+    _pulseController.dispose();
+
+    super.dispose();
   }
 
-  final pos = await LocationService.getCurrentLocationSafe(
-  accuracy: LocationAccuracy.high,
-  timeLimit: const Duration(seconds: 20),
-);
-		if(pos == null) return;
-  
-  setState(() {
-    _myLat = pos.latitude;
-    _myLng = pos.longitude;
-  });
-print('myLat $_myLat , myLng $_myLng');
-}
   Future<void> _initRequesterId() async {
     final id = await IdentityManager.getOrCreateDeviceId();
-	final deviceId=await
-	IdentityManager.getOrCreateDeviceId();
-	 
+    final deviceId = await IdentityManager.getOrCreateDeviceId();
+
     if (!mounted) return;
 
     setState(() {
       requesterId = id;
-	  _requesterDeviceId=deviceId;
+      _requesterDeviceId = deviceId;
     });
-    
-	_loadGroupId();
+
+    await _loadGroupId();
   }
+
   Future<void> _loadGroupId() async {
-  final prefs = await SharedPreferences.getInstance();
-  final gid = prefs.getString('groupId');
-	isMaster =await IdentityManager.getIsMaster();
+    final prefs = await SharedPreferences.getInstance();
+    final gid = prefs.getString('groupId');
+    final master = await IdentityManager.getIsMaster();
 
-  setState(() {
-  _groupId=gid;  
-	});
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    _initCallMeLiveSync(); 
-	});
- 
-}
+    if (!mounted) return;
 
-Future<void> _loadMyName() async {
-  final name = await IdentityManager.getMyName();
-  setState(() {
-    _cachedMyName = name;
-	_currentRequesterName=_cachedMyName;
-	requesterName=_cachedMyName;
+    setState(() {
+      _groupId = gid;
+      isMaster = master;
+    });
 
-  });
-}
-
-String shortCode(String id) {
-  final clean = id.replaceAll('-', '').toUpperCase();
-  return "${clean.substring(0,4)}-${clean.substring(4,8)}";
-}
-  
-
-
-Future<void> _loadAlertSettings() async {
-  final prefs = await SharedPreferences.getInstance();
-
-  setState(() {
-    requestAlertsEnabled =
-        prefs.getBool('locator_request_alerts') ?? true;
-
-    deviceWarningsEnabled =
-        prefs.getBool('locator_device_warnings') ?? true;
-  });
-}
-
-Future<void> _initBatteryDefaults() async {
-  final prefs = await SharedPreferences.getInstance();
-
-  if (!prefs.containsKey('batteryAlertThreshold')) {
-    await prefs.setInt('batteryAlertThreshold', 20);
-  }
-}
-
-String formatAlertTs(Timestamp? ts) {
-  if (ts == null) return '';
-
-  final dt = ts.toDate();
-  final now = DateTime.now();
-
-  final sameDay =
-      dt.year == now.year &&
-      dt.month == now.month &&
-      dt.day == now.day;
-
-  if (sameDay) {
-    final h = dt.hour.toString().padLeft(2, '0');
-    final m = dt.minute.toString().padLeft(2, '0');
-    return '$h:$m';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initCallMeLiveSync();
+    });
   }
 
-  final d = dt.day.toString().padLeft(2, '0');
-  final mo = dt.month.toString().padLeft(2, '0');
-  final h = dt.hour.toString().padLeft(2, '0');
-  final m = dt.minute.toString().padLeft(2, '0');
+  Future<void> _loadMyName() async {
+    final name = await IdentityManager.getMyName();
 
-  return '$d.$mo $h:$m';
-}
+    if (!mounted) return;
 
-Future<void> saveRequestAlerts(bool value) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setBool('locator_request_alerts', value);
-
-  setState(() {
-    requestAlertsEnabled = value;
-  });
-}
-
-Future<void> saveDeviceWarnings(bool value) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.setBool('locator_device_warnings', value);
-
-  setState(() {
-    deviceWarningsEnabled = value;
-  });
-}
-  
-String formatLastSeen(DateTime? lastSeen) {
-  if (lastSeen == null) return "-";
-
-  final diff = DateTime.now().difference(lastSeen);
-
-  if (diff.inSeconds < 60) return "ONLINE";
-  if (diff.inMinutes < 60) return "Last seen ${diff.inMinutes}m ago";
-  if (diff.inHours < 24) return "Last seen ${diff.inHours}h ago";
-
-  return "Last seen ${diff.inDays}d ago";
-}
-
-String formatDistance(double? distance, double acc) {
-  if (distance == null) return "-";
-
-  // NEARBY
-  if (distance <= acc + 30) {
-    return "NEARBY";
+    setState(() {
+      _cachedMyName = name;
+      _currentRequesterName = name;
+      requesterName = name;
+    });
   }
 
-  // KM
-  if (distance >= 1000) {
-    final km = distance / 1000;
-    return "${km.toStringAsFixed(1)} km ±${(acc / 1000).toStringAsFixed(2)}";
+  Future<void> _loadAlertSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    if (!mounted) return;
+
+    setState(() {
+      requestAlertsEnabled = prefs.getBool('locator_request_alerts') ?? true;
+      deviceWarningsEnabled = prefs.getBool('locator_device_warnings') ?? true;
+    });
   }
 
-  // METERS
-  return "${distance.round()} m ±${acc.round()}";
-}
+  Future<void> _initBatteryDefaults() async {
+    final prefs = await SharedPreferences.getInstance();
 
-  
-  @override
-  void dispose(){
-   NotificationService.suppressForegroundAlerts = 
-  false;
-  _presenceUiTimer?.cancel();
-  _pulseController.dispose();
-  _reqLocationTimer?.cancel();
-  super.dispose();
-  _callAlertSub?.cancel();
-  _callMeRtdbSub?.cancel(); 
-  }   
+    if (!prefs.containsKey('batteryAlertThreshold')) {
+      await prefs.setInt('batteryAlertThreshold', 20);
+    }
+  }
 
-Future<void> _sendRequest() async {
-  try {
-    if (_groupId == null || _groupId!.isEmpty) return;
-    if (_selectedLocatorId == null || _selectedLocatorId!.isEmpty) return;
-    if (requesterId == null || requesterId!.isEmpty) return;
+  Future<void> _getMyLocation() async {
+    LocationPermission permission = await Geolocator.checkPermission();
 
-    final locatorDoc = await FirebaseFirestore.instance
-        .collection('locators')
-        .doc(_selectedLocatorId)
-        .get();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
 
-    final paired = locatorDoc.data()?['pairedRequesters'] as Map<String, dynamic>?;
-    final entry = paired?[requesterId];
-
-    if (entry == null || entry['active'] != true) {
-      print('REQ BLOCKED => not paired');
+    if (permission == LocationPermission.deniedForever) {
       return;
     }
 
-    final requesterDeviceId = await IdentityManager.getOrCreateDeviceId();
+    final pos = await LocationService.getCurrentLocationSafe(
+      accuracy: LocationAccuracy.high,
+      timeLimit: const Duration(seconds: 20),
+    );
 
-    final locatorRef = FirebaseFirestore.instance
-        .collection('groups')
-        .doc(_groupId)
-        .collection('locators')
-        .doc(_selectedLocatorId);
-
-    final requestsRef = locatorRef.collection('requests');
-    final responsesRef = locatorRef.collection('responses');
-
-    // -------------------------------
-    // trim ONLY my own requests
-    // keep max 9 before adding new one
-    // no orderBy in query -> sort in Dart
-    // -------------------------------
-    final myRequestsSnap = await requestsRef
-        .where('requesterDeviceId', isEqualTo: requesterDeviceId)
-        .get();
-
-    final myRequestDocs = myRequestsSnap.docs.toList()
-      ..sort((a, b) {
-        final aTs = a.data()['ts'];
-        final bTs = b.data()['ts'];
-
-        final aMs = aTs is Timestamp ? aTs.millisecondsSinceEpoch : 0;
-        final bMs = bTs is Timestamp ? bTs.millisecondsSinceEpoch : 0;
-
-        return aMs.compareTo(bMs);
-      });
-
-    if (myRequestDocs.length >= 10) {
-      final deleteCount = myRequestDocs.length - 9;
-      final batch = FirebaseFirestore.instance.batch();
-
-      for (final doc in myRequestDocs.take(deleteCount)) {
-        batch.delete(doc.reference);
-      }
-
-      await batch.commit();
-    }
-
-    // -------------------------------
-    // trim ONLY my own responses
-    // keep max 9 before adding new one
-    // response field: requesterDeviceId
-    // no orderBy in query -> sort in Dart
-    // -------------------------------
-    final myResponsesSnap = await responsesRef
-        .where('requesterDeviceId', isEqualTo: requesterDeviceId)
-        .get();
-
-    final myResponseDocs = myResponsesSnap.docs.toList()
-      ..sort((a, b) {
-        final aTs = a.data()['ts'];
-        final bTs = b.data()['ts'];
-
-        final aMs = aTs is Timestamp ? aTs.millisecondsSinceEpoch : 0;
-        final bMs = bTs is Timestamp ? bTs.millisecondsSinceEpoch : 0;
-
-        return aMs.compareTo(bMs);
-      });
-
-    if (myResponseDocs.length >= 10) {
-      final deleteCount = myResponseDocs.length - 9;
-      final batch = FirebaseFirestore.instance.batch();
-
-      for (final doc in myResponseDocs.take(deleteCount)) {
-        batch.delete(doc.reference);
-      }
-
-      await batch.commit();
-    }
-
-    final doc = await requestsRef.add({
-      'type': 'rl',
-      'requesterId': requesterId,
-      'requesterDeviceId': requesterDeviceId,
-      'locatorId': _selectedLocatorId,
-      'ts': FieldValue.serverTimestamp(),
-    });
+    if (pos == null) return;
+    if (!mounted) return;
 
     setState(() {
-      _pendingRequestId = doc.id;
-      _timeout = false;
+      _myLat = pos.latitude;
+      _myLng = pos.longitude;
     });
-
-    Future.delayed(const Duration(seconds: 60), () {
-      if (!mounted) return;
-
-      if (_pendingRequestId == doc.id) {
-        setState(() {
-          _timeout = true;
-        });
-      }
-    });
-  } catch (e, st) {
-    print('SEND REQUEST ERROR => $e');
-    print(st);
-  }
-}
-
-  
-String lastSeenText(Timestamp ts) {
-  final time = ts.toDate();
-  final now = DateTime.now();
-  final diff = now.difference(time);
-
-  if (diff.inSeconds <= 60) {
-    return "Online";
   }
 
-  final y = time.year;
-  final m = time.month.toString().padLeft(2, '0');
-  final d = time.day.toString().padLeft(2, '0');
-  final h = time.hour.toString().padLeft(2, '0');
-  final min = time.minute.toString().padLeft(2, '0');
+  Future<void> saveRequestAlerts(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('locator_request_alerts', value);
 
-  return "Last seen $y-$m-$d $h:$min";
-}    
+    if (!mounted) return;
 
-// requester_screen.dart içinde RTDB Dinleyicisi
-void _initCallMeLiveSync() {
-  if (_groupId == null || _groupId!.isEmpty) return;
+    setState(() {
+      requestAlertsEnabled = value;
+    });
+  }
 
-  print("LynraCare🚀 RTDB CallMe Multi-Listener Started");
+  Future<void> saveDeviceWarnings(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('locator_device_warnings', value);
 
-  // Eski aboneliği temizle
-  _callMeRtdbSub?.cancel();
+    if (!mounted) return;
 
-  // RTDBService üzerinden tüm grubun mevcudiyet akışını alıyoruz
-  _callMeRtdbSub = RTDBService().getGroupPresenceStream(_groupId!).listen((event) async {
-	final data = event.snapshot.value as Map?;
-    if (data == null) return;
-    // Aktif bir çağrı bulmak için locator listesini dönüyoruz
-    String? foundAlertId;
-    String? foundLocatorId;
-    String? foundDisplayName;
-    String? foundTs;
-	
+    setState(() {
+      deviceWarningsEnabled = value;
+    });
+  }
 
-    data.forEach((locId, locData) {
-      if (locData is! Map) return;
-      final commands = locData['commands'] as Map?;
-      final callMe = commands?['call_me'] as Map?;
-      final String? handledBy = callMe?['handledBy']?.toString();
-	  
-      // 1. Şart: 'pending' true mu?
-      if (callMe != null && callMe['pending'] == true) {
-        targetMode = (callMe['targetMode'] ?? 'all').toString();
-        targetReqId = (callMe['requesterId'] ?? '').toString();
+  String shortCode(String id) {
+    final clean = id.replaceAll('-', '').toUpperCase();
+    if (clean.length < 8) return clean;
+    return "${clean.substring(0, 4)}-${clean.substring(4, 8)}";
+  }
 
-        // 2. Şart: Hedef biz miyiz? (All veya bizim ID)
-        bool isTarget = ((targetMode == 'all' && handledBy==null)|| 
-                        (targetMode == 'single' && targetReqId == _requesterDeviceId));
+  String formatLastSeen(DateTime? lastSeen) {
+    if (lastSeen == null) return "Unknown";
 
-        if (isTarget) {
-          foundAlertId = "rtdb_${locId}_${callMe['ts']}"; // Unique ID oluşturuyoruz
-          foundLocatorId = locId.toString();
-		  // Tarih formatlama fonksiyonu
-    String formatAlertTsFromDate(DateTime date) {
-      final now = DateTime.now();
-      final sameDay = date.year == now.year && date.month == now.month && date.day == now.day;
-      final hh = date.hour.toString().padLeft(2, '0');
-      final mm = date.minute.toString().padLeft(2, '0');
+    final diff = DateTime.now().difference(lastSeen);
 
-      if (sameDay) return '$hh:$mm';
+    if (diff.inSeconds < 60) return "Just now";
+    if (diff.inMinutes < 60) return "${diff.inMinutes} min ago";
+    if (diff.inHours < 24) return "${diff.inHours} h ago";
 
-      final dd = date.day.toString().padLeft(2, '0');
-      final mo = date.month.toString().padLeft(2, '0');
-      return '$dd.$mo $hh:$mm';
+    return "${diff.inDays} d ago";
+  }
+
+  String formatDistance(double? distance, double acc) {
+    if (distance == null) return "--";
+
+    if (distance <= acc + 30) {
+      return "NEARBY";
     }
-          
-          // Timestamp formatlama (RTDB'den gelen int ms)
-          final int? tsMs = callMe['ts'] as int?;
-          if (tsMs != null) {
-            final dt = DateTime.fromMillisecondsSinceEpoch(tsMs);
-            foundTs = formatAlertTsFromDate(dt); // Senin tarih formatlama fonksiyonun
-          }
-		  
-          // 1. Doğrudan commands/call_me içindeki locatorName'e bakıyoruz
-		foundDisplayName = callMe['locatorName']?.toString();
-		print("LynraCare 🎯 Hedef İsim: $foundDisplayName");
-        }
-		
-	  print("LynraCare Found Callme_Alert ");
-      }
+
+    if (distance >= 1000) {
+      final km = distance / 1000;
+      return "${km.toStringAsFixed(1)} km";
+    }
+
+    return "${distance.round()} m";
+  }
+
+  String formatCoordinate(double value) {
+    return value.toStringAsFixed(6);
+  }
+
+  Future<void> _openInMaps(double lat, double lng) async {
+    final uri = Uri.parse(
+      'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
+    );
+
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
+  void _copyLocation(double lat, double lng) {
+    Clipboard.setData(
+      ClipboardData(text: '${formatCoordinate(lat)}, ${formatCoordinate(lng)}'),
+    );
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Location copied')),
+    );
+  }
+
+  void _showQrDialog(String groupId) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.white,
+        insetPadding: const EdgeInsets.all(20),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "GROUP QR",
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 16),
+              QrImageView(
+                data: groupId,
+                version: QrVersions.auto,
+                size: 240,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                shortCode(groupId),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: groupId));
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(Icons.copy_rounded),
+                  label: const Text('Copy group code'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _joinGroup() async {
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const _GroupQrScanner(),
+      ),
+    );
+
+    if (result == null || result.isEmpty) return;
+
+    final reqId = await IdentityManager.getOrCreateDeviceId();
+    final reqName = _currentRequesterName;
+    final now = FieldValue.serverTimestamp();
+
+    await IdentityManager.setLocalGroupId(result);
+
+    await FirebaseFirestore.instance
+        .collection('groups')
+        .doc(result)
+        .collection('devices')
+        .doc(reqId)
+        .set({
+      'deviceId': reqId,
+      'groupId': result,
+      'role': 'requester',
+      'name': reqName,
+      'joinedAt': now,
+      'active': true,
+      'isMaster': false,
     });
 
     if (!mounted) return;
 
-    if (foundAlertId != null) {
-      print("Yeni bir alert bulduk veya mevcut alert güncellendi");
-      if (_lastAlertId == foundAlertId) return;
-      setState(() {
-        _lastAlertId = foundAlertId;
-        _activeCallAlertId = foundAlertId; // DISMISS için kullanacağız
-        _callRequestFrom = foundDisplayName;
-        _callRequestLocatorId = foundLocatorId;
-        _callRequestTs = foundTs;
-		print("_callRequestFrom:$_callRequestFrom");
-      });
-    } else {
-      // Ortada aktif 'pending: true' kalmadıysa kutuyu kapat
-      if (_activeCallAlertId != null && _activeCallAlertId!.startsWith("rtdb_")) {
-        setState(() {
-          _callRequestFrom = null;
-          _activeCallAlertId = null;
-          _callRequestTs = null;
-        });
-      }
-    }
-  }, onError: (e) {
-    print("LynraCare🚀 RTDB CALL_ME ERROR => $e");
-  });
-}
+    setState(() {
+      _groupId = result;
+    });
 
-
-
-  Future<void> _openInMaps(double lat, double lng) async {
-    final uri =
-        Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      // sessiz geç
-    }
+    _initCallMeLiveSync();
   }
 
-  Future<void> _resolveAddress(double lat, double lng) async {
-    final key = '${lat.toStringAsFixed(5)},${lng.toStringAsFixed(5)}';
-    if (_lastAddressKey == key && _lastAddress != null) return;
+  void _initCallMeLiveSync() {
+    if (_groupId == null || _groupId!.isEmpty) return;
 
-    try {
-      final placemarks = await placemarkFromCoordinates(lat, lng);
-      if (placemarks.isEmpty) return;
+    _callMeRtdbSub?.cancel();
 
-      final p = placemarks.first;
+    _callMeRtdbSub =
+        RTDBService().getGroupPresenceStream(_groupId!).listen((event) async {
+      final data = event.snapshot.value as Map?;
+      if (data == null) return;
 
-      final parts = <String>[
-        if ((p.street ?? '').trim().isNotEmpty) p.street!.trim(),
-        if ((p.locality ?? '').trim().isNotEmpty) p.locality!.trim(),
-        if ((p.administrativeArea ?? '').trim().isNotEmpty)
-          p.administrativeArea!.trim(),
-      ];
+      String? foundAlertId;
+      String? foundLocatorId;
+      String? foundDisplayName;
+      String? foundTs;
 
-      final addr = parts.where((e) => e.isNotEmpty).join(', ');
-      if (addr.isEmpty) return;
+      data.forEach((locId, locData) {
+        if (locData is! Map) return;
+
+        final commands = locData['commands'] as Map?;
+        final callMe = commands?['call_me'] as Map?;
+        final handledBy = callMe?['handledBy']?.toString();
+
+        if (callMe != null && callMe['pending'] == true) {
+          targetMode = (callMe['targetMode'] ?? 'all').toString();
+          targetReqId = (callMe['requesterId'] ?? '').toString();
+
+          final isTarget =
+              (targetMode == 'all' && handledBy == null) ||
+              (targetMode == 'single' && targetReqId == _requesterDeviceId);
+
+          if (isTarget) {
+            foundAlertId = "rtdb_${locId}_${callMe['ts']}";
+            foundLocatorId = locId.toString();
+            foundDisplayName = callMe['locatorName']?.toString();
+
+            final tsRaw = callMe['ts'];
+            final tsMs = tsRaw is int ? tsRaw : int.tryParse('$tsRaw');
+
+            if (tsMs != null) {
+              foundTs = _formatAlertTsFromDate(
+                DateTime.fromMillisecondsSinceEpoch(tsMs),
+              );
+            }
+          }
+        }
+      });
 
       if (!mounted) return;
-      setState(() {
-        _lastAddressKey = key;
-        _lastAddress = addr;
-      });
-    } catch (_) {
-      // sessiz geç
-    }
+
+      if (foundAlertId != null) {
+        if (_lastAlertId == foundAlertId) return;
+
+        setState(() {
+          _lastAlertId = foundAlertId;
+          _activeCallAlertId = foundAlertId;
+          _callRequestFrom = foundDisplayName;
+          _callRequestLocatorId = foundLocatorId;
+          _callRequestTs = foundTs;
+        });
+      } else {
+        if (_activeCallAlertId != null &&
+            _activeCallAlertId!.startsWith("rtdb_")) {
+          setState(() {
+            _callRequestFrom = null;
+            _activeCallAlertId = null;
+            _callRequestTs = null;
+          });
+        }
+      }
+    }, onError: (e) {
+      debugPrint("LynraCare RTDB CALL_ME ERROR => $e");
+    });
   }
-  String lastSeen(Timestamp ts) {
-	  final time = ts.toDate();
-	  final formatted = DateFormat('d MMM yyyy • HH:mm').format(time);
-	  return 'Last seen $formatted';
-	}
 
-void _showQrDialog(String groupId) {
-  showDialog(
-    context: context,
-    builder: (_) => Dialog(
-      backgroundColor: Colors.white,
-      insetPadding: const EdgeInsets.all(20),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              "GROUP QR",
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 18,
-              ),
-            ),
-            const SizedBox(height: 16),
-            QrImageView(
-              data: groupId,
-              version: QrVersions.auto,
-              size: 240,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              shortCode(groupId),
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.5,
-              ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}	
+  String _formatAlertTsFromDate(DateTime date) {
+    final now = DateTime.now();
+    final sameDay =
+        date.year == now.year && date.month == now.month && date.day == now.day;
 
-Future<void> _joinGroup() async {
-  final result = await Navigator.push<String>(
-    context,
-    MaterialPageRoute(
-      builder: (_) => const _GroupQrScanner(),
-    ),
-  );
+    final hh = date.hour.toString().padLeft(2, '0');
+    final mm = date.minute.toString().padLeft(2, '0');
 
-  if (result == null || result.isEmpty) return;
+    if (sameDay) return '$hh:$mm';
 
-  final requesterId = await IdentityManager.getOrCreateDeviceId();
-  final requesterName = _currentRequesterName;
-  final now = FieldValue.serverTimestamp();
-  await IdentityManager.setLocalGroupId(result);
-  await FirebaseFirestore.instance
-      .collection('groups')
-      .doc(result)
-      .collection('devices')
-      .doc(requesterId)
-      .set({
-    'deviceId': requesterId,
-    'groupId': result,
-    'role': 'requester',
-	'name': requesterName,
-    'joinedAt': now,
-    'active': true,
-    'isMaster': false,
-  });
+    final dd = date.day.toString().padLeft(2, '0');
+    final mo = date.month.toString().padLeft(2, '0');
 
-  setState(() {
-    _groupId = result;
-  });
-}
+    return '$dd.$mo $hh:$mm';
+  }
 
+  Future<void> _dismissCallMe() async {
+    final alertId = _activeCallAlertId;
+    final locatorId = _callRequestLocatorId;
+    final groupId = _groupId;
+    final reqId = requesterId;
 
-	
-	
+    if (groupId == null || groupId.isEmpty) return;
+    if (locatorId == null || locatorId.isEmpty) return;
+    if (alertId == null || alertId.isEmpty) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('groups')
+          .doc(groupId)
+          .collection('locators')
+          .doc(locatorId)
+          .collection('alerts')
+          .doc(alertId)
+          .delete();
+    } catch (e) {
+      debugPrint('CALL_ME DISMISS DELETE ERROR => $e');
+    }
+
+    if (reqId != null && reqId.isNotEmpty) {
+      try {
+        await FirebaseFirestore.instance.collection('requesters').doc(reqId).get();
+      } catch (_) {}
+    }
+
+    await RTDBService().updateCallRequest(
+      groupId: groupId,
+      locatorId: locatorId,
+      isPending: false,
+      handlerName: _currentRequesterName,
+      targetMode: targetMode,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _callRequestFrom = null;
+      _callRequestLocatorId = null;
+      _activeCallAlertId = null;
+      _callRequestTs = null;
+    });
+  }
+
+  void _syncWatchingStatus(List<String> locatorIds) {
+    if (_groupId == null || _groupId!.isEmpty) return;
+    if (requesterId == null || requesterId!.isEmpty) return;
+
+    final next = locatorIds.toSet();
+
+    final toStart = next.difference(_watchedLocatorIds);
+    final toStop = _watchedLocatorIds.difference(next);
+
+    for (final locatorId in toStart) {
+      RTDBService().setWatchingStatus(
+        groupId: _groupId!,
+        locatorId: locatorId,
+        requesterId: requesterId!,
+        requesterName: _currentRequesterName ?? "Requester",
+        isWatching: true,
+      );
+    }
+
+    for (final locatorId in toStop) {
+      RTDBService().setWatchingStatus(
+        groupId: _groupId!,
+        locatorId: locatorId,
+        requesterId: requesterId!,
+        requesterName: _currentRequesterName ?? "Requester",
+        isWatching: false,
+      );
+    }
+
+    _watchedLocatorIds
+      ..clear()
+      ..addAll(next);
+  }
+
+  void _clearWatchingStatus() {
+    if (_groupId == null || _groupId!.isEmpty) return;
+    if (requesterId == null || requesterId!.isEmpty) return;
+
+    for (final locatorId in _watchedLocatorIds) {
+      RTDBService().setWatchingStatus(
+        groupId: _groupId!,
+        locatorId: locatorId,
+        requesterId: requesterId!,
+        requesterName: _currentRequesterName ?? "Requester",
+        isWatching: false,
+      );
+    }
+
+    _watchedLocatorIds.clear();
+  }
+
   @override
   Widget build(BuildContext context) {
-  final displayId = _groupId ?? requesterId;
-  
     if (requesterId == null) {
       return const Scaffold(
+        backgroundColor: Color(0xFFF1F5F9),
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
-    final theme = Theme.of(context);
-    final visibleRequestId = _lastRequestId;
-    final pendingRequestId = _pendingRequestId;
-	
-
-		
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
-appBar: AppBar(
-  elevation: 0,
-  backgroundColor: const Color(0xFFF1F5F9),
-  surfaceTintColor: Colors.transparent,
-  titleSpacing: 20,
-  title: Row(
-  children: [
-    const Text(
-      'LynraCare',
-      style: TextStyle(
-        fontWeight: FontWeight.w800,
-        color: Color(0xFF0F172A),
-      ),
-    ),
-    const SizedBox(width: 8),
-    // İsim ve İkon Kısmı
-    Flexible(
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Flexible(
-            child: Text(
-              _cachedMyName!,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF64748B),
-              ),
-            ),
-          ),
-          // --- MASTER İKONU BURADA ---
-          if (isMaster) ...[
-            const SizedBox(width: 4),
-            const Icon(
-              Icons.verified_rounded, // Şık bir onay ikonu veya 'crown' (tac)
-              size: 16,
-              color: Color(0xFF6366F1), // Senin o Indigo/Mor rengin
-            ),
-          ],
-        ],
-      ),
-    ),
-  ],
-),
-  actions: [
-    Padding(
-      padding: const EdgeInsets.only(right: 12),
-      child: FilledButton.tonalIcon(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const AddLocatorScreen()),
-          );
-        },
-        icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-        label: const Text('Add locator', style: TextStyle(fontSize: 13)),
-        style: FilledButton.styleFrom(
-          foregroundColor: const Color(0xFF0F172A),
-          backgroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 12), // Butonu biraz daralttık
-        ),
-      ),
-    ),
-  ],
-),
-      body: SafeArea(
-        child: ListView(
-		padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: const Color(0xFFF1F5F9),
+        surfaceTintColor: Colors.transparent,
+        titleSpacing: 20,
+        title: Row(
           children: [
-if (_groupId != null)
-Container(
-  margin: const EdgeInsets.only(bottom: 12),
-  padding: const EdgeInsets.all(16),
-  decoration: BoxDecoration(
-    color: Colors.white,
-    borderRadius: BorderRadius.circular(20),
-    border: Border.all(color: const Color(0xFFE2E8F0)),
-  ),
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Text(
-        "GROUP",
-        style: TextStyle(
-          fontWeight: FontWeight.w800,
-          color: Color(0xFF0F172A),
-        ),
-      ),
-      const SizedBox(height: 6),
-      Text(
-        shortCode(_groupId!),
-        style: const TextStyle(
-          fontSize: 22,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 1.5,
-        ),
-      ),
-      const SizedBox(height: 12),
-
-  GestureDetector(
-  onTap: () => _showQrDialog(_groupId!),      
-  child:Container(
-        height: 120,
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        
-
-  child: Center(
-    child: QrImageView(
-      data: _groupId!,
-      version: QrVersions.auto,
-      size: 100,
-    ),
-  ),
-),
-),
-      
-
-      const SizedBox(height: 8),
-
-      TextButton(
-        onPressed: () {
-          Clipboard.setData(ClipboardData(text: _groupId!));
-        },
-        child: const Text("COPY"),
-      ),
-    ],
-  ),
-),		  
-  
-if (_callRequestFrom != null)
-  Container(
-    margin: const EdgeInsets.only(bottom: 12),
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: const Color(0xFFFEF2F2),
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: const Color(0xFFDC2626)),
-    ),
-    child: Row(
-      children: [
-        const Icon(Icons.call, color: Color(0xFFDC2626)),
-        const SizedBox(width: 10),
-        Expanded(
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        '$_callRequestFrom wants you to call',
-        style: const TextStyle(
-          fontWeight: FontWeight.w700,
-          color: Color(0xFF7F1D1D),
-        ),
-      ),
-      if (_callRequestTs != null && _callRequestTs!.isNotEmpty)
-        Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: Text(
-            _callRequestTs!,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF991B1B),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-    ],
-  ),
-),
-        TextButton(
-onPressed: () async {
-  final alertId = _activeCallAlertId;
-  final locatorId = _callRequestLocatorId;
-  final groupId = _groupId;
-print("_activeCallAlertId:$_activeCallAlertId,_callRequestLocatorId:$_callRequestLocatorId,_groupId:$_groupId");
-   if (groupId == null || groupId.isEmpty) return;
-  if (locatorId == null || locatorId.isEmpty) return;
-  if (alertId == null || alertId.isEmpty) return;
-
-  try {
-  await FirebaseFirestore.instance
-      .collection('groups')
-      .doc(groupId)
-      .collection('locators')
-      .doc(locatorId)
-      .collection('alerts')
-      .doc(alertId)
-      .delete();
-} catch (e) {
-  print('CALL_ME DISMISS DELETE ERROR => $e');
-}
-
-final requesterDoc = await FirebaseFirestore.instance
-.collection('requesters')
-.doc(requesterId)
-.get();
-final requesterName = _currentRequesterName;
-
-// 1. RTDB'ye "Tamam, ben ilgileniyorum / kapattım" de
-  await RTDBService().updateCallRequest(
-    groupId: _groupId!,
-    locatorId: _callRequestLocatorId!,
-    isPending: false, 
-    handlerName: requesterName, 
-    targetMode: targetMode, // Single mı All mı?
-  );
-// Kendi ekranından kutuyu hemen kaldır
-  setState(() {
-    _callRequestFrom = null;
-    _callRequestLocatorId = null;
-    _activeCallAlertId = null;
-_callRequestTs = null;
-  });
-},
-          child: const Text('DISMISS'),
-        ),
-      ],
-    ),
-  ),		  
-
-  
-  
-if (_groupId == null || _groupId!.isEmpty) ...[
-  const SizedBox(height: 8),
-  SizedBox(
-    width: double.infinity,
-    child: OutlinedButton.icon(
-      onPressed: _joinGroup,
-      icon: const Icon(Icons.qr_code_scanner),
-      label: const Text("Join group"),
-    ),
-  ),
-],		  
             Container(
-              padding: const EdgeInsets.all(16),
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(28),
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF1D4ED8),
-                    Color(0xFF2563EB),
-                    Color(0xFF3B82F6),
-                  ],
-                ),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x221D4ED8),
-                    blurRadius: 28,
-                    offset: Offset(0, 12),
-                  ),
-                ],
+                color: const Color(0xFFE0E7FF),
+                borderRadius: BorderRadius.circular(12),
               ),
+              child: const Icon(
+                Icons.shield_rounded,
+                size: 21,
+                color: Color(0xFF4F46E5),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Text(
+                    'LynraCare',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                      fontSize: 20,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
                   Row(
                     children: [
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(
-                          Icons.travel_explore_rounded,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      const Expanded(
+                      Flexible(
                         child: Text(
-                          'Requester Device',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 19,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.3,
+                          'Requester: ${_cachedMyName ?? "Requester"}',
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF64748B),
                           ),
                         ),
                       ),
+                      if (isMaster) ...[
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.verified_rounded,
+                          size: 14,
+                          color: Color(0xFF6366F1),
+                        ),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Request location from the selected locator device.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.92),
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed:
-                          _selectedLocatorId == null ? null : _sendRequest,
-                      icon: const Icon(Icons.my_location_rounded),
-                      label: const Text('Request location'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: const Color(0xFF1D4ED8),
-                        disabledBackgroundColor:
-                            Colors.white.withValues(alpha: 0.65),
-                        disabledForegroundColor: const Color(0xFF94A3B8),
-                        padding: const EdgeInsets.symmetric(vertical: 11),
-                        textStyle: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 10,
-                      horizontal: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-  stream: (_groupId == null || _groupId!.isEmpty)
-      ? null
-      : FirebaseFirestore.instance
-          .collection('locators')
-          .where('groupId', isEqualTo: _groupId)
-          .where('role', isEqualTo: 'locator')
-          .where('active', isEqualTo: true)
-          .snapshots(),
-  builder: (context, snapshot) {
-    final allDocs = snapshot.data?.docs ?? [];
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          if (_groupId != null && _groupId!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: IconButton.filledTonal(
+                onPressed: () => _showQrDialog(_groupId!),
+                icon: const Icon(Icons.qr_code_2_rounded),
+                color: const Color(0xFF0F172A),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white,
+                ),
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: FilledButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const AddLocatorScreen()),
+                );
+              },
+              icon: const Icon(Icons.add_rounded, size: 20),
+              label: const Text('Add locator'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF4F46E5),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                textStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+          children: [
+            if (_groupId == null || _groupId!.isEmpty)
+              _JoinGroupCard(onJoin: _joinGroup),
 
-    final docs = allDocs.where((doc) {
+            if (_callRequestFrom != null)
+              _CallMeCard(
+                from: _callRequestFrom!,
+                ts: _callRequestTs,
+                onDismiss: _dismissCallMe,
+              ),
+
+            _SectionHeader(
+              title: 'My Locators',
+              subtitle: 'Live status from your paired locators',
+              trailing: _groupId == null
+                  ? null
+                  : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseFirestore.instance
+                          .collection('locators')
+                          .where('groupId', isEqualTo: _groupId)
+                          .where('role', isEqualTo: 'locator')
+                          .where('active', isEqualTo: true)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        final docs = _filterPairedLocators(snapshot.data?.docs ?? []);
+                        if (docs.isEmpty) return const SizedBox.shrink();
+
+                        return StreamBuilder<DatabaseEvent>(
+                          stream: RTDBService().getGroupPresenceStream(_groupId!),
+                          builder: (context, snap) {
+                            final presence =
+                                _parsePresenceMap(snap.data?.snapshot.value);
+
+                            int onlineCount = 0;
+
+                            for (final doc in docs) {
+                              final item = _presenceForLocator(
+                                locatorId: doc.id,
+                                presence: presence,
+                              );
+
+                              if (item.online) onlineCount++;
+                            }
+
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '$onlineCount online',
+                                  style: const TextStyle(
+                                    color: Color(0xFF16A34A),
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(width: 7),
+                                Container(
+                                  width: 9,
+                                  height: 9,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF16A34A),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    ),
+            ),
+
+            const SizedBox(height: 12),
+
+            if (_groupId == null || _groupId!.isEmpty)
+              const _EmptyLocatorCard(
+                title: 'No group yet',
+                subtitle: 'Join or create a group first to see paired locators.',
+              )
+            else
+              _LocatorList(
+                groupId: _groupId!,
+                requesterId: requesterId!,
+                myLat: _myLat,
+                myLng: _myLng,
+                pulse: _pulse,
+                onOpenMaps: _openInMaps,
+                onCopyLocation: _copyLocation,
+                formatLastSeen: formatLastSeen,
+                formatDistance: formatDistance,
+                formatCoordinate: formatCoordinate,
+                filterPairedLocators: _filterPairedLocators,
+                parsePresenceMap: _parsePresenceMap,
+                presenceForLocator: _presenceForLocator,
+                onLocatorsVisible: (ids) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _syncWatchingStatus(ids);
+                  });
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _filterPairedLocators(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    return docs.where((doc) {
       final data = doc.data();
-      final pairedRequesters =
-          data['pairedRequesters'] as Map<String, dynamic>?;
+      final pairedRequesters = data['pairedRequesters'] as Map<String, dynamic>?;
 
       if (pairedRequesters == null || requesterId == null) {
         return false;
@@ -1002,71 +786,203 @@ if (_groupId == null || _groupId!.isEmpty) ...[
 
       return entry['active'] == true;
     }).toList();
-  if (docs.length == 1 && _selectedLocatorId != docs.first.id) {
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!mounted) return;
-    setState(() {
-      _selectedLocatorId = docs.first.id;
-	  // Seçildiğinde RTDB'ye "İzliyorum" mührünü bas (İstediğin yeni mantık)
-        RTDBService().setWatchingStatus(
-          groupId: _groupId!,
-          locatorId: _selectedLocatorId!,
-          requesterId: requesterId!,
-          requesterName: _currentRequesterName ?? "Requester",
-          isWatching: true,
-        );
-    });
-  });
-}
+  }
 
-    if (docs.isEmpty) {
-	print("LynraCaredocs is Empty");
-      return Text(
-        _groupId == null
-            ? 'Create or join a group first'
-            : 'No paired locator',
-        style: theme.textTheme.bodyMedium?.copyWith(
-          color: Colors.white70,
-          fontWeight: FontWeight.w600,
-        ),
-      );
+  Map<dynamic, dynamic> _parsePresenceMap(Object? value) {
+    if (value is Map<dynamic, dynamic>) return value;
+    if (value is Map) return value;
+    return {};
+  }
+
+  _LocatorPresence _presenceForLocator({
+    required String locatorId,
+    required Map<dynamic, dynamic> presence,
+  }) {
+    final raw = presence[locatorId];
+
+    if (raw is! Map) {
+      return const _LocatorPresence();
     }
 
-return Wrap(
-  spacing: 8,
-  runSpacing: 8,
-  children: docs.map((doc) {
-    final deviceData = doc.data();
-    final locatorId  = doc.id;
-    final name = (deviceData['name'] ?? deviceData['deviceId'] ?? locatorId).toString();
-    final selected = locatorId == _selectedLocatorId;
-    return GestureDetector(
-      onTap: () {
-		if(_selectedLocatorId!=null)
-		{
-// Seçildiğinde RTDB'ye "İzliyorum" mührünü bas (İstediğin yeni mantık)
-        RTDBService().setWatchingStatus(
-          groupId: _groupId!,
-          locatorId: _selectedLocatorId!,
-          requesterId: requesterId!,
-          requesterName: _currentRequesterName ?? "Requester",
-          isWatching: false,
-        );
-		}
-        setState(() {
-          _selectedLocatorId = locatorId;
-        });
-        // Seçildiğinde RTDB'ye "İzliyorum" mührünü bas (İstediğin yeni mantık)
-        RTDBService().setWatchingStatus(
-          groupId: _groupId!,
-          locatorId: locatorId,
-          requesterId: requesterId!,
-          requesterName: _currentRequesterName ?? "Requester",
-          isWatching: true,
+    final status = (raw['status'] ?? '').toString();
+    final lat = (raw['lat'] as num?)?.toDouble();
+    final lng = (raw['lng'] as num?)?.toDouble();
+    final acc = (raw['acc'] as num?)?.toDouble();
+    final battery = (raw['battery'] as num?)?.toInt();
+    final gpsOn = raw['gpsEnabled'] ?? true;
+
+    DateTime? lastSeen;
+    final tsRaw = raw['lastSeen'];
+    final tsMs = tsRaw is int ? tsRaw : int.tryParse('$tsRaw');
+
+    if (tsMs != null) {
+      lastSeen = DateTime.fromMillisecondsSinceEpoch(tsMs);
+    }
+
+    return _LocatorPresence(
+      status: status,
+      online: status == 'online',
+      lat: lat,
+      lng: lng,
+      acc: acc,
+      battery: battery,
+      gpsOn: gpsOn == true,
+      lastSeen: lastSeen,
+    );
+  }
+}
+
+class _LocatorList extends StatelessWidget {
+  final String groupId;
+  final String requesterId;
+  final double? myLat;
+  final double? myLng;
+  final Animation<double> pulse;
+  final Future<void> Function(double lat, double lng) onOpenMaps;
+  final void Function(double lat, double lng) onCopyLocation;
+  final String Function(DateTime? lastSeen) formatLastSeen;
+  final String Function(double? distance, double acc) formatDistance;
+  final String Function(double value) formatCoordinate;
+  final List<QueryDocumentSnapshot<Map<String, dynamic>>> Function(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) filterPairedLocators;
+  final Map<dynamic, dynamic> Function(Object? value) parsePresenceMap;
+  final _LocatorPresence Function({
+    required String locatorId,
+    required Map<dynamic, dynamic> presence,
+  }) presenceForLocator;
+  final void Function(List<String> ids) onLocatorsVisible;
+
+  const _LocatorList({
+    required this.groupId,
+    required this.requesterId,
+    required this.myLat,
+    required this.myLng,
+    required this.pulse,
+    required this.onOpenMaps,
+    required this.onCopyLocation,
+    required this.formatLastSeen,
+    required this.formatDistance,
+    required this.formatCoordinate,
+    required this.filterPairedLocators,
+    required this.parsePresenceMap,
+    required this.presenceForLocator,
+    required this.onLocatorsVisible,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('locators')
+          .where('groupId', isEqualTo: groupId)
+          .where('role', isEqualTo: 'locator')
+          .where('active', isEqualTo: true)
+          .snapshots(),
+      builder: (context, locatorSnapshot) {
+        final docs = filterPairedLocators(locatorSnapshot.data?.docs ?? []);
+
+        onLocatorsVisible(docs.map((e) => e.id).toList());
+
+        if (locatorSnapshot.connectionState == ConnectionState.waiting) {
+          return const _LoadingCard();
+        }
+
+        if (docs.isEmpty) {
+          return const _EmptyLocatorCard(
+            title: 'No paired locator',
+            subtitle: 'Add a locator or wait until pairing is approved.',
+          );
+        }
+
+        return StreamBuilder<DatabaseEvent>(
+          stream: RTDBService().getGroupPresenceStream(groupId),
+          builder: (context, presenceSnapshot) {
+            final presence = parsePresenceMap(presenceSnapshot.data?.snapshot.value);
+
+            return Column(
+              children: docs.map((doc) {
+                final data = doc.data();
+                final locatorId = doc.id;
+                final name =
+                    (data['name'] ?? data['deviceId'] ?? locatorId).toString();
+
+                final item = presenceForLocator(
+                  locatorId: locatorId,
+                  presence: presence,
+                );
+
+                double? distance;
+                if (myLat != null &&
+                    myLng != null &&
+                    item.lat != null &&
+                    item.lng != null) {
+                  distance = Geolocator.distanceBetween(
+                    myLat!,
+                    myLng!,
+                    item.lat!,
+                    item.lng!,
+                  );
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 14),
+                  child: _LocatorCard(
+                    locatorId: locatorId,
+                    name: name,
+                    presence: item,
+                    distance: distance,
+                    pulse: pulse,
+                    onOpenMaps: onOpenMaps,
+                    onCopyLocation: onCopyLocation,
+                    formatLastSeen: formatLastSeen,
+                    formatDistance: formatDistance,
+                    formatCoordinate: formatCoordinate,
+                  ),
+                );
+              }).toList(),
+            );
+          },
         );
       },
-      onLongPress: () async {
-        final changed = await Navigator.push(
+    );
+  }
+}
+
+class _LocatorCard extends StatelessWidget {
+  final String locatorId;
+  final String name;
+  final _LocatorPresence presence;
+  final double? distance;
+  final Animation<double> pulse;
+  final Future<void> Function(double lat, double lng) onOpenMaps;
+  final void Function(double lat, double lng) onCopyLocation;
+  final String Function(DateTime? lastSeen) formatLastSeen;
+  final String Function(double? distance, double acc) formatDistance;
+  final String Function(double value) formatCoordinate;
+
+  const _LocatorCard({
+    required this.locatorId,
+    required this.name,
+    required this.presence,
+    required this.distance,
+    required this.pulse,
+    required this.onOpenMaps,
+    required this.onCopyLocation,
+    required this.formatLastSeen,
+    required this.formatDistance,
+    required this.formatCoordinate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final hasLocation = presence.lat != null && presence.lng != null;
+    final lastText = presence.online ? 'Just now' : formatLastSeen(presence.lastSeen);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(26),
+      onLongPress: () {
+        Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => PairingOptionsScreen(
@@ -1075,693 +991,305 @@ return Wrap(
             ),
           ),
         );
-        if (changed == true && mounted) setState(() {});
       },
-      child: StreamBuilder<DatabaseEvent>(
-        // --- RTDB VERİ KAYNAĞI ---
-        stream: RTDBService().getGroupPresenceStream(_groupId!),
-        builder: (context, snap) {
-          // Default değerler
-          bool online = false;
-          int battery = 0;
-          bool gpsOn = true;
-          double? lat, lng, acc;
-          DateTime? lastSeen;
-
-          if (snap.hasData && snap.data!.snapshot.value != null) {
-            final allLocators = snap.data!.snapshot.value as Map<dynamic, dynamic>;
-            final myData = allLocators[locatorId] as Map<dynamic, dynamic>?;
-
-            if (myData != null) {
-              online = myData['status'] == 'online';
-              battery = myData['battery'] ?? 0;
-              gpsOn = myData['gpsEnabled'] ?? true;
-              lat = (myData['lat'] as num?)?.toDouble();
-              lng = (myData['lng'] as num?)?.toDouble();
-              acc = (myData['acc'] as num?)?.toDouble() ?? 0;
-              
-              final ts = myData['lastSeen'] as int?;
-              if (ts != null) {
-                lastSeen = DateTime.fromMillisecondsSinceEpoch(ts);
-              }
-            }
-          }
-
-          // Mesafe hesaplama mantığı (Eski haliyle aynı)
-          double? distance;
-          if (_myLat != null && _myLng != null && lat != null && lng != null) {
-            distance = Geolocator.distanceBetween(_myLat!, _myLng!, lat, lng);
-          }
-
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: selected ? Colors.white : Colors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: selected ? const Color(0xFF1D4ED8) : Colors.white,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              online
-                  ? AnimatedBuilder(
-                      animation: _pulse,
-                      builder: (context, child) => Transform.scale(scale: _pulse.value, child: child),
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                      ),
-                    )
-                  : Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(color: Colors.white70, shape: BoxShape.circle),
-                    ),
-              const SizedBox(width: 6),
-              Text(
-                online ? "ONLINE" : formatLastSeen(lastSeen),
-                style: TextStyle(
-                  color: online ? Colors.green : Colors.white70,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (online) ...[
-                const SizedBox(width: 12),
-                Text(
-                  "🔋$battery%",
-                  style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  gpsOn ? "📍GPS" : "⚠️GPS",
-                  style: TextStyle(
-                    color: gpsOn ? Colors.white70 : Colors.orange,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (distance != null) ...[
-                  const SizedBox(width: 12),
-                  Text(
-                    formatDistance(distance, acc ?? 0),
-                    style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                ],
-              ],
-            ],
-          );
-        },
-      ),
-    );
-  }).toList(),
-);
-
-  },
-),
-                  ),
-                ],
-              ),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x120F172A),
+              blurRadius: 22,
+              offset: Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _LocatorHeader(
+              name: name,
+              online: presence.online,
+              lastText: lastText,
+              pulse: pulse,
             ),
             const SizedBox(height: 14),
-
-            if (visibleRequestId == null && pendingRequestId == null)
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+            GridView.count(
+              crossAxisCount: 2,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 2.15,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _MetricTile(
+                  icon: Icons.battery_full_rounded,
+                  iconColor: _batteryColor(presence.battery),
+                  label: 'Battery',
+                  value: presence.battery == null ? '--' : '${presence.battery}%',
                 ),
-                child: Column(
-                  children: [
-                    Container(
-                      width: 54,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE0E7FF),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: const Icon(
-                        Icons.location_searching_rounded,
-                        color: Color(0xFF4338CA),
-                        size: 26,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'No active request yet',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF0F172A),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _selectedLocatorId == null
-                          ? 'Add and select a locator first.'
-                          : 'Tap request location and wait for locator response.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF64748B),
-                        height: 1.4,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+                _MetricTile(
+                  icon: presence.gpsOn
+                      ? Icons.gps_fixed_rounded
+                      : Icons.gps_off_rounded,
+                  iconColor: presence.gpsOn
+                      ? const Color(0xFF16A34A)
+                      : const Color(0xFFEF4444),
+                  label: 'GPS',
+                  value: presence.gpsOn ? 'ON' : 'OFF',
                 ),
-              ),
-
-           /* if (pendingRequestId != null) ...[
-              _StatusCard(
-                icon: _timeout
-                    ? Icons.error_outline
-                    : Icons.hourglass_top_rounded,
-                iconBg: _timeout
-                    ? const Color(0xFFFEF2F2)
-                    : const Color(0xFFFFF7ED),
-                iconColor: _timeout
-                    ? const Color(0xFFDC2626)
-                    : const Color(0xFFEA580C),
-                title: _timeout
-                    ? 'Locator did not respond'
-                    : 'Waiting for response',
-                subtitle: _timeout
-                    ? 'Please try again'
-                    : 'Request sent successfully. Waiting for locator device...',
-              ),
-              const SizedBox(height: 14),
-            ],*/
-
-            if (pendingRequestId != null || visibleRequestId != null)
-              StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance
-                    .collection('locators')
-                    .doc(_selectedLocatorId)
-                    .snapshots(),
-                builder: (context, locatorSnapshot) {
-				  /*if (locatorSnapshot.connectionState == ConnectionState.waiting) {
-					return const SizedBox();
-				  }
-
-				  if (locatorSnapshot.hasError) {
-					return const SizedBox();
-				  }
-
-				  if (!locatorSnapshot.hasData || locatorSnapshot.data == null) {
-					return const SizedBox();
-				  }
-
-				  final locatorDoc = locatorSnapshot.data!;
-				  if (!locatorDoc.exists) {
-					return const SizedBox();
-				  }
-
-				  final locatorData = locatorDoc.data();
-				  if (locatorData == null) {
-					return const SizedBox();
-				  }
-
-				  final pairedRequesters =
-					locatorData['pairedRequesters'] as Map<String, dynamic>?;
-
-				  final isStillPaired =
-					pairedRequesters != null && pairedRequesters.containsKey(requesterId);
-
-				  if (!isStillPaired) {
-					WidgetsBinding.instance.addPostFrameCallback((_) {
-					  if (!mounted) return;
-					  setState(() {
-						_pendingRequestId = null;
-						_lastRequestId = null;
-						_timeout = false;
-						_lastAddress = null;
-						_lastAddressKey = null;
-					  });
-					});
-					return const SizedBox();
-				  }*/
-				  return StreamBuilder<DatabaseEvent>(
-  stream: RTDBService().getGroupPresenceStream(_groupId!),
-  builder: (context, snapshot) {
-    if (snapshot.connectionState == ConnectionState.waiting) {
-      return const SizedBox();}	
-	if (snapshot.hasError) {
-      return const SizedBox();}
-    if (!snapshot.hasData || snapshot.data!.snapshot.value == null) {
-      return const SizedBox();}
-
-    // RTDB'den gelen tüm grubun verisi
-    final allLocators = snapshot.data!.snapshot.value as Map<dynamic, dynamic>;
-    // Sadece seçili olan cihazın verisi
-    final myData = allLocators[_selectedLocatorId] as Map<dynamic, dynamic>?;
-
-    if (myData == null) {
-      return const SizedBox();
-    }
-
-    // UI'ın beklediği değişkenlerin RTDB'den parse edilmesi
-    final status = (myData['status'] ?? '').toString();
-    final lat = (myData['lat'] as num?)?.toDouble();
-    final lng = (myData['lng'] as num?)?.toDouble();
-    final acc = (myData['acc'] as num?)?.toDouble();
-    final battery = (myData['battery'] as num?)?.toInt();
-    
-    // Zaman damgası dönüşümü
-    final tsInt = myData['lastSeen'] as int?;
-    final Timestamp? ts = tsInt != null 
-    ? Timestamp.fromMillisecondsSinceEpoch(tsInt) 
-    : null;
-
-    final hasFix = (status == 'online' || (lat != null && lng != null));
-    final online = status == 'online';
-
-    if (!hasFix) {
-      return _StatusCard(
-        icon: Icons.sync_problem_rounded,
-        iconBg: const Color(0xFFFEF2F2),
-        iconColor: const Color(0xFFDC2626),
-        title: 'Waiting for Fix',
-        subtitle: 'Status: $status\nLocation data not valid yet...',
-      );
-    }
-    // Adres çözme tetikleyicisi
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (lat != null && lng != null) {
-        _resolveAddress(lat, lng);
-      }
-    });
-  print("LynraCare_respone 8");
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x120F172A),
-                blurRadius: 18,
-                offset: Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.location_on_rounded,
-                      color: Color(0xFF16A34A),
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Location result',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF0F172A),
-                    ),
-                  ),
-                ],
-              ),
-              if (_lastAddress != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: const Color(0xFFE2E8F0),
-                    ),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(top: 2),
-                        child: Icon(
-                          Icons.place_rounded,
-                          color: Color(0xFF1D4ED8),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _lastAddress!,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: const Color(0xFF0F172A),
-                            height: 1.4,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                _MetricTile(
+                  icon: Icons.my_location_rounded,
+                  iconColor: const Color(0xFF2563EB),
+                  label: 'Accuracy',
+                  value: presence.acc == null
+                      ? '--'
+                      : '${presence.acc!.toStringAsFixed(0)} m',
+                ),
+                _MetricTile(
+                  icon: Icons.route_rounded,
+                  iconColor: const Color(0xFF8B5CF6),
+                  label: 'Distance',
+                  value: formatDistance(distance, presence.acc ?? 0),
                 ),
               ],
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 10,
-                runSpacing: 8,
-                children: [
-                  _MiniInfo(
-                    icon: Icons.gps_fixed_rounded,
-                    text: acc != null
-                        ? 'Accuracy ${acc.toStringAsFixed(0)} m'
-                        : 'Accuracy -',
+            ),
+            const SizedBox(height: 12),
+            _LocationBox(
+              hasLocation: hasLocation,
+              online: presence.online,
+              lat: presence.lat,
+              lng: presence.lng,
+              formatCoordinate: formatCoordinate,
+              onCopy: hasLocation
+                  ? () => onCopyLocation(presence.lat!, presence.lng!)
+                  : null,
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: hasLocation
+                    ? () => onOpenMaps(presence.lat!, presence.lng!)
+                    : null,
+                icon: const Icon(Icons.map_rounded),
+                label: const Text('Open in Maps'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF4F46E5),
+                  side: const BorderSide(color: Color(0xFF6366F1)),
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  textStyle: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
                   ),
-                  if (battery != null)
-                    _MiniInfo(
-                      icon: Icons.battery_full,
-                      text: 'Battery $battery%',
-                    ),
-                  _MiniInfo(
-                    icon: Icons.circle,
-                    text: online ? 'Online' : lastSeenText(ts!),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: (lat != null && lng != null) 
-    ? () => _openInMaps(lat, lng) 
-    : null, // Değer yoksa buton pasif olur (veya boş bir fonksiyon verebilirsin)
-                  label: const Text('Open in Maps'),
-                ),
-              ),
-            ],
-          ),
-        );
-  },
-);
-					/*return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-  stream: FirebaseFirestore.instance
-      .collection('groups')
-      .doc(_groupId)
-      .collection('locators')
-      .doc(_selectedLocatorId)
-      .collection('responses')
-      .doc(pendingRequestId ?? visibleRequestId)
-      .snapshots(),
-  builder: (context, snapshot) {
-    if (snapshot.connectionState == ConnectionState.waiting) {
-      return const SizedBox();
-    }
-
-    if (snapshot.hasError) {
-      return const SizedBox();
-    }
-
-    if (!snapshot.hasData || snapshot.data == null) {
-      return const SizedBox();
-    }
-
-    final responseDoc = snapshot.data!;
-    if (!responseDoc.exists) {
-      return const SizedBox();
-    }
-
-    final data = responseDoc.data();
-    if (data == null) {
-      return const SizedBox();
-    }
-
-    final responseDeviceId =
-        (data['requesterDeviceId'] ?? '').toString().trim();
-
-    if (_requesterDeviceId != null &&
-        responseDeviceId.isNotEmpty &&
-        responseDeviceId != _requesterDeviceId) {
-      return const SizedBox();
-    }
-
-    final status = (data['status'] ?? '').toString();
-    final lat = (data['lat'] as num?)?.toDouble();
-    final lng = (data['lng'] as num?)?.toDouble();
-    final hasFix = (status == 'ok' && lat != null && lng != null);
-
-    if (hasFix && pendingRequestId != null) {
-      final currentPending = pendingRequestId;
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        if (!mounted) return;
-
-        setState(() {
-          _lastRequestId = currentPending;
-          _pendingRequestId = null;
-          _timeout = false;
-          _lastAddress = null;
-          _lastAddressKey = null;
-        });
-      });
-    }
-
-    if (visibleRequestId == null && pendingRequestId != null) {
-      return const SizedBox();
-    }
-
-    if (visibleRequestId == null && pendingRequestId == null) {
-      return const SizedBox();
-    }
-
-    final displayDocId = _lastRequestId ?? visibleRequestId;
-    if (displayDocId == null) {
-      return const SizedBox();
-    }
-
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('groups')
-          .doc(_groupId)
-          .collection('locators')
-          .doc(_selectedLocatorId)
-          .collection('responses')
-          .doc(displayDocId)
-          .snapshots(),
-      builder: (context, visibleSnapshot) {
-        final visibleData = visibleSnapshot.data?.data();
-
-        if (visibleData == null) {
-          return const SizedBox();
-        }
-
-        final visibleResponseDeviceId =
-            (visibleData['requesterDeviceId'] ?? '').toString().trim();
-
-        if (_requesterDeviceId != null &&
-            visibleResponseDeviceId.isNotEmpty &&
-            visibleResponseDeviceId != _requesterDeviceId) {
-          return const SizedBox();
-        }
-
-        final status = (visibleData['status'] ?? '').toString();
-        final lat = (visibleData['lat'] as num?)?.toDouble();
-        final lng = (visibleData['lng'] as num?)?.toDouble();
-        final acc = (visibleData['acc'] as num?)?.toDouble();
-        final ts = visibleData['ts'] as Timestamp?;
-        final battery = (visibleData['battery'] as num?)?.toInt();
-
-        final hasFix = (status == 'ok' && lat != null && lng != null);
-        final online =
-            ts != null &&
-            DateTime.now().difference(ts.toDate()).inSeconds <= 60;
-
-        if (!hasFix) {
-          return _StatusCard(
-            icon: Icons.sync_problem_rounded,
-            iconBg: const Color(0xFFFEF2F2),
-            iconColor: const Color(0xFFDC2626),
-            title: 'Response received',
-            subtitle: 'Status: $status\nWaiting for valid location...',
-          );
-        }
-
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _resolveAddress(lat, lng);
-        });
-
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x120F172A),
-                blurRadius: 18,
-                offset: Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.location_on_rounded,
-                      color: Color(0xFF16A34A),
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Location result',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: const Color(0xFF0F172A),
-                    ),
-                  ),
-                ],
-              ),
-              if (_lastAddress != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: const Color(0xFFE2E8F0),
-                    ),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.only(top: 2),
-                        child: Icon(
-                          Icons.place_rounded,
-                          color: Color(0xFF1D4ED8),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _lastAddress!,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: const Color(0xFF0F172A),
-                            height: 1.4,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-              ],
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 10,
-                runSpacing: 8,
-                children: [
-                  _MiniInfo(
-                    icon: Icons.gps_fixed_rounded,
-                    text: acc != null
-                        ? 'Accuracy ${acc.toStringAsFixed(0)} m'
-                        : 'Accuracy -',
-                  ),
-                  if (battery != null)
-                    _MiniInfo(
-                      icon: Icons.battery_full,
-                      text: 'Battery $battery%',
-                    ),
-                  _MiniInfo(
-                    icon: Icons.circle,
-                    text: online ? 'Online' : lastSeenText(ts!),
-                  ),
-                ],
               ),
-              const SizedBox(height: 14),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _openInMaps(lat, lng),
-                  icon: const Icon(Icons.map_rounded),
-                  label: const Text('Open in Maps'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  },
-);*/
-
-
-				  
-                },
-              ),
+            ),
           ],
         ),
       ),
     );
   }
+
+  Color _batteryColor(int? battery) {
+    if (battery == null) return const Color(0xFF64748B);
+    if (battery <= 20) return const Color(0xFFEF4444);
+    if (battery <= 40) return const Color(0xFFF59E0B);
+    return const Color(0xFF16A34A);
+  }
 }
 
-class _MiniInfo extends StatelessWidget {
-  final IconData icon;
-  final String text;
+class _LocatorHeader extends StatelessWidget {
+  final String name;
+  final bool online;
+  final String lastText;
+  final Animation<double> pulse;
 
-  const _MiniInfo({
+  const _LocatorHeader({
+    required this.name,
+    required this.online,
+    required this.lastText,
+    required this.pulse,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final avatarBg = online ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2);
+    final avatarColor =
+        online ? const Color(0xFF16A34A) : const Color(0xFFEF4444);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Container(
+          width: 54,
+          height: 54,
+          decoration: BoxDecoration(
+            color: avatarBg,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.person_rounded,
+            color: avatarColor,
+            size: 31,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  online
+                      ? AnimatedBuilder(
+                          animation: pulse,
+                          builder: (context, child) => Transform.scale(
+                            scale: pulse.value,
+                            child: child,
+                          ),
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF16A34A),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          width: 8,
+                          height: 8,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFCBD5E1),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                  const SizedBox(width: 8),
+                  Text(
+                    online ? 'ONLINE' : 'OFFLINE',
+                    style: TextStyle(
+                      color: online
+                          ? const Color(0xFF16A34A)
+                          : const Color(0xFF64748B),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  const Text(
+                    '•',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Flexible(
+                    child: Text(
+                      lastText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF334155),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.more_vert_rounded),
+          color: Colors.white,
+          onSelected: (_) {},
+          itemBuilder: (_) => const [
+            PopupMenuItem(
+              value: 'manage',
+              child: Text('Manage locator'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final String value;
+
+  const _MetricTile({
     required this.icon,
-    required this.text,
+    required this.iconColor,
+    required this.label,
+    required this.value,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 17, color: const Color(0xFF475569)),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: const Color(0xFF475569),
-                  fontWeight: FontWeight.w600,
+          Icon(icon, color: iconColor, size: 24),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontSize: 17,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1769,27 +1297,292 @@ class _MiniInfo extends StatelessWidget {
   }
 }
 
-class _StatusCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconBg;
-  final Color iconColor;
+class _LocationBox extends StatelessWidget {
+  final bool hasLocation;
+  final bool online;
+  final double? lat;
+  final double? lng;
+  final String Function(double value) formatCoordinate;
+  final VoidCallback? onCopy;
+
+  const _LocationBox({
+    required this.hasLocation,
+    required this.online,
+    required this.lat,
+    required this.lng,
+    required this.formatCoordinate,
+    required this.onCopy,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final title = hasLocation
+        ? (online ? 'Location (WGS84)' : 'Last known location')
+        : 'Location';
+
+    final value = hasLocation
+        ? '${formatCoordinate(lat!)}, ${formatCoordinate(lng!)}'
+        : 'Waiting for location update...';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(13, 12, 10, 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            hasLocation ? Icons.location_on_rounded : Icons.location_searching_rounded,
+            color: const Color(0xFF4F46E5),
+            size: 25,
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: hasLocation
+                        ? const Color(0xFF0F172A)
+                        : const Color(0xFF64748B),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: hasLocation ? 0.2 : 0,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onCopy,
+            icon: const Icon(Icons.copy_rounded),
+            color: const Color(0xFF64748B),
+            tooltip: 'Copy location',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget? trailing;
+
+  const _SectionHeader({
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.4,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (trailing != null) trailing!,
+      ],
+    );
+  }
+}
+
+class _JoinGroupCard extends StatelessWidget {
+  final VoidCallback onJoin;
+
+  const _JoinGroupCard({
+    required this.onJoin,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEFF6FF),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFBFDBFE)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.qr_code_scanner_rounded,
+              color: Color(0xFF2563EB),
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Join a group',
+                  style: TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                  ),
+                ),
+                SizedBox(height: 3),
+                Text(
+                  'Scan group QR to connect with locators.',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: onJoin,
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Join'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CallMeCard extends StatelessWidget {
+  final String from;
+  final String? ts;
+  final VoidCallback onDismiss;
+
+  const _CallMeCard({
+    required this.from,
+    required this.ts,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFEF2F2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFFCA5A5)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.call_rounded,
+              color: Color(0xFFDC2626),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$from wants you to call',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF7F1D1D),
+                  ),
+                ),
+                if (ts != null && ts!.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      ts!,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF991B1B),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: onDismiss,
+            child: const Text('DISMISS'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyLocatorCard extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const _StatusCard({
-    required this.icon,
-    required this.iconBg,
-    required this.iconColor,
+  const _EmptyLocatorCard({
     required this.title,
     required this.subtitle,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
     return Container(
-      padding: const EdgeInsets.all(20),
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
@@ -1801,34 +1594,83 @@ class _StatusCard extends StatelessWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: iconBg,
+              color: const Color(0xFFE0E7FF),
               borderRadius: BorderRadius.circular(18),
             ),
-            child: Icon(icon, color: iconColor, size: 28),
+            child: const Icon(
+              Icons.group_add_rounded,
+              color: Color(0xFF4F46E5),
+              size: 28,
+            ),
           ),
           const SizedBox(height: 14),
           Text(
             title,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
+            style: const TextStyle(
+              color: Color(0xFF0F172A),
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
             ),
-            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             subtitle,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: const Color(0xFF64748B),
-              height: 1.45,
-            ),
             textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF64748B),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              height: 1.35,
+            ),
           ),
         ],
       ),
     );
   }
 }
+
+class _LoadingCard extends StatelessWidget {
+  const _LoadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 150,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+  }
+}
+
+class _LocatorPresence {
+  final String status;
+  final bool online;
+  final double? lat;
+  final double? lng;
+  final double? acc;
+  final int? battery;
+  final bool gpsOn;
+  final DateTime? lastSeen;
+
+  const _LocatorPresence({
+    this.status = '',
+    this.online = false,
+    this.lat,
+    this.lng,
+    this.acc,
+    this.battery,
+    this.gpsOn = true,
+    this.lastSeen,
+  });
+}
+
 class _GroupQrScanner extends StatefulWidget {
   const _GroupQrScanner();
 
