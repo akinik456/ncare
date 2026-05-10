@@ -736,15 +736,7 @@ class _RequesterScreenState extends State<RequesterScreen>
                     ),
             ),
 
-            const SizedBox(height: 6),
-
-            if (_groupId != null && _groupId!.isNotEmpty)
-              _LocatorQuickStrip(
-                groupId: _groupId!,
-                filterPairedLocators: _filterPairedLocators,
-              ),
-
-            const SizedBox(height: 6),
+            const SizedBox(height: 12),
 
             if (_groupId == null || _groupId!.isEmpty)
               const _EmptyLocatorCard(
@@ -836,91 +828,6 @@ class _RequesterScreenState extends State<RequesterScreen>
       battery: battery,
       gpsOn: gpsOn == true,
       lastSeen: lastSeen,
-    );
-  }
-}
-
-
-class _LocatorQuickStrip extends StatelessWidget {
-  final String groupId;
-  final List<QueryDocumentSnapshot<Map<String, dynamic>>> Function(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
-  ) filterPairedLocators;
-
-  const _LocatorQuickStrip({
-    required this.groupId,
-    required this.filterPairedLocators,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: FirebaseFirestore.instance
-          .collection('locators')
-          .where('groupId', isEqualTo: groupId)
-          .where('role', isEqualTo: 'locator')
-          .where('active', isEqualTo: true)
-          .snapshots(),
-      builder: (context, snapshot) {
-        final docs = filterPairedLocators(snapshot.data?.docs ?? []);
-        if (docs.isEmpty) return const SizedBox.shrink();
-
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          child: Row(
-            children: List.generate(docs.length, (index) {
-              final doc = docs[index];
-              final data = doc.data();
-              final name =""; (data['name'] ?? 'L${index + 1}').toString();
-
-              return Container(
-                margin: EdgeInsets.only(right: index == docs.length - 1 ? 0 : 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x0A0F172A),
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'L${index + 1}',
-                      style: const TextStyle(
-                        color: Color(0xFF4F46E5),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    /*ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 82),
-                      child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF334155),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),*/
-                  ],
-                ),
-              );
-            }),
-          ),
-        );
-      },
     );
   }
 }
@@ -1019,7 +926,7 @@ class _LocatorList extends StatelessWidget {
                 }
 
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.only(bottom: 14),
                   child: _LocatorCard(
                     locatorId: locatorId,
                     name: name,
@@ -1073,7 +980,7 @@ class _LocatorCard extends StatelessWidget {
     final lastText = presence.online ? 'Just now' : formatLastSeen(presence.lastSeen);
 
     return InkWell(
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(26),
       onLongPress: () {
         Navigator.push(
           context,
@@ -1086,16 +993,16 @@ class _LocatorCard extends StatelessWidget {
         );
       },
       child: Container(
-        padding: const EdgeInsets.all(6),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(26),
           border: Border.all(color: const Color(0xFFE2E8F0)),
           boxShadow: const [
             BoxShadow(
               color: Color(0x120F172A),
-              blurRadius: 16,
-              offset: Offset(0, 7),
+              blurRadius: 22,
+              offset: Offset(0, 10),
             ),
           ],
         ),
@@ -1108,12 +1015,12 @@ class _LocatorCard extends StatelessWidget {
               lastText: lastText,
               pulse: pulse,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 14),
             GridView.count(
               crossAxisCount: 2,
-              mainAxisSpacing: 4,//8,
-              crossAxisSpacing: 4,//8,
-              childAspectRatio: 3.15,//2.75,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 2.15,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               children: [
@@ -1149,7 +1056,7 @@ class _LocatorCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 12),
             _LocationBox(
               hasLocation: hasLocation,
               online: presence.online,
@@ -1160,7 +1067,7 @@ class _LocatorCard extends StatelessWidget {
                   ? () => onCopyLocation(presence.lat!, presence.lng!)
                   : null,
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
@@ -1172,13 +1079,13 @@ class _LocatorCard extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: const Color(0xFF4F46E5),
                   side: const BorderSide(color: Color(0xFF6366F1)),
-                  padding: const EdgeInsets.symmetric(vertical: 9),
+                  padding: const EdgeInsets.symmetric(vertical: 13),
                   textStyle: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
                   ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
               ),
@@ -1220,8 +1127,8 @@ class _LocatorHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Container(
-          width: 46,
-          height: 46,
+          width: 54,
+          height: 54,
           decoration: BoxDecoration(
             color: avatarBg,
             shape: BoxShape.circle,
@@ -1229,10 +1136,10 @@ class _LocatorHeader extends StatelessWidget {
           child: Icon(
             Icons.person_rounded,
             color: avatarColor,
-            size: 27,
+            size: 31,
           ),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1243,12 +1150,12 @@ class _LocatorHeader extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   color: Color(0xFF0F172A),
-                  fontSize: 19,
+                  fontSize: 20,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.4,
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Row(
                 children: [
                   online
@@ -1344,16 +1251,16 @@ class _MetricTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 7, 10, 7),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Row(
         children: [
-          Icon(icon, color: iconColor, size: 20),
-          const SizedBox(width: 2),
+          Icon(icon, color: iconColor, size: 24),
+          const SizedBox(width: 9),
           Expanded(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1369,14 +1276,14 @@ class _MetricTile extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 1),
+                const SizedBox(height: 2),
                 Text(
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF0F172A),
-                    fontSize: 16,
+                    fontSize: 17,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.2,
                   ),
@@ -1419,10 +1326,10 @@ class _LocationBox extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(11, 8, 8, 8),
+      padding: const EdgeInsets.fromLTRB(13, 12, 10, 12),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(17),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Row(
@@ -1430,9 +1337,9 @@ class _LocationBox extends StatelessWidget {
           Icon(
             hasLocation ? Icons.location_on_rounded : Icons.location_searching_rounded,
             color: const Color(0xFF4F46E5),
-            size: 21,
+            size: 25,
           ),
-          const SizedBox(width: 9),
+          const SizedBox(width: 11),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1445,14 +1352,14 @@ class _LocationBox extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const SizedBox(height: 1),
+                const SizedBox(height: 3),
                 Text(
                   value,
                   style: TextStyle(
                     color: hasLocation
                         ? const Color(0xFF0F172A)
                         : const Color(0xFF64748B),
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w900,
                     letterSpacing: hasLocation ? 0.2 : 0,
                   ),
