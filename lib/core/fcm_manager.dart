@@ -78,12 +78,14 @@ static Future<void> ensureSubscriptions() async {
 
 	} else if (role == 'requester') {
 	  print("LynraCareFCM => Requester subscribe denemesi: $myId");
-	  
+	  final topic = "req_$myId";
 	  try {
-		await FirebaseMessaging.instance.subscribeToTopic(myId);
+		await FirebaseMessaging.instance
+    .subscribeToTopic(topic)
+    .timeout(const Duration(seconds: 10));
 		print("LynraCareFCM => Requester Başarıyla Abone Oldu: $myId");
 	  } catch (e) {
-		print("LynraCareFCM ERROR => Abonelik başarısız: $e");
+		print("LynraCareFCM ERROR => Abonelik başarısız veya timeout: $e");
 	  }
 
 	} else {

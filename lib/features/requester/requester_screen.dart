@@ -9,6 +9,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../l10n/app_localizations.dart';
 
 import '../../core/identity_manager.dart';
 import '../../core/location_helper.dart';
@@ -367,7 +368,7 @@ class _RequesterScreenState extends State<RequesterScreen>
     if (_groupId == null || _groupId!.isEmpty) return;
 
     _callMeRtdbSub?.cancel();
-
+print("_initCallMeLiveSync is called");
     _callMeRtdbSub =
         RTDBService().getGroupPresenceStream(_groupId!).listen((event) async {
       final data = event.snapshot.value as Map?;
@@ -677,7 +678,8 @@ class _RequesterScreenState extends State<RequesterScreen>
 
             _SectionHeader(
               title: 'My Locators',
-              subtitle: 'Live status from your paired locators',
+							subtitle:  AppLocalizations.of(context)!.livestatus,
+              //subtitle: 'Live status from your paired locators',
               trailing: _groupId == null
                   ? null
                   : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
@@ -900,8 +902,8 @@ class _LocatorQuickStrip extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    /*ConstrainedBox(
+										const SizedBox(width: 6),
+                    ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 82),
                       child: Text(
                         name,
@@ -913,7 +915,7 @@ class _LocatorQuickStrip extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ),*/
+                    ),
                   ],
                 ),
               );

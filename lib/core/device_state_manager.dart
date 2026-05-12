@@ -6,6 +6,8 @@ import 'package:geolocator/geolocator.dart' as geo;
 import 'package:firebase_database/firebase_database.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'role_manager.dart';
+
 
 import 'alert_engine.dart';
 import 'identity_manager.dart';
@@ -151,6 +153,8 @@ static  void _restartPresenceTimer() {
 
   // --- RTDB GÜNCELLEME ---  
 static  Future<void> updatePresence({String source = "UNKNOWN"}) async {
+final String? role = await RoleManager.getRole();
+if (role != 'locator') return;//?*?
  print("DEBUG: updatePresence tetiklendi! Kaynak: $source, Süre: $currentIntervalSeconds");
  print("LynraCare: currentIntervalSeconds:$currentIntervalSeconds ,RTDB updateStatus [${DateTime.now()}]");
   final locatorId = await IdentityManager.getOrCreateDeviceId();
@@ -194,6 +198,8 @@ static  Future<void> updatePresence({String source = "UNKNOWN"}) async {
   }
   
 Future<void> _checkState() async {
+final String? role = await RoleManager.getRole();
+if (role != 'locator') return;//?*?
 print("LynraCare _checkState");
   // 1. Cihaz içi kontroller (Hızlı ve Bedava)
   gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();

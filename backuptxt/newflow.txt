@@ -1,0 +1,34 @@
+Yeni mantık:
+Requester ekranı açılır↓
+RTDB’ye “ben bu locatorleri izliyorum / aktifim” bilgisini yazar↓
+Locator foreground service çalışıyorsa RTDB listener bunu görür↓
+Locator konum/battery/gps state’i RTDB’ye yazar↓
+Requester canlı görür
+
+Ama locator BG’de uyumuşsa:
+Requester RTDB state’i yazar↓
+FCM locator topic’ine sadece “wake” yollar↓
+Locator uyanır↓
+RTDB’ye bakar↓
+gerekirse servis/listener başlatır↓
+live state yazmaya devam eder
+
+Yani eski:
+send request → locator cevap yazsın
+yerine yeni:
+requester active → locator live state yayınlasın
+mantığına geçiyoruz.
+
+Bence locator tarafında BG için gerekli parçalar:
+1. Foreground service sürekli/yarı sürekli canlı kalacak
+2. Service içinde RTDB listener olacak
+3. FCM background handler “wake/check” yapacak
+4. BootReceiver restart sonrası servisi tekrar başlatacak
+5. WorkManager watchdog servis öldüyse kaldıracak
+Burada FCM artık “konum isteği” değil brom.
+Sadece dürtme:
+wake_locator
+gibi.
+En temiz karar şu olur:
+RTDB ana sistem, FCM sadece locator’ı uyandıran sigorta.
+Send request’i kaldırınca BG çalışma kaybolmaz; sadece “istek-cevap” modeli yerine locator canlı yayın modeli gelir.

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 
@@ -9,6 +10,7 @@ import 'features/home/home_screen.dart';
 import 'features/setup/name_screen.dart';
 import 'features/locator/locator_permission_screen.dart';
 import 'features/requester/requester_permission_screen.dart';
+import 'features/auth/auth_storage.dart';
 import 'core/role_manager.dart';
 import 'features/role/role_screen.dart';
 import 'core/locator_ui_state.dart';
@@ -28,6 +30,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'l10n/app_localizations.dart';
+
+
 import 'features/requester/requester_screen.dart';
 import 'core/identity_manager.dart';
 import 'package:battery_plus/battery_plus.dart';
@@ -41,6 +46,7 @@ Future<void> main() async {
   final String? role = await RoleManager.getRole();
   final service = FlutterBackgroundService();
   bool isRunning = await service.isRunning();
+	
   
     if (role != null) 
 	{
@@ -431,44 +437,139 @@ Future<bool> _isStillPaired({
   return entry != null && entry['active'] == true;
 }
 
-class LynraCareApp extends StatelessWidget {
-  
- final bool setupDone; 
- const LynraCareApp({super.key, required this.setupDone});
+class LynraCareApp extends StatefulWidget {
+  final bool setupDone;
+
+  const LynraCareApp({
+    super.key,
+    required this.setupDone,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'LynraCare',
-      theme: ThemeData(
-        useMaterial3: true,
-        // Splash ile uyumlu olması için arka planı buradan da sabitleyebilirsin
-        scaffoldBackgroundColor: const Color(0xFF0F172A), 
-      ),
-      home: FutureBuilder<String?>(
-        future: RoleManager.getRole(),
-        builder: (context, snapshot) {
-          // 1. VERİ BEKLENİRKEN: Beyaz ekran/Loading yerine Splash gösteriyoruz
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const SplashScreen(); // Az önce oluşturduğumuz şık ekran
-          }
-          final role = snapshot.data;
-          if (role == 'locator') {
-		  	 if (setupDone) {
-				return const HomeScreen();
-			 }
-			 return const NameScreen(); 			  
-			} 
-          if (role == 'requester') {
-		    if (setupDone) {
-            return const RequesterScreen();
-			}
-		  return const NameScreen();
-          }
-          return const RoleScreen();
-        },
-      ),
-    );
+  State<LynraCareApp> createState() => _LynraCareAppState();
+}
+
+
+class _LynraCareAppState extends State<LynraCareApp> {
+  Locale _locale = const Locale('tr');
+
+  @override
+  void initState() {
+    super.initState();
+    loadLocale();
   }
+
+  Future<void> loadLocale() async {
+    final code = await AuthStorage.safeRead("app_locale");
+		print("LynraCare__code:$code");
+    if (code != null) {
+      setState(() {
+        _locale = Locale(code);
+      });
+    }
+  }
+
+  /*Future<void> setLocale(Locale locale) async {
+    await storage.write(
+      key: "app_locale",
+      value: locale.languageCode,
+    );
+
+    setState(() {
+      _locale = locale;
+			print("LynraCare__locale:$_locale");
+    });
+  }*/
+
+
+  @override
+Widget build(BuildContext context) {
+  return MaterialApp(
+    locale: _locale,
+    debugShowCheckedModeBanner: false,
+    title: 'LynraCare',
+
+    builder: (context, child) {
+      final lang = Localizations.localeOf(context).languageCode;
+			print("LynraCare_lang:$lang");
+      double textScale = 0.8;
+
+      if (lang == 'hi' || lang == 'th') {
+        textScale = 1.16;
+      } else if (lang == 'ar') {
+        textScale = 1.14;
+      } else if (lang == 'ja' || lang == 'ko' || lang == 'zh') {
+        textScale = 1.10;
+      }
+
+      return MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          textScaler: TextScaler.linear(textScale),
+        ),
+        child: child!,
+      );
+    },
+
+    localizationsDelegates:  [
+      AppLocalizations.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+
+    supportedLocales: const [
+      Locale('en'),
+      Locale('tr'),
+      Locale('es'),
+      Locale('de'),
+      Locale('fr'),
+      Locale('it'),
+      Locale('hi'),
+      Locale('ko'),
+      Locale('ja'),
+      Locale('zh'),
+      Locale('ar'),
+      Locale('ru'),
+      Locale('id'),
+      Locale('vi'),
+      Locale('th'),
+      Locale('nl'),
+      Locale('pl'),
+      Locale('sv'),
+      Locale.fromSubtags(languageCode: 'pt', countryCode: 'BR'),
+    ],
+
+    theme: ThemeData(
+      useMaterial3: true,
+      scaffoldBackgroundColor: const Color(0xFF0F172A),
+    ),
+
+    home: FutureBuilder<String?>(
+      future: RoleManager.getRole(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const SplashScreen();
+        }
+
+        final role = snapshot.data;
+
+        if (role == 'locator') {
+          if (widget.setupDone) {
+            return const HomeScreen();
+          }
+          return const NameScreen();
+        }
+
+        if (role == 'requester') {
+          if (widget.setupDone) {
+            return const RequesterScreen();
+          }
+          return const NameScreen();
+        }
+
+        return const RoleScreen();
+      },
+    ),
+  );
+}
 }
