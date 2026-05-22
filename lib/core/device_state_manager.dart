@@ -20,7 +20,7 @@ class DeviceStateManager {
   DeviceStateManager._();
   static final DeviceStateManager instance = DeviceStateManager._();
   static const int _placeTransitionCooldownSeconds = 120;
-  static   int currentIntervalSeconds = 30;//3600; // Başlangıç: 1 Saat
+  static   int currentIntervalSeconds = 3600; // Başlangıç: 1 Saat
   bool _isWorkerMode = false; // Isolate kimliğini tutacak bayrak
   bool _isActiveRequest = false; 
 static  Timer? _presenceTimer;
@@ -68,7 +68,7 @@ static const double _accelThreshold = 10;
 
 static DateTime? _lastMovementTime;
 static const Duration _movementExpiry = Duration(minutes: 5); // 3 dakika tolerans
-
+static String? _role;
   bool get isReady => _isReady;
 
   Stream<bool> get readyStream async* {
@@ -76,7 +76,9 @@ static const Duration _movementExpiry = Duration(minutes: 5); // 3 dakika tolera
     yield* _readyController.stream;
   }
   
-  void start({bool isWorker = false}) {
+Future<void> start({bool isWorker = false}) async {
+	_role = await RoleManager.getRole();
+	if (_role != 'locator') return;
   print("DeviceStateManager called");
     _isWorkerMode = isWorker;
     _ticker?.cancel();
@@ -141,20 +143,20 @@ static void initSettingsListener(String groupId, String locatorId) {
 } 
   
 static  void _restartPresenceTimer() {
+	if (_role != 'locator') return;
   print("LynraCare updatePresence Timer started");
   updatePresence(source: "PRESENCE_TIMER");
     _presenceTimer?.cancel();
-    _presenceTimer = Timer.periodic(
+    /*_presenceTimer = Timer.periodic(
       Duration(seconds: currentIntervalSeconds),
       (_) => updatePresence(source: "MAIN_TICKER"),
-    );
+    );*/ //?*?
   }
   
 
   // --- RTDB GÜNCELLEME ---  
 static  Future<void> updatePresence({String source = "UNKNOWN"}) async {
-final String? role = await RoleManager.getRole();
-if (role != 'locator') return;//?*?
+if (_role != 'locator') return;//?*?
  print("DEBUG: updatePresence tetiklendi! Kaynak: $source, Süre: $currentIntervalSeconds");
  print("LynraCare: currentIntervalSeconds:$currentIntervalSeconds ,RTDB updateStatus [${DateTime.now()}]");
   final locatorId = await IdentityManager.getOrCreateDeviceId();
@@ -198,8 +200,7 @@ if (role != 'locator') return;//?*?
   }
   
 Future<void> _checkState() async {
-final String? role = await RoleManager.getRole();
-if (role != 'locator') return;//?*?
+if (_role != 'locator') return;//?*?
 print("LynraCare _checkState");
   // 1. Cihaz içi kontroller (Hızlı ve Bedava)
   gpsEnabled = await geo.Geolocator.isLocationServiceEnabled();
@@ -273,6 +274,7 @@ if (_isMovingByAccel && _lastMovementTime != null) {
   }
   
 void initAccelerometer() {
+if (_role != 'locator') return;
   _accelSub?.cancel();
   print("LynraCare: İvmeölçer bekçisi aktif (Threshold: 10)");
 
@@ -294,6 +296,8 @@ void initAccelerometer() {
 }
 
   void _startGeofenceTicker() {
+if (_role != 'locator') return;//?*?	
+	
   _geoTicker?.cancel();
   _geoTicker = Timer.periodic(const Duration(seconds: 60), (_) async {
     // 1. ANA ŞALTER: Global Geofence kapalıysa zaten uyu.
@@ -328,6 +332,7 @@ void initAccelerometer() {
 
 // 1. ASIL İŞİ YAPAN MOTOR (FONKSİYON)
 Future<void> _performGeofenceCheck() async {
+if (_role != 'locator') return;
 print("ZINK _performGeofenceCheck _gfEnabled:$_gfEnabled");
   if (!_gfEnabled) return;
   
@@ -347,6 +352,7 @@ print("ZINK _performGeofenceCheck _gfEnabled:$_gfEnabled");
 }
 
 void onMovementDetected() {
+if (_role != 'locator') return;
   if (!_isMovingByAccel) {
     _isMovingByAccel = true;
     print("ZINK: Cihaz hareket moduna geçti!");
@@ -361,6 +367,7 @@ Future<void> _handleSavedPlacesGeofence({
   required String locatorId,
   required geo.Position pos,
 }) async {
+if (_role != 'locator') return;
   // 1. Erken Çıkış & Temel Veriler
 	print(" ZINK _handleSavedPlacesGeofence fonk");
   if (_cachedPlaces.isEmpty) return;
@@ -453,6 +460,7 @@ Future<void> _handleSavedPlacesGeofence({
 }  
   
 static void setTrackingState({bool? moving, bool? watched}) {
+if (_role != 'locator') return;
     // 1. Durumları güncelle
     if (moving != null) _isMoving = moving;
     if (watched != null) _isWatched = watched;
@@ -478,8 +486,8 @@ static void setTrackingState({bool? moving, bool? watched}) {
 
       print("Aktiflik bitti, 2 dkk sonra 30s moduna geçilecek...");
       _cooldownTimer = Timer(const Duration(minutes: 2), () {
-        if (currentIntervalSeconds != 3600) {
-          currentIntervalSeconds = 3600;
+        if (currentIntervalSeconds != 30) {
+          currentIntervalSeconds = 30;
           print("Vites: 30s (Sessizlik sağlandı, cooldown bitti)");
           onIntervalChanged?.call(currentIntervalSeconds);
 		  _restartPresenceTimer();

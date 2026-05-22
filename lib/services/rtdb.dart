@@ -38,10 +38,11 @@ class RTDBService {
         "lastSeen": ServerValue.timestamp,
       });
 
+				print("LynraCare_HeartBeat");
       // Status'u online yap
       locatorRef.update({
         "status": "online",
-		"battery": _lastBatteryLevel,
+				"battery": _lastBatteryLevel,
         "lastSeen": ServerValue.timestamp,
       });
     }
@@ -57,7 +58,7 @@ class RTDBService {
     required bool isWatching,
   }) {
     final watcherRef = _dbRef.child("presence/groups/$groupId/active_watchers/$locatorId/$requesterId");
-
+		print("LynraCare_setWatchingStatus");
     if (isWatching) {
       // İzlemeye başlayınca: onDisconnect ile otomatik temizlik ekle
       watcherRef.onDisconnect().remove();
@@ -83,7 +84,7 @@ Future<void> updateStatus({
     // update() kullanarak sadece paketteki alanları günceller, 
     // mevcut diğer verileri (status gibi) bozmaz.
     await locatorRef.update(data);
-	//print("LynraCareRTDB Update Success");
+	print("LynraCareRTDB Update Success");
   } catch (e) {
     print("LynraCareRTDB Update Error: $e");
   }

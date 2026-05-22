@@ -104,6 +104,8 @@ if (role == 'locator' && setupDone && groupId != null) {
 
 FirebaseMessaging.onMessage.listen((message) async {
   await NotificationGateway.handle(message);
+	DeviceStateManager.updatePresence(source: "MAIN_UI");
+	return;
   if (role != 'locator') return;
 
   final data = message.data;
@@ -264,6 +266,25 @@ runApp(LynraCareApp(setupDone: setupDone));
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  print("LynraCare FCM_BG: message received");
+
+  await NotificationService.showFromRemoteMessage(message);
+
+  print("LynraCare FCM_BG: updatePresence start");
+
+  await DeviceStateManager.updatePresence(source: "FCM_BG_RL");
+
+  print("LynraCare FCM_BG: updatePresence done");
+
+  return;
+
+
 print("LynraCareBG_HANDLER START => data=${message.data}");
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
@@ -451,7 +472,7 @@ class LynraCareApp extends StatefulWidget {
 
 
 class _LynraCareAppState extends State<LynraCareApp> {
-  Locale _locale = const Locale('tr');
+  Locale _locale = const Locale('en');
 
   @override
   void initState() {

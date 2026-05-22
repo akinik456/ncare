@@ -1,0 +1,44 @@
+class RequesterScreen extends StatefulWidget {
+class _RequesterScreenState extends State<RequesterScreen>
+  void initState() {    
+  void dispose() {
+  Future<void> _initRequesterId() async {
+  Future<void> _loadGroupId() async {
+  Future<void> _loadMyName() async {
+  Future<void> _loadAlertSettings() async {
+  Future<void> _initBatteryDefaults() async {
+  Future<void> _getMyLocation() async {
+  Future<void> saveRequestAlerts(bool value) async {
+  Future<void> saveDeviceWarnings(bool value) async {
+  String shortCode(String id) {
+  String formatLastSeen(DateTime? lastSeen) {
+  String formatDistance(double? distance, double acc) {
+  String formatCoordinate(double value) {
+  Future<void> _openInMaps(double lat, double lng) async {
+  void _copyLocation(double lat, double lng) {
+  Future<void> _sendRequest() async {
+  void _showQrDialog(String groupId) {
+  Future<void> _joinGroup() async {
+  void _initCallMeLiveSync() {
+  String _formatAlertTsFromDate(DateTime date) {
+  Future<void> _dismissCallMe() async {
+  void _syncWatchingStatus(List<String> locatorIds) {
+  void _clearWatchingStatus() {
+  Widget build(BuildContext context) {
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _filterPairedLocators(
+  Map<dynamic, dynamic> _parsePresenceMap(Object? value) {
+  _LocatorPresence _presenceForLocator({
+class _LocatorQuickStrip extends StatelessWidget {
+class _LocatorList extends StatelessWidget {
+class _LocatorCard extends StatelessWidget {
+class _LocatorHeader extends StatelessWidget {
+class _MetricTile extends StatelessWidget {
+class _LocationBox extends StatelessWidget {
+class _SectionHeader extends StatelessWidget {
+class _JoinGroupCard extends StatelessWidget {
+class _CallMeCard extends StatelessWidget {
+class _EmptyLocatorCard extends StatelessWidget {
+class _LoadingCard extends StatelessWidget {
+class _LocatorPresence {
+class _GroupQrScanner extends StatefulWidget {
+class _GroupQrScannerState extends State<_GroupQrScanner> {

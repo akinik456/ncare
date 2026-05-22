@@ -9,6 +9,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../l10n/app_localizations.dart';
 
 import '../../core/identity_manager.dart';
@@ -30,15 +31,16 @@ class _RequesterScreenState extends State<RequesterScreen>
   String? requesterId;
   String? _groupId;
   String? _requesterDeviceId;
-
+  String? _pendingRequestId; // şu an beklenen yeni request
   String? requesterName;
   String? _currentRequesterName;
   String? _cachedMyName;
+  String? _selectedLocatorId;
 
   bool isMaster = false;
   bool requestAlertsEnabled = true;
   bool deviceWarningsEnabled = true;
-
+  bool _timeout = false;
   double? _myLat;
   double? _myLng;
 
@@ -57,9 +59,13 @@ class _RequesterScreenState extends State<RequesterScreen>
   String? _callRequestLocatorId;
   String? targetMode;
   String? targetReqId;
-
+  late final Stream<DatabaseEvent> _presenceStream;
+final Map<String, DateTime> _lastAutoReqAt = {};
   final Set<String> _watchedLocatorIds = {};
-
+	
+	final ValueNotifier<_RequesterLocation?> _myLocationNotifier =
+    ValueNotifier(null);
+	
   @override
   void initState() {
     super.initState();
@@ -81,7 +87,7 @@ class _RequesterScreenState extends State<RequesterScreen>
     );*/
 
     _reqLocationTimer = Timer.periodic(
-      const Duration(seconds: 15),
+      const Duration(seconds: 30),
       (_) => _getMyLocation(),
     );
 
@@ -102,7 +108,6 @@ class _RequesterScreenState extends State<RequesterScreen>
     _reqLocationTimer?.cancel();
     _callMeRtdbSub?.cancel();
     _pulseController.dispose();
-
     super.dispose();
   }
 
@@ -127,13 +132,16 @@ class _RequesterScreenState extends State<RequesterScreen>
 
     if (!mounted) return;
 
+    if (gid == null) return;
+
+    final stream = RTDBService()
+        .getGroupPresenceStream(gid)
+        .asBroadcastStream();
+
     setState(() {
       _groupId = gid;
       isMaster = master;
-    });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initCallMeLiveSync();
+      _presenceStream = stream;
     });
   }
 
@@ -167,6 +175,34 @@ class _RequesterScreenState extends State<RequesterScreen>
       await prefs.setInt('batteryAlertThreshold', 20);
     }
   }
+	
+	void _autoWakeStaleLocators({
+  required List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  required Map<dynamic, dynamic> presence,
+}) {
+  final now = DateTime.now();
+
+  for (final doc in docs) {
+    final locatorId = doc.id;
+    final item = _presenceForLocator(
+      locatorId: locatorId,
+      presence: presence,
+    );
+
+    final lastSeen = item.lastSeen;
+    final isStale = lastSeen == null || now.difference(lastSeen).inSeconds > 60;
+print("lastSeen:$lastSeen");
+    if (!isStale) continue;
+
+    final lastReq = _lastAutoReqAt[locatorId];
+    if (lastReq != null && now.difference(lastReq).inSeconds < 90) {
+      continue;
+    }
+
+    _lastAutoReqAt[locatorId] = now;
+    _sendRequestToLocator(locatorId);
+  }
+}
 
   Future<void> _getMyLocation() async {
     LocationPermission permission = await Geolocator.checkPermission();
@@ -185,12 +221,26 @@ class _RequesterScreenState extends State<RequesterScreen>
     );
 
     if (pos == null) return;
-    if (!mounted) return;
+if (!mounted) return;
 
-    setState(() {
-      _myLat = pos.latitude;
-      _myLng = pos.longitude;
-    });
+if (_myLat != null && _myLng != null) {
+  final moved = Geolocator.distanceBetween(
+    _myLat!,
+    _myLng!,
+    pos.latitude,
+    pos.longitude,
+  );
+
+  if (moved < 10) return;
+}
+_myLat = pos.latitude;
+_myLng = pos.longitude;
+
+_myLocationNotifier.value = _RequesterLocation(
+  pos.latitude,
+  pos.longitude,
+);
+
   }
 
   Future<void> saveRequestAlerts(bool value) async {
@@ -221,9 +271,9 @@ class _RequesterScreenState extends State<RequesterScreen>
     return "${clean.substring(0, 4)}-${clean.substring(4, 8)}";
   }
 
-  String formatLastSeen(DateTime? lastSeen) {
+  /*String formatLastSeen(DateTime? lastSeen) {
     if (lastSeen == null) return "Unknown";
-
+		
     final diff = DateTime.now().difference(lastSeen);
 
     if (diff.inSeconds < 60) return "Just now";
@@ -231,7 +281,27 @@ class _RequesterScreenState extends State<RequesterScreen>
     if (diff.inHours < 24) return "${diff.inHours} h ago";
 
     return "${diff.inDays} d ago";
+  }*/ // /*/
+	
+String formatLastSeen(DateTime? lastSeen) {
+  if (lastSeen == null) return "unknown";
+
+  final diff = DateTime.now().difference(lastSeen);
+
+  if (diff.inSeconds < 60) {
+    return "${diff.inSeconds} sec ago";
   }
+
+  if (diff.inMinutes < 60) {
+    return "${diff.inMinutes} min ago";
+  }
+
+  if (diff.inHours < 24) {
+    return "${diff.inHours} h ago";
+  }
+
+  return "${diff.inDays} d ago";
+}	
 
   String formatDistance(double? distance, double acc) {
     if (distance == null) return "--";
@@ -265,9 +335,163 @@ class _RequesterScreenState extends State<RequesterScreen>
       ClipboardData(text: '${formatCoordinate(lat)}, ${formatCoordinate(lng)}'),
     );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Location copied')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Location copied')));
+  }
+	
+	Future<void> _sendRequestToLocator(String locatorId) async {
+  try {
+    if (_groupId == null || _groupId!.isEmpty) return;
+    if (locatorId.isEmpty) return;
+    if (requesterId == null || requesterId!.isEmpty) return;
+
+    final requesterDeviceId = await IdentityManager.getOrCreateDeviceId();
+
+    final locatorRef = FirebaseFirestore.instance
+        .collection('groups')
+        .doc(_groupId)
+        .collection('locators')
+        .doc(locatorId);
+
+    final requestsRef = locatorRef.collection('requests');
+
+    await requestsRef.add({
+      'type': 'rl',
+      'requesterId': requesterId,
+      'requesterDeviceId': requesterDeviceId,
+      'locatorId': locatorId,
+      'ts': FieldValue.serverTimestamp(),
+      'auto': true,
+    });
+
+    print('AUTO RL SENT => $locatorId');
+  } catch (e, st) {
+    print('AUTO SEND REQUEST ERROR => $e');
+    print(st);
+  }
+}
+
+  Future<void> _sendRequest() async {
+    try {
+      if (_groupId == null || _groupId!.isEmpty) return;
+      if (_selectedLocatorId == null || _selectedLocatorId!.isEmpty) return;
+      if (requesterId == null || requesterId!.isEmpty) return;
+
+      final locatorDoc = await FirebaseFirestore.instance
+          .collection('locators')
+          .doc(_selectedLocatorId)
+          .get();
+
+      final paired =
+          locatorDoc.data()?['pairedRequesters'] as Map<String, dynamic>?;
+      final entry = paired?[requesterId];
+
+      if (entry == null || entry['active'] != true) {
+        print('REQ BLOCKED => not paired');
+        return;
+      }
+
+      final requesterDeviceId = await IdentityManager.getOrCreateDeviceId();
+
+      final locatorRef = FirebaseFirestore.instance
+          .collection('groups')
+          .doc(_groupId)
+          .collection('locators')
+          .doc(_selectedLocatorId);
+
+      final requestsRef = locatorRef.collection('requests');
+      final responsesRef = locatorRef.collection('responses');
+
+      // -------------------------------
+      // trim ONLY my own requests
+      // keep max 9 before adding new one
+      // no orderBy in query -> sort in Dart
+      // -------------------------------
+      final myRequestsSnap = await requestsRef
+          .where('requesterDeviceId', isEqualTo: requesterDeviceId)
+          .get();
+
+      final myRequestDocs = myRequestsSnap.docs.toList()
+        ..sort((a, b) {
+          final aTs = a.data()['ts'];
+          final bTs = b.data()['ts'];
+
+          final aMs = aTs is Timestamp ? aTs.millisecondsSinceEpoch : 0;
+          final bMs = bTs is Timestamp ? bTs.millisecondsSinceEpoch : 0;
+
+          return aMs.compareTo(bMs);
+        });
+
+      if (myRequestDocs.length >= 10) {
+        final deleteCount = myRequestDocs.length - 9;
+        final batch = FirebaseFirestore.instance.batch();
+
+        for (final doc in myRequestDocs.take(deleteCount)) {
+          batch.delete(doc.reference);
+        }
+
+        await batch.commit();
+      }
+
+      // -------------------------------
+      // trim ONLY my own responses
+      // keep max 9 before adding new one
+      // response field: requesterDeviceId
+      // no orderBy in query -> sort in Dart
+      // -------------------------------
+      final myResponsesSnap = await responsesRef
+          .where('requesterDeviceId', isEqualTo: requesterDeviceId)
+          .get();
+
+      final myResponseDocs = myResponsesSnap.docs.toList()
+        ..sort((a, b) {
+          final aTs = a.data()['ts'];
+          final bTs = b.data()['ts'];
+
+          final aMs = aTs is Timestamp ? aTs.millisecondsSinceEpoch : 0;
+          final bMs = bTs is Timestamp ? bTs.millisecondsSinceEpoch : 0;
+
+          return aMs.compareTo(bMs);
+        });
+
+      if (myResponseDocs.length >= 10) {
+        final deleteCount = myResponseDocs.length - 9;
+        final batch = FirebaseFirestore.instance.batch();
+
+        for (final doc in myResponseDocs.take(deleteCount)) {
+          batch.delete(doc.reference);
+        }
+
+        await batch.commit();
+      }
+
+      final doc = await requestsRef.add({
+        'type': 'rl',
+        'requesterId': requesterId,
+        'requesterDeviceId': requesterDeviceId,
+        'locatorId': _selectedLocatorId,
+        'ts': FieldValue.serverTimestamp(),
+      });
+
+      setState(() {
+        _pendingRequestId = doc.id;
+        _timeout = false;
+      });
+
+      Future.delayed(const Duration(seconds: 60), () {
+        if (!mounted) return;
+
+        if (_pendingRequestId == doc.id) {
+          setState(() {
+            _timeout = true;
+          });
+        }
+      });
+    } catch (e, st) {
+      print('SEND REQUEST ERROR => $e');
+      print(st);
+    }
   }
 
   void _showQrDialog(String groupId) {
@@ -276,9 +500,7 @@ class _RequesterScreenState extends State<RequesterScreen>
       builder: (_) => Dialog(
         backgroundColor: Colors.white,
         insetPadding: const EdgeInsets.all(20),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -286,17 +508,10 @@ class _RequesterScreenState extends State<RequesterScreen>
             children: [
               const Text(
                 "GROUP QR",
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                ),
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
               ),
               const SizedBox(height: 16),
-              QrImageView(
-                data: groupId,
-                version: QrVersions.auto,
-                size: 240,
-              ),
+              QrImageView(data: groupId, version: QrVersions.auto, size: 240),
               const SizedBox(height: 12),
               Text(
                 shortCode(groupId),
@@ -327,9 +542,7 @@ class _RequesterScreenState extends State<RequesterScreen>
   Future<void> _joinGroup() async {
     final result = await Navigator.push<String>(
       context,
-      MaterialPageRoute(
-        builder: (_) => const _GroupQrScanner(),
-      ),
+      MaterialPageRoute(builder: (_) => const _GroupQrScanner()),
     );
 
     if (result == null || result.isEmpty) return;
@@ -346,14 +559,14 @@ class _RequesterScreenState extends State<RequesterScreen>
         .collection('devices')
         .doc(reqId)
         .set({
-      'deviceId': reqId,
-      'groupId': result,
-      'role': 'requester',
-      'name': reqName,
-      'joinedAt': now,
-      'active': true,
-      'isMaster': false,
-    });
+          'deviceId': reqId,
+          'groupId': result,
+          'role': 'requester',
+          'name': reqName,
+          'joinedAt': now,
+          'active': true,
+          'isMaster': false,
+        });
 
     if (!mounted) return;
 
@@ -368,74 +581,79 @@ class _RequesterScreenState extends State<RequesterScreen>
     if (_groupId == null || _groupId!.isEmpty) return;
 
     _callMeRtdbSub?.cancel();
-print("_initCallMeLiveSync is called");
-    _callMeRtdbSub =
-        RTDBService().getGroupPresenceStream(_groupId!).listen((event) async {
-      final data = event.snapshot.value as Map?;
-      if (data == null) return;
+    print("_initCallMeLiveSync is called");
+    _callMeRtdbSub = RTDBService()
+        .getGroupPresenceStream(_groupId!)
+        .listen(
+          (event) async {
+            final data = event.snapshot.value as Map?;
+            if (data == null) return;
 
-      String? foundAlertId;
-      String? foundLocatorId;
-      String? foundDisplayName;
-      String? foundTs;
+            String? foundAlertId;
+            String? foundLocatorId;
+            String? foundDisplayName;
+            String? foundTs;
 
-      data.forEach((locId, locData) {
-        if (locData is! Map) return;
+            data.forEach((locId, locData) {
+              if (locData is! Map) return;
 
-        final commands = locData['commands'] as Map?;
-        final callMe = commands?['call_me'] as Map?;
-        final handledBy = callMe?['handledBy']?.toString();
+              final commands = locData['commands'] as Map?;
+              final callMe = commands?['call_me'] as Map?;
+              final handledBy = callMe?['handledBy']?.toString();
 
-        if (callMe != null && callMe['pending'] == true) {
-          targetMode = (callMe['targetMode'] ?? 'all').toString();
-          targetReqId = (callMe['requesterId'] ?? '').toString();
+              if (callMe != null && callMe['pending'] == true) {
+                targetMode = (callMe['targetMode'] ?? 'all').toString();
+                targetReqId = (callMe['requesterId'] ?? '').toString();
 
-          final isTarget =
-              (targetMode == 'all' && handledBy == null) ||
-              (targetMode == 'single' && targetReqId == _requesterDeviceId);
+                final isTarget =
+                    (targetMode == 'all' && handledBy == null) ||
+                    (targetMode == 'single' &&
+                        targetReqId == _requesterDeviceId);
 
-          if (isTarget) {
-            foundAlertId = "rtdb_${locId}_${callMe['ts']}";
-            foundLocatorId = locId.toString();
-            foundDisplayName = callMe['locatorName']?.toString();
+                if (isTarget) {
+                  foundAlertId = "rtdb_${locId}_${callMe['ts']}";
+                  foundLocatorId = locId.toString();
+                  foundDisplayName = callMe['locatorName']?.toString();
 
-            final tsRaw = callMe['ts'];
-            final tsMs = tsRaw is int ? tsRaw : int.tryParse('$tsRaw');
+                  final tsRaw = callMe['ts'];
+                  final tsMs = tsRaw is int ? tsRaw : int.tryParse('$tsRaw');
 
-            if (tsMs != null) {
-              foundTs = _formatAlertTsFromDate(
-                DateTime.fromMillisecondsSinceEpoch(tsMs),
-              );
+                  if (tsMs != null) {
+                    foundTs = _formatAlertTsFromDate(
+                      DateTime.fromMillisecondsSinceEpoch(tsMs),
+                    );
+                  }
+                }
+              }
+            });
+
+            if (!mounted) return;
+
+            if (foundAlertId != null) {
+              if (_lastAlertId == foundAlertId) return;
+
+              setState(() {
+                _lastAlertId = foundAlertId;
+                _activeCallAlertId = foundAlertId;
+                _callRequestFrom = foundDisplayName;
+                _callRequestLocatorId = foundLocatorId;
+                _callRequestTs = foundTs;
+              });
+            } else {
+              if (_activeCallAlertId != null &&
+                  _activeCallAlertId!.startsWith("rtdb_")) {
+                setState(() {
+                  _callRequestFrom = null;
+                  _activeCallAlertId = null;
+                  _callRequestTs = null;
+                });
+              }
             }
-          }
-        }
-      });
-
-      if (!mounted) return;
-
-      if (foundAlertId != null) {
-        if (_lastAlertId == foundAlertId) return;
-
-        setState(() {
-          _lastAlertId = foundAlertId;
-          _activeCallAlertId = foundAlertId;
-          _callRequestFrom = foundDisplayName;
-          _callRequestLocatorId = foundLocatorId;
-          _callRequestTs = foundTs;
-        });
-      } else {
-        if (_activeCallAlertId != null &&
-            _activeCallAlertId!.startsWith("rtdb_")) {
-          setState(() {
-            _callRequestFrom = null;
-            _activeCallAlertId = null;
-            _callRequestTs = null;
-          });
-        }
-      }
-    }, onError: (e) {
-      debugPrint("LynraCare RTDB CALL_ME ERROR => $e");
-    });
+          },
+          onError: (e) {
+            debugPrint("LynraCare RTDB CALL_ME ERROR => $e");
+          },
+        );
   }
 
   String _formatAlertTsFromDate(DateTime date) {
@@ -479,7 +697,10 @@ print("_initCallMeLiveSync is called");
 
     if (reqId != null && reqId.isNotEmpty) {
       try {
-        await FirebaseFirestore.instance.collection('requesters').doc(reqId).get();
+        await FirebaseFirestore.instance
+            .collection('requesters')
+            .doc(reqId)
+            .get();
       } catch (_) {}
     }
 
@@ -633,9 +854,7 @@ print("_initCallMeLiveSync is called");
                 onPressed: () => _showQrDialog(_groupId!),
                 icon: const Icon(Icons.qr_code_2_rounded),
                 color: const Color(0xFF0F172A),
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.white,
-                ),
+                style: IconButton.styleFrom(backgroundColor: Colors.white),
               ),
             ),
           Padding(
@@ -678,7 +897,7 @@ print("_initCallMeLiveSync is called");
 
             _SectionHeader(
               title: 'My Locators',
-							subtitle:  AppLocalizations.of(context)!.livestatus,
+              subtitle: AppLocalizations.of(context)!.livestatus,
               //subtitle: 'Live status from your paired locators',
               trailing: _groupId == null
                   ? null
@@ -690,14 +909,17 @@ print("_initCallMeLiveSync is called");
                           .where('active', isEqualTo: true)
                           .snapshots(),
                       builder: (context, snapshot) {
-                        final docs = _filterPairedLocators(snapshot.data?.docs ?? []);
+                        final docs = _filterPairedLocators(
+                          snapshot.data?.docs ?? [],
+                        );
                         if (docs.isEmpty) return const SizedBox.shrink();
 
                         return StreamBuilder<DatabaseEvent>(
-                          stream: RTDBService().getGroupPresenceStream(_groupId!),
+                          stream: _presenceStream,
                           builder: (context, snap) {
-                            final presence =
-                                _parsePresenceMap(snap.data?.snapshot.value);
+                            final presence = _parsePresenceMap(
+                              snap.data?.snapshot.value,
+                            );
 
                             int onlineCount = 0;
 
@@ -751,29 +973,38 @@ print("_initCallMeLiveSync is called");
             if (_groupId == null || _groupId!.isEmpty)
               const _EmptyLocatorCard(
                 title: 'No group yet',
-                subtitle: 'Join or create a group first to see paired locators.',
+                subtitle:
+                    'Join or create a group first to see paired locators.',
               )
             else
               _LocatorList(
-                groupId: _groupId!,
-                requesterId: requesterId!,
-                myLat: _myLat,
-                myLng: _myLng,
-                pulse: _pulse,
-                onOpenMaps: _openInMaps,
-                onCopyLocation: _copyLocation,
-                formatLastSeen: formatLastSeen,
-                formatDistance: formatDistance,
-                formatCoordinate: formatCoordinate,
-                filterPairedLocators: _filterPairedLocators,
-                parsePresenceMap: _parsePresenceMap,
-                presenceForLocator: _presenceForLocator,
-                onLocatorsVisible: (ids) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    _syncWatchingStatus(ids);
-                  });
-                },
-              ),
+							groupId: _groupId!,
+							requesterId: requesterId!,
+							presenceStream: _presenceStream,
+							myLat: _myLat,
+							myLng: _myLng,
+							myLocationNotifier: _myLocationNotifier,
+							pulse: _pulse,
+							onOpenMaps: _openInMaps,
+							onCopyLocation: _copyLocation,
+							formatLastSeen: formatLastSeen,
+							formatDistance: formatDistance,
+							formatCoordinate: formatCoordinate,
+							filterPairedLocators: _filterPairedLocators,
+							parsePresenceMap: _parsePresenceMap,
+							presenceForLocator: _presenceForLocator,
+							onLocatorsVisible: (ids) {
+								WidgetsBinding.instance.addPostFrameCallback((_) {
+									_syncWatchingStatus(ids);
+								});
+							},
+							onPresenceUpdated: (docs, presence) {
+								_autoWakeStaleLocators(
+									docs: docs,
+									presence: presence,
+								);
+							},
+						),
           ],
         ),
       ),
@@ -785,7 +1016,8 @@ print("_initCallMeLiveSync is called");
   ) {
     return docs.where((doc) {
       final data = doc.data();
-      final pairedRequesters = data['pairedRequesters'] as Map<String, dynamic>?;
+      final pairedRequesters =
+          data['pairedRequesters'] as Map<String, dynamic>?;
 
       if (pairedRequesters == null || requesterId == null) {
         return false;
@@ -842,12 +1074,12 @@ print("_initCallMeLiveSync is called");
   }
 }
 
-
 class _LocatorQuickStrip extends StatelessWidget {
   final String groupId;
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> Function(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
-  ) filterPairedLocators;
+  )
+  filterPairedLocators;
 
   const _LocatorQuickStrip({
     required this.groupId,
@@ -874,11 +1106,17 @@ class _LocatorQuickStrip extends StatelessWidget {
             children: List.generate(docs.length, (index) {
               final doc = docs[index];
               final data = doc.data();
-              final name =""; (data['name'] ?? 'L${index + 1}').toString();
+              final name = "";
+              (data['name'] ?? 'L${index + 1}').toString();
 
               return Container(
-                margin: EdgeInsets.only(right: index == docs.length - 1 ? 0 : 8),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                margin: EdgeInsets.only(
+                  right: index == docs.length - 1 ? 0 : 8,
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(999),
@@ -902,7 +1140,7 @@ class _LocatorQuickStrip extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-										const SizedBox(width: 6),
+                    const SizedBox(width: 6),
                     ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 82),
                       child: Text(
@@ -927,32 +1165,43 @@ class _LocatorQuickStrip extends StatelessWidget {
   }
 }
 
-class _LocatorList extends StatelessWidget {
+class _LocatorList extends StatefulWidget {
   final String groupId;
   final String requesterId;
   final double? myLat;
   final double? myLng;
+	final ValueNotifier<_RequesterLocation?> myLocationNotifier;
   final Animation<double> pulse;
   final Future<void> Function(double lat, double lng) onOpenMaps;
   final void Function(double lat, double lng) onCopyLocation;
   final String Function(DateTime? lastSeen) formatLastSeen;
   final String Function(double? distance, double acc) formatDistance;
   final String Function(double value) formatCoordinate;
+  final Stream<DatabaseEvent>? presenceStream;
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> Function(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) filterPairedLocators;
+
   final Map<dynamic, dynamic> Function(Object? value) parsePresenceMap;
+
   final _LocatorPresence Function({
     required String locatorId,
     required Map<dynamic, dynamic> presence,
   }) presenceForLocator;
+
   final void Function(List<String> ids) onLocatorsVisible;
+final void Function(
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  Map<dynamic, dynamic> presence,
+) onPresenceUpdated;
 
   const _LocatorList({
     required this.groupId,
     required this.requesterId,
+    required this.presenceStream,
     required this.myLat,
     required this.myLng,
+		required this.myLocationNotifier,
     required this.pulse,
     required this.onOpenMaps,
     required this.onCopyLocation,
@@ -963,21 +1212,31 @@ class _LocatorList extends StatelessWidget {
     required this.parsePresenceMap,
     required this.presenceForLocator,
     required this.onLocatorsVisible,
+		required this.onPresenceUpdated,
   });
+
+  @override
+  State<_LocatorList> createState() => _LocatorListState();
+}
+
+class _LocatorListState extends State<_LocatorList> {
+  Map<dynamic, dynamic> _lastPresence = {};
 
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
       stream: FirebaseFirestore.instance
           .collection('locators')
-          .where('groupId', isEqualTo: groupId)
+          .where('groupId', isEqualTo: widget.groupId)
           .where('role', isEqualTo: 'locator')
           .where('active', isEqualTo: true)
           .snapshots(),
       builder: (context, locatorSnapshot) {
-        final docs = filterPairedLocators(locatorSnapshot.data?.docs ?? []);
+        final docs = widget.filterPairedLocators(
+          locatorSnapshot.data?.docs ?? [],
+        );
 
-        onLocatorsVisible(docs.map((e) => e.id).toList());
+        widget.onLocatorsVisible(docs.map((e) => e.id).toList());
 
         if (locatorSnapshot.connectionState == ConnectionState.waiting) {
           return const _LoadingCard();
@@ -991,30 +1250,48 @@ class _LocatorList extends StatelessWidget {
         }
 
         return StreamBuilder<DatabaseEvent>(
-          stream: RTDBService().getGroupPresenceStream(groupId),
+          stream: widget.presenceStream,
           builder: (context, presenceSnapshot) {
-            final presence = parsePresenceMap(presenceSnapshot.data?.snapshot.value);
+            final freshPresence = widget.parsePresenceMap(
+              presenceSnapshot.data?.snapshot.value,
+            );
+
+            if (freshPresence.isNotEmpty) {
+              _lastPresence = freshPresence;
+            }
+
+            final presence = freshPresence.isNotEmpty
+                ? freshPresence
+                : _lastPresence;
+						WidgetsBinding.instance.addPostFrameCallback((_) {
+  widget.onPresenceUpdated(docs, presence);
+});
+            print("presence state: ${presenceSnapshot.connectionState}");
+            print("presence hasData: ${presenceSnapshot.hasData}");
+            print("presence fresh: $freshPresence");
+            print("presence used: $presence");
 
             return Column(
               children: docs.map((doc) {
                 final data = doc.data();
                 final locatorId = doc.id;
-                final name =
-                    (data['name'] ?? data['deviceId'] ?? locatorId).toString();
+                final name = (data['name'] ?? data['deviceId'] ?? locatorId)
+                    .toString();
 
-                final item = presenceForLocator(
+                final item = widget.presenceForLocator(
                   locatorId: locatorId,
                   presence: presence,
                 );
 
                 double? distance;
-                if (myLat != null &&
-                    myLng != null &&
+
+                if (widget.myLat != null &&
+                    widget.myLng != null &&
                     item.lat != null &&
                     item.lng != null) {
                   distance = Geolocator.distanceBetween(
-                    myLat!,
-                    myLng!,
+                    widget.myLat!,
+                    widget.myLng!,
                     item.lat!,
                     item.lng!,
                   );
@@ -1023,16 +1300,18 @@ class _LocatorList extends StatelessWidget {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _LocatorCard(
-                    locatorId: locatorId,
+                    key: ValueKey(locatorId),
+										locatorId: locatorId,
                     name: name,
                     presence: item,
                     distance: distance,
-                    pulse: pulse,
-                    onOpenMaps: onOpenMaps,
-                    onCopyLocation: onCopyLocation,
-                    formatLastSeen: formatLastSeen,
-                    formatDistance: formatDistance,
-                    formatCoordinate: formatCoordinate,
+                    pulse: widget.pulse,
+										myLocationNotifier: widget.myLocationNotifier,
+                    onOpenMaps: widget.onOpenMaps,
+                    onCopyLocation: widget.onCopyLocation,
+                    formatLastSeen: widget.formatLastSeen,
+                    formatDistance: widget.formatDistance,
+                    formatCoordinate: widget.formatCoordinate,
                   ),
                 );
               }).toList(),
@@ -1050,18 +1329,20 @@ class _LocatorCard extends StatelessWidget {
   final _LocatorPresence presence;
   final double? distance;
   final Animation<double> pulse;
+	final ValueNotifier<_RequesterLocation?> myLocationNotifier;
   final Future<void> Function(double lat, double lng) onOpenMaps;
   final void Function(double lat, double lng) onCopyLocation;
   final String Function(DateTime? lastSeen) formatLastSeen;
   final String Function(double? distance, double acc) formatDistance;
   final String Function(double value) formatCoordinate;
-
   const _LocatorCard({
+	super.key,
     required this.locatorId,
     required this.name,
     required this.presence,
     required this.distance,
     required this.pulse,
+		required this.myLocationNotifier,
     required this.onOpenMaps,
     required this.onCopyLocation,
     required this.formatLastSeen,
@@ -1072,7 +1353,13 @@ class _LocatorCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasLocation = presence.lat != null && presence.lng != null;
-    final lastText = presence.online ? 'Just now' : formatLastSeen(presence.lastSeen);
+    /*final lastText = presence.online
+        ? 'Just now'
+        : formatLastSeen(presence.lastSeen);*/ // ?*?
+				
+		final lastText = presence.online
+    ? 'ONLINE (${formatLastSeen(presence.lastSeen)})'
+    : 'OFFLINE (${formatLastSeen(presence.lastSeen)})';		
 
     return InkWell(
       borderRadius: BorderRadius.circular(22),
@@ -1080,10 +1367,8 @@ class _LocatorCard extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => PairingOptionsScreen(
-              locatorId: locatorId,
-              locatorName: name,
-            ),
+            builder: (_) =>
+                PairingOptionsScreen(locatorId: locatorId, locatorName: name),
           ),
         );
       },
@@ -1107,15 +1392,15 @@ class _LocatorCard extends StatelessWidget {
             _LocatorHeader(
               name: name,
               online: presence.online,
-              lastText: lastText,
+              lastText: lastText ,
               pulse: pulse,
             ),
             const SizedBox(height: 10),
             GridView.count(
               crossAxisCount: 2,
-              mainAxisSpacing: 4,//8,
-              crossAxisSpacing: 4,//8,
-              childAspectRatio: 3.15,//2.75,
+              mainAxisSpacing: 4, //8,
+              crossAxisSpacing: 4, //8,
+              childAspectRatio: 3.15, //2.75,
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               children: [
@@ -1123,7 +1408,9 @@ class _LocatorCard extends StatelessWidget {
                   icon: Icons.battery_full_rounded,
                   iconColor: _batteryColor(presence.battery),
                   label: 'Battery',
-                  value: presence.battery == null ? '--' : '${presence.battery}%',
+                  value: presence.battery == null
+                      ? '--'
+                      : '${presence.battery}%',
                 ),
                 _MetricTile(
                   icon: presence.gpsOn
@@ -1143,12 +1430,33 @@ class _LocatorCard extends StatelessWidget {
                       ? '--'
                       : '${presence.acc!.toStringAsFixed(0)} m',
                 ),
-                _MetricTile(
-                  icon: Icons.route_rounded,
-                  iconColor: const Color(0xFF8B5CF6),
-                  label: 'Distance',
-                  value: formatDistance(distance, presence.acc ?? 0),
-                ),
+                ValueListenableBuilder<_RequesterLocation?>(
+  valueListenable: myLocationNotifier,
+  builder: (context, myLoc, _) {
+    double? liveDistance;
+
+    if (myLoc != null &&
+        presence.lat != null &&
+        presence.lng != null) {
+      liveDistance = Geolocator.distanceBetween(
+        myLoc.lat,
+        myLoc.lng,
+        presence.lat!,
+        presence.lng!,
+      );
+    }
+
+    return _MetricTile(
+      icon: Icons.route_rounded,
+      iconColor: const Color(0xFF8B5CF6),
+      label: 'Distance',
+      value: formatDistance(
+        liveDistance,
+        presence.acc ?? 0,
+      ),
+    );
+  },
+),
               ],
             ),
             const SizedBox(height: 4),
@@ -1215,8 +1523,9 @@ class _LocatorHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final avatarBg = online ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2);
-    final avatarColor =
-        online ? const Color(0xFF16A34A) : const Color(0xFFEF4444);
+    final avatarColor = online
+        ? const Color(0xFF16A34A)
+        : const Color(0xFFEF4444);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -1224,15 +1533,8 @@ class _LocatorHeader extends StatelessWidget {
         Container(
           width: 46,
           height: 46,
-          decoration: BoxDecoration(
-            color: avatarBg,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            Icons.person_rounded,
-            color: avatarColor,
-            size: 27,
-          ),
+          decoration: BoxDecoration(color: avatarBg, shape: BoxShape.circle),
+          child: Icon(Icons.person_rounded, color: avatarColor, size: 27),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -1256,10 +1558,8 @@ class _LocatorHeader extends StatelessWidget {
                   online
                       ? AnimatedBuilder(
                           animation: pulse,
-                          builder: (context, child) => Transform.scale(
-                            scale: pulse.value,
-                            child: child,
-                          ),
+                          builder: (context, child) =>
+                              Transform.scale(scale: pulse.value, child: child),
                           child: Container(
                             width: 8,
                             height: 8,
@@ -1319,10 +1619,7 @@ class _LocatorHeader extends StatelessWidget {
           color: Colors.white,
           onSelected: (_) {},
           itemBuilder: (_) => const [
-            PopupMenuItem(
-              value: 'manage',
-              child: Text('Manage locator'),
-            ),
+            PopupMenuItem(value: 'manage', child: Text('Manage locator')),
           ],
         ),
       ],
@@ -1430,7 +1727,9 @@ class _LocationBox extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            hasLocation ? Icons.location_on_rounded : Icons.location_searching_rounded,
+            hasLocation
+                ? Icons.location_on_rounded
+                : Icons.location_searching_rounded,
             color: const Color(0xFF4F46E5),
             size: 21,
           ),
@@ -1524,9 +1823,7 @@ class _SectionHeader extends StatelessWidget {
 class _JoinGroupCard extends StatelessWidget {
   final VoidCallback onJoin;
 
-  const _JoinGroupCard({
-    required this.onJoin,
-  });
+  const _JoinGroupCard({required this.onJoin});
 
   @override
   Widget build(BuildContext context) {
@@ -1622,10 +1919,7 @@ class _CallMeCard extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(
-              Icons.call_rounded,
-              color: Color(0xFFDC2626),
-            ),
+            child: const Icon(Icons.call_rounded, color: Color(0xFFDC2626)),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1654,10 +1948,7 @@ class _CallMeCard extends StatelessWidget {
               ],
             ),
           ),
-          TextButton(
-            onPressed: onDismiss,
-            child: const Text('DISMISS'),
-          ),
+          TextButton(onPressed: onDismiss, child: const Text('DISMISS')),
         ],
       ),
     );
@@ -1668,10 +1959,7 @@ class _EmptyLocatorCard extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  const _EmptyLocatorCard({
-    required this.title,
-    required this.subtitle,
-  });
+  const _EmptyLocatorCard({required this.title, required this.subtitle});
 
   @override
   Widget build(BuildContext context) {
@@ -1737,9 +2025,7 @@ class _LoadingCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
-      child: const Center(
-        child: CircularProgressIndicator(),
-      ),
+      child: const Center(child: CircularProgressIndicator()),
     );
   }
 }
@@ -1796,4 +2082,10 @@ class _GroupQrScannerState extends State<_GroupQrScanner> {
       ),
     );
   }
+}
+class _RequesterLocation {
+  final double lat;
+  final double lng;
+
+  const _RequesterLocation(this.lat, this.lng);
 }
