@@ -26,8 +26,8 @@ class RequesterScreen extends StatefulWidget {
   State<RequesterScreen> createState() => _RequesterScreenState();
 }
 
-class _RequesterScreenState extends State<RequesterScreen>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {  String? requesterId;
+class _RequesterScreenState extends State<RequesterScreen> with SingleTickerProviderStateMixin {
+  String? requesterId;
   String? _groupId;
   String? _requesterDeviceId;
   String? _pendingRequestId; // şu an beklenen yeni request
@@ -45,7 +45,7 @@ class _RequesterScreenState extends State<RequesterScreen>
 
   Timer? _presenceUiTimer;
   Timer? _reqLocationTimer;
-Timer? _watchingHeartbeatTimer;
+
   late AnimationController _pulseController;
   late Animation<double> _pulse;
 
@@ -61,14 +61,14 @@ Timer? _watchingHeartbeatTimer;
   late final Stream<DatabaseEvent> _presenceStream;
 final Map<String, DateTime> _lastAutoReqAt = {};
   final Set<String> _watchedLocatorIds = {};
-	List<String> _visibleLocatorIds = [];
+	
 	final ValueNotifier<_RequesterLocation?> _myLocationNotifier =
     ValueNotifier(null);
 	
   @override
   void initState() {
     super.initState();
-WidgetsBinding.instance.addObserver(this);
+
     NotificationService.suppressForegroundAlerts = true;
 
     _pulseController = AnimationController(
@@ -89,14 +89,7 @@ WidgetsBinding.instance.addObserver(this);
       const Duration(seconds: 30),
       (_) => _getMyLocation(),
     );
-_watchingHeartbeatTimer = Timer.periodic(
-  const Duration(seconds: 30),
-  (_) {
-    if (_visibleLocatorIds.isEmpty) return;
-    _syncWatchingStatus(_visibleLocatorIds);
-		print("_visibleLocatorIds:$_visibleLocatorIds");
-  },
-);
+
     _initRequesterId();
     _loadMyName();
     _loadAlertSettings();
@@ -112,10 +105,8 @@ _watchingHeartbeatTimer = Timer.periodic(
 
     _presenceUiTimer?.cancel();
     _reqLocationTimer?.cancel();
-		_watchingHeartbeatTimer?.cancel();
     _callMeRtdbSub?.cancel();
     _pulseController.dispose();
-		WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -141,7 +132,7 @@ _watchingHeartbeatTimer = Timer.periodic(
     if (!mounted) return;
 
     if (gid == null) return;
-print("gid:$gid");
+
     final stream = RTDBService()
         .getGroupPresenceStream(gid)
         .asBroadcastStream();
@@ -238,8 +229,8 @@ if (_myLat != null && _myLng != null) {
     pos.latitude,
     pos.longitude,
   );
-print("moved:$moved");
-  //if (moved < 10) return;
+
+  if (moved < 10) return;
 }
 _myLat = pos.latitude;
 _myLng = pos.longitude;
@@ -501,29 +492,7 @@ String formatLastSeen(DateTime? lastSeen) {
       print(st);
     }
   }
-@override
-void didChangeAppLifecycleState(AppLifecycleState state) {
-  print("Requester lifecycle => $state");
 
-  if (state == AppLifecycleState.resumed) {
-    if (_watchingHeartbeatTimer?.isActive != true) {
-      _watchingHeartbeatTimer = Timer.periodic(
-        const Duration(seconds: 30),
-        (_) {
-          if (_visibleLocatorIds.isEmpty) return;
-          _syncWatchingStatus(_visibleLocatorIds);
-        },
-      );
-    }
-  }
-
-  if (state == AppLifecycleState.paused ||
-      state == AppLifecycleState.inactive ||
-      state == AppLifecycleState.detached) {
-    _watchingHeartbeatTimer?.cancel();
-    _watchingHeartbeatTimer = null;
-  }
-}
   void _showQrDialog(String groupId) {
     showDialog(
       context: context,
@@ -753,7 +722,6 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
   }
 
   void _syncWatchingStatus(List<String> locatorIds) {
-	print("_syncWatchingStatus called");
     if (_groupId == null || _groupId!.isEmpty) return;
     if (requesterId == null || requesterId!.isEmpty) return;
 
@@ -762,15 +730,15 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
     final toStart = next.difference(_watchedLocatorIds);
     final toStop = _watchedLocatorIds.difference(next);
 
-    for (final locatorId in next) {
-  RTDBService().setWatchingStatus(
-    groupId: _groupId!,
-    locatorId: locatorId,
-    requesterId: requesterId!,
-    requesterName: _currentRequesterName ?? "Requester",
-    isWatching: true,
-  );
-}
+    for (final locatorId in toStart) {
+      RTDBService().setWatchingStatus(
+        groupId: _groupId!,
+        locatorId: locatorId,
+        requesterId: requesterId!,
+        requesterName: _currentRequesterName ?? "Requester",
+        isWatching: true,
+      );
+    }
 
     for (final locatorId in toStop) {
       RTDBService().setWatchingStatus(
@@ -1025,12 +993,10 @@ void didChangeAppLifecycleState(AppLifecycleState state) {
 							parsePresenceMap: _parsePresenceMap,
 							presenceForLocator: _presenceForLocator,
 							onLocatorsVisible: (ids) {
-  _visibleLocatorIds = ids;
-
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    _syncWatchingStatus(ids);
-  });
-},
+								WidgetsBinding.instance.addPostFrameCallback((_) {
+									_syncWatchingStatus(ids);
+								});
+							},
 							onPresenceUpdated: (docs, presence) {
 								_autoWakeStaleLocators(
 									docs: docs,

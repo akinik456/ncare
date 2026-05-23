@@ -1,0 +1,444 @@
+
+REQUESTER_SCREEN GERÇEK MİMARİSİ
+
+Aslında dosya 5 ana sisteme ayrılıyor:
+
+1. BOOT / INIT SYSTEM
+
+Amaç:
+Requester ekranını ayağa kaldırmak.
+
+Akış
+initState
+↓
+_initRequesterId()
+↓
+_loadGroupId()
+↓
+_presenceStream hazırlanır
+↓
+UI canlı hale gelir
+
+İlgili alanlar:
+
+Kritik noktalar:
+
+requesterId
+groupId
+presenceStream
+requesterName
+
+Bu bölüm “ekranın kimliği”.
+
+2. REQUESTER SELF STATE SYSTEM
+
+Bu bölüm requester’ın kendi cihazını yönetiyor.
+
+İçerik
+requester location
+requester watching durumu
+alert preferences
+requester timers
+Kritik fonksiyon
+_getMyLocation()
+
+Bu:
+
+requester GPS okur
+distance hesaplarına temel olur
+locator card’lara reactive distance sağlar
+
+Şu an yaptığımız notifier optimizasyonu burada 😄
+
+3. LIVE PRESENCE ENGINE (DOSYANIN KALBİ)
+
+Bence dosyanın en kritik sistemi.
+
+Veri kaynakları
+Firestore
+
+Kim locator?
+
+groups/{gid}/locators
+RTDB
+
+Locator canlı mı?
+
+presence/{locatorId}
+Ana akış
+Firestore locator docs
++
+RTDB presence map
+↓
+_merge_
+↓
+presenceForLocator()
+↓
+LocatorCard
+
+Bunun merkezi:
+
+_presenceForLocator()
+
+Bu fonksiyon:
+RTDB raw map → typed UI model çeviriyor.
+
+Aslında mini “mapper layer”.
+
+4. AUTO WAKE SYSTEM
+
+Bu baya profesyonel olmuş brom 😄
+
+Amaç:
+
+Locator sessizleşirse
+↓
+Requester otomatik RL yollar
+↓
+Locator BG wake olur
+↓
+RTDB update gelir
+
+Ana fonksiyon:
+
+_autoWakeStaleLocators()
+
+Çalışma mantığı:
+
+lastSeen > 60sn
+↓
+90sn cooldown check
+↓
+_sendRequestToLocator()
+
+Bu sistem aslında:
+“presence watchdog”
+
+5. WATCHING SYSTEM
+
+Bence bu da çok önemli.
+
+Requester ekranı açıkken:
+
+Requester watching=true
+
+kapatınca:
+
+watching=false
+
+Locator böylece:
+
+biri onu izliyor mu
+fast mode gerekli mi
+
+anlayabiliyor.
+
+Merkez:
+
+_syncWatchingStatus()
+
+ve
+
+_clearWatchingStatus()
+
+Bu aslında requester → locator canlı etkileşim sistemi.
+
+UI MİMARİSİ
+
+Şimdi en önemli bölüm.
+
+Dosya aslında şöyle:
+
+RequesterScreen
+│
+├── AppBar
+├── JoinGroupCard
+├── CallMeCard
+├── SectionHeader
+├── LocatorQuickStrip
+└── LocatorList
+      │
+      ├── Firestore Stream
+      ├── RTDB Stream
+      ├── merge
+      └── LocatorCard[]
+
+Yani gerçek kalp:
+
+_LocatorList
+
+Çünkü burada:
+
+Firestore
+RTDB
+merge
+filtering
+visibility sync
+auto wake
+distance prep
+
+hepsi birleşiyor.
+
+EN KRİTİK 3 FONKSİYON
+
+Bence bunlar requester_screen’in “çekirdeği”.
+
+1.
+_presenceForLocator()
+
+RTDB → UI model
+
+2.
+_autoWakeStaleLocators()
+
+Sessiz locator recovery
+
+3.
+_LocatorList.build()
+
+Canlı veri orkestrasyonu
+
+BENCE SONRAKİ ADIM
+
+Artık flowchart çıkarabiliriz.
+
+Ama direkt 2090 satırın flowchart’ı değil.
+
+Önce:
+
+LEVEL-1 FLOWCHART
+
+yani:
+
+RequesterScreen açılır
+↓
+Identity yüklenir
+↓
+Group yüklenir
+↓
+Firestore locator stream
+↓
+RTDB presence stream
+↓
+Merge
+↓
+Locator UI render
+↓
+Auto wake stale locator
+↓
+Watching sync
+
+Sonra istersek:
+
+CallMe subsystem
+Pairing subsystem
+Presence subsystem
+Distance subsystem
+
+ayrı mini chart’lara böleriz.
+
+Ve dürüst olayım brom:
+bu dosya artık “Flutter screen” değil.
+Gerçek zamanlı state orchestration olmuş 😄
+
+*************
+RequesterScreen büyük resim.
+flowchart TD
+    A[RequesterScreen açılır] --> B[initState]
+    B --> C[_initRequesterId]
+    C --> D[_loadGroupId]
+    D --> E[RTDB presenceStream hazırlanır]
+
+    B --> F[_loadMyName]
+    B --> G[_loadAlertSettings]
+    B --> H[_getMyLocation timer başlar]
+
+    E --> I[build UI]
+    I --> J[Firestore locator listesi]
+    J --> K[_filterPairedLocators]
+    K --> L[RTDB presence stream]
+    L --> M[_parsePresenceMap]
+    M --> N[_presenceForLocator]
+
+    N --> O[_LocatorCard render]
+    O --> P[Battery / GPS / Accuracy / Distance / Location]
+
+    M --> Q[_autoWakeStaleLocators]
+    Q --> R[lastSeen stale mi?]
+    R -->|Evet| S[_sendRequestToLocator]
+    R -->|Hayır| T[Hiçbir şey yapma]
+
+    K --> U[_syncWatchingStatus]
+    U --> V[RTDB watching=true]
+
+    W[dispose] --> X[_clearWatchingStatus]
+    X --> Y[RTDB watching=false]
+		
+Bu chart dosyanın ana omurgası brom: init, streamler, 
+locator listesi, presence merge, card render, auto wake ve 
+watching cleanup. Bunlar dosyada initState, _loadGroupId, 
+_getMyLocation, _autoWakeStaleLocators, _LocatorList, 
+_presenceForLocator, _syncWatchingStatus ve 
+_clearWatchingStatus etrafında dönüyor.
+
+*******************		
+
+Live Presence Engine
+
+flowchart TD
+    A[RTDB presence stream gelir] --> B[_parsePresenceMap]
+
+    B --> C[presence map oluşur]
+
+    C --> D[_presenceForLocator]
+
+    D --> E[raw RTDB data parse edilir]
+
+    E --> F[
+        status
+        lat/lng
+        accuracy
+        battery
+        gpsEnabled
+        lastSeen
+    ]
+
+    F --> G[_LocatorPresence model]
+
+    G --> H[_LocatorCard]
+
+    H --> I[ONLINE/OFFLINE]
+    H --> J[Distance]
+    H --> K[Battery]
+    H --> L[GPS]
+    H --> M[Accuracy]
+    H --> N[LocationBox]
+
+    C --> O[_autoWakeStaleLocators]
+
+    O --> P[lastSeen kontrolü]
+
+    P -->|60s stale| Q[cooldown check]
+    Q -->|uygun| R[_sendRequestToLocator]
+    Q -->|değil| S[skip]
+
+    P -->|fresh| T[normal akış]
+		
+		Bu chart’ın kritik noktası şu brom:
+
+Requester aslında:
+
+locator listesini Firestore’dan alıyor
+canlı durumu RTDB’den alıyor
+sonra bunları merge ediyor
+
+Yani sistem:
+
+Firestore = kimler var
+RTDB = şu an durumları ne
+
+mantığında 😄
+
+Ve bence şu fonksiyon dosyanın en kritik dönüşüm noktası:
+
+_presenceForLocator()
+
+Çünkü:
+
+ham RTDB map
+→ typed UI model
+
+çevirisi burada oluyor.
+
+*************************
+
+REQUESTER_SCREEN SUBSYSTEM MAP
+
+flowchart TD
+
+    A[RequesterScreen]
+
+    A --> B[Boot / Identity Engine]
+    A --> C[Location Engine]
+    A --> D[Presence Engine]
+    A --> E[Auto Wake Engine]
+    A --> F[Watching Engine]
+    A --> G[CallMe Engine]
+    A --> H[Locator UI Engine]
+
+%% ---------------------------------------------------
+
+    B --> B1[_initRequesterId]
+    B --> B2[_loadGroupId]
+    B --> B3[_loadMyName]
+    B --> B4[_loadAlertSettings]
+
+%% ---------------------------------------------------
+
+    C --> C1[_getMyLocation]
+    C --> C2[_myLocationNotifier]
+    C --> C3[Distance updates]
+
+%% ---------------------------------------------------
+
+    D --> D1[_presenceStream]
+    D --> D2[_parsePresenceMap]
+    D --> D3[_presenceForLocator]
+    D --> D4[_LocatorPresence]
+
+%% ---------------------------------------------------
+
+    E --> E1[_autoWakeStaleLocators]
+    E --> E2[lastSeen check]
+    E --> E3[_sendRequestToLocator]
+
+%% ---------------------------------------------------
+
+    F --> F1[_syncWatchingStatus]
+    F --> F2[_clearWatchingStatus]
+    F --> F3[RTDB watching state]
+
+%% ---------------------------------------------------
+
+    G --> G1[_initCallMeLiveSync]
+    G --> G2[_dismissCallMe]
+    G --> G3[RTDB commands/call_me]
+
+%% ---------------------------------------------------
+
+    H --> H1[_LocatorList]
+    H --> H2[_LocatorCard]
+    H --> H3[_MetricTile]
+    H --> H4[_LocationBox]
+    H --> H5[_LocatorHeader]
+		
+*******************************
+
+Bu dosyanın kalbi _LocatorList
+Firestore + RTDB + UI merge orada. İlerde problem çıkarsa ilk 
+bakılacak yer burası.
+onLocatorsVisible build içinde çağrılıyor
+Şu an çalışır ama teorik olarak build sırasında side-effect. 
+Bunu ileride addPostFrameCallback ile zaten sardığın mantığa 
+benzer daha temiz hale getiririz.
+_autoWakeStaleLocators çok kritik
+Bu sistem iyi ama PS testte en çok loglanması gereken yer burası:
+lastSeen
+isStale
+cooldown
+RL sent
+_sendRequest() manuel eski akış gibi kalmış
+_selectedLocatorId kullanıyor. Yeni mantıkta “tüm locators 
+izleniyor” dediğimiz için bu fonksiyon ileride ya sadeleşir ya 
+kalkar.
+_myLat/_myLng artık legacy gibi kaldı
+Distance için notifier’a geçtik. İleride tamamen 
+_myLocationNotifier merkezli yapabiliriz.
+Bu dosya artık bölünebilir ama şimdi değil
+Şu an refactor yapmayalım. Önce flowchart + test + 
+davranış doğrulama. Sonra:
+RequesterLocationEngine
+RequesterPresenceEngine
+LocatorCardWidgets
+gibi ayırırız.
+

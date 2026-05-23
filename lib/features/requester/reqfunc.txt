@@ -28,6 +28,7 @@ class _RequesterScreenState extends State<RequesterScreen>
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _filterPairedLocators(
   Map<dynamic, dynamic> _parsePresenceMap(Object? value) {
   _LocatorPresence _presenceForLocator({
+	
 class _LocatorQuickStrip extends StatelessWidget {
 class _LocatorList extends StatelessWidget {
 class _LocatorCard extends StatelessWidget {

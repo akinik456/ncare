@@ -52,7 +52,9 @@ class _HomeScreenState extends State<HomeScreen> {
   String _watcherName = "";
   int _displayInterval = 30;
   
- 
+ Map? _latestWatchersData;
+Timer? _watchersFreshnessTimer;
+
 @override
 void initState() {
   super.initState();
@@ -90,48 +92,24 @@ void initState() {
   });
 }
 
-	Future<void> _initWatchersListener() async {
+Future<void> _initWatchersListener() async {
   _watchersRef = FirebaseDatabase.instance
-    .ref("presence/groups/${groupId}/active_watchers/${locatorId}");
+      .ref("presence/groups/$groupId/active_watchers/$locatorId");
 
-_watchersSubscription = _watchersRef?.onValue.listen((event) {
-  // 1. Veriyi çek ve Map'e çevir
-  final data = event.snapshot.value;
-  
-  if (data != null && data is Map) {
-	setState(() {
-		  _isBeingWatched = true;
-		  
-		  // Tüm isimleri bir listeye toplayalım
-		  List<String> nameList = [];
-		  data.values.forEach((v) {
-			if (v is Map && v["name"] != null) {
-			  nameList.add(v["name"].toString());
-			}
-		  });
+  _watchersFreshnessTimer?.cancel();
+  _watchersFreshnessTimer = Timer.periodic(
+    const Duration(seconds: 10),
+    (_) => _evaluateWatchers(),
+  );
 
-		  // İsimleri virgülle birleştir (Örn: "r23, Ahmet, Ayşe")
-		  if (nameList.length <= 2) {
-			_watcherName = nameList.join(", ");
-		  } else {
-			// Eğer 2'den fazlaysa: "r23, Ahmet +1 kişi" gibi şık göster
-			_watcherName = "${nameList[0]}, ${nameList[1]} +${nameList.length - 2} kişi";
-		  }
-		});
-  DeviceStateManager.setTrackingState(watched: true);
-  } else {
-    // 3. Veri yoksa veya boşsa durumu sıfırla
-    setState(() {
-      _isBeingWatched = false;
-      _watcherName = "";
-    });
-  // ZIRHLI GÜNCELLEME: İzleyici artık yok (false)
-  // Bu, vitesi hemen 1 saate çekmez, sadece "izleyici bitti" der.
-  // Eğer o sırada hareket (moving) varsa vites 30sn'de kalmaya devam eder.
-  DeviceStateManager.setTrackingState(watched: false);
-  }
-});
-}	
+  _watchersSubscription = _watchersRef?.onValue.listen((event) {
+    final data = event.snapshot.value;
+
+    _latestWatchersData = data is Map ? data : null;
+
+    _evaluateWatchers();
+  });
+}
 	Future<void> _initEverything() async {
     await _initLocatorId();
     await _loadLocatorName();
@@ -158,6 +136,49 @@ _watchersSubscription = _watchersRef?.onValue.listen((event) {
 	_watchersSubscription?.cancel();
     super.dispose();
   }
+	
+	void _evaluateWatchers() {
+  final data = _latestWatchersData;
+  final List<String> nameList = [];
+  final nowMs = DateTime.now().millisecondsSinceEpoch;
+  const watcherFreshMs = 60 * 1000;
+
+  if (data != null) {
+    data.values.forEach((v) {
+      if (v is Map) {
+        final atRaw = v["at"];
+        final atMs = atRaw is int ? atRaw : int.tryParse("$atRaw");
+        if (atMs == null) return;
+
+        if (nowMs - atMs >= watcherFreshMs) return;
+
+        if (v["name"] != null) {
+          nameList.add(v["name"].toString());
+        }
+      }
+    });
+  }
+
+  if (!mounted) return;
+
+  if (nameList.isNotEmpty) {
+    setState(() {
+      _isBeingWatched = true;
+      _watcherName = nameList.length <= 2
+          ? nameList.join(", ")
+          : "${nameList[0]}, ${nameList[1]} +${nameList.length - 2} kişi";
+    });
+
+    DeviceStateManager.setTrackingState(watched: true);
+  } else {
+    setState(() {
+      _isBeingWatched = false;
+      _watcherName = "";
+    });
+
+    DeviceStateManager.setTrackingState(watched: false);
+  }
+}
 
   Future<void> _initLocatorId() async {
     final id = await IdentityManager.getOrCreateDeviceId();
